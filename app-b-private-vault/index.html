@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#065F46" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Private Vault" />
+  <meta name="description" content="Private income and expense financial vault" />
+
+  <title>Private Vault</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Offline banner ────────────────────────────────────────────── -->
+  <div id="offline-banner" class="offline-banner hidden" role="status">
+    <span>📡</span>
+    <span>Offline — changes will sync when reconnected</span>
+  </div>
+
+  <!-- ── Main screen container ─────────────────────────────────────── -->
+  <main id="screen" role="main" aria-live="polite">
+    <div class="login-screen" id="initial-loader">
+      <div class="spinner" style="border-top-color:var(--primary)"></div>
+    </div>
+  </main>
+
+  <!-- ── Bottom navigation (hidden until authenticated + unlocked) ─── -->
+  <nav class="bottom-nav hidden" id="bottom-nav" role="navigation" aria-label="Main navigation">
+    <button class="nav-item active" data-screen="dashboard" aria-label="Dashboard">
+      <span class="nav-icon">💰</span>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" data-screen="transactions" aria-label="Transactions">
+      <span class="nav-icon">📋</span>
+      <span>Records</span>
+    </button>
+    <button class="nav-item" data-screen="analytics" aria-label="Analytics">
+      <span class="nav-icon">📊</span>
+      <span>Analytics</span>
+    </button>
+    <button class="nav-item" data-screen="settings" aria-label="Settings">
+      <span class="nav-icon">⚙️</span>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+</div><!-- #app -->
+
+<!-- ── App bootstrap ──────────────────────────────────────────────── -->
+<script type="module">
+  import { handleOAuthCallback, isAuthenticated, startOAuthFlow } from '../shared/auth.js';
+  import { initDriveFolders, initDataFile, initMirrorFile, readData } from '../shared/drive.js';
+  import { setCachedFinanceData, getCachedFinanceData, openDB } from '../shared/db.js';
+  import { navigate, initNav } from './js/router.js';
+  import { isPinSet, verifyPin } from './js/pin.js';
+  import { isOnline, onNetworkChange, showToast } from '../shared/utils.js';
+  import { CLIENT_ID, REDIRECT_URI } from './js/auth-config.js';
+  import { initInstallPrompt, showIOSInstallHint } from '../shared/pwa-install.js';
+  import { watchConnectivity } from '../shared/sync-queue.js';
+
+  // ── Background sync registration ──────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      if ('periodicSync' in reg) {
+        reg.periodicSync.register('drive-mirror-sync', { minInterval: 30 * 60 * 1000 }).catch(() => {});
+      }
+    }).catch(() => {});
+
+    navigator.serviceWorker.addEventListener('message', async (e) => {
+      if (e.data?.type === 'MIRROR_SYNC_REQUESTED') {
+        if (!isOnline() || !isAuthenticated()) return;
+        const cached = await getCachedFinanceData();
+        if (cached) {
+          const { writeMirrorSnapshot } = await import('../shared/drive.js');
+          writeMirrorSnapshot('finance', cached).catch(() => {});
+        }
+      }
+    });
+  }
+
+  // ── Offline banner ─────────────────────────────────────────────────
+  const banner = document.getElementById('offline-banner');
+  updateOfflineBanner(isOnline());
+  onNetworkChange((online) => {
+    updateOfflineBanner(online);
+    if (online) showToast('Back online — syncing...', 'success');
+  });
+  function updateOfflineBanner(online) {
+    banner.classList.toggle('hidden', online);
+  }
+
+  // ── PIN timeout (lock after 5 min background) ─────────────────────
+  let lockTimer = null;
+  let appUnlocked = false;
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      lockTimer = setTimeout(() => {
+        appUnlocked = false;
+        if (isAuthenticated()) showPinLock();
+      }, 5 * 60 * 1000);
+    } else {
+      clearTimeout(lockTimer);
+    }
+  });
+
+  // ── Boot sequence ──────────────────────────────────────────────────
+  async function boot() {
+    try {
+      // Handle OAuth callback
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('code') || urlParams.has('error')) {
+        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+      }
+
+      if (!isAuthenticated()) {
+        showLogin();
+        return;
+      }
+
+      await openDB();
+
+      // Show PIN lock or setup
+      if (!isPinSet()) {
+        // First time: set up PIN
+        showPinSetup();
+        return;
+      }
+
+      if (!appUnlocked) {
+        showPinLock();
+        return;
+      }
+
+      await loadAndShowApp();
+
+    } catch (err) {
+      console.error('Boot error:', err);
+      showLogin();
+    }
+  }
+
+  async function loadAndShowApp() {
+    const cached = await getCachedFinanceData();
+    if (cached) showApp();
+
+    if (isOnline()) {
+      try {
+        await initDriveFolders();
+        await initDataFile('finance');
+        await initMirrorFile('finance');
+        const { data } = await readData('finance');
+        await setCachedFinanceData(data);
+        showApp();
+      } catch (err) {
+        if (err.message === 'Authentication required') {
+          showLogin();
+        } else if (cached) {
+          showToast('Using cached data', 'warning');
+        } else {
+          showError(err.message);
+        }
+      }
+    } else if (!cached) {
+      showError('No cached data. Please connect to the internet first.');
+    }
+  }
+
+  function showLogin() {
+    const screen = document.getElementById('screen');
+    screen.innerHTML = `
+      <div class="login-screen fade-in">
+        <div class="login-logo">🔐</div>
+        <h1 class="login-title">Private Vault</h1>
+        <p class="login-subtitle">Your personal finance tracker<br>Private, secure, PIN-protected</p>
+        <button class="google-signin-btn" id="signin-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Sign in with Google
+        </button>
+      </div>
+    `;
+    document.getElementById('signin-btn').addEventListener('click', () => {
+      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
+    });
+  }
+
+  function showPinLock() {
+    const { renderPinLock } = import('./js/screens/pin-lock.js').then(m => {
+      m.renderPinLock(document.getElementById('screen'), {
+        onSuccess: async () => {
+          appUnlocked = true;
+          await loadAndShowApp();
+        },
+        onForgot: () => showLogin()
+      });
+    });
+  }
+
+  function showPinSetup() {
+    import('./js/screens/pin-lock.js').then(m => {
+      m.renderPinSetup(document.getElementById('screen'), {
+        onComplete: async () => {
+          appUnlocked = true;
+          await loadAndShowApp();
+        }
+      });
+    });
+  }
+
+  function showApp() {
+    document.getElementById('bottom-nav').classList.remove('hidden');
+    initNav();
+    navigate('dashboard');
+    initInstallPrompt('Private Vault', '#065F46');
+    showIOSInstallHint('Private Vault');
+    watchConnectivity(({ processed, failed }) => {
+      if (processed > 0) showToast(`Synced ${processed} pending change${processed > 1 ? 's' : ''}`, 'success');
+      if (failed   > 0) showToast(`${failed} change${failed > 1 ? 's' : ''} failed to sync`, 'error');
+    });
+  }
+
+  function showError(msg) {
+    document.getElementById('screen').innerHTML = `
+      <div class="login-screen">
+        <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+        <p style="color:var(--danger);font-weight:600;text-align:center;padding:0 24px;">${msg}</p>
+        <button class="btn btn-primary" style="margin-top:24px;" onclick="window.location.reload()">Retry</button>
+      </div>
+    `;
+  }
+
+  window.addEventListener('auth:required', () => {
+    appUnlocked = false;
+    document.getElementById('bottom-nav').classList.add('hidden');
+    showLogin();
+  });
+
+  boot();
+</script>
+
+</body>
+</html>
