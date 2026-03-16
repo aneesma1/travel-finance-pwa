@@ -18,7 +18,7 @@
 // REDIRECT_URI will keep working without any changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com';
+export const CLIENT_ID = '36787254386-o0pikuppj1ebcceh4qrjofu3fvqch6bo.apps.googleusercontent.com';
 
 function detectRedirectUri() {
   const loc = window.location;

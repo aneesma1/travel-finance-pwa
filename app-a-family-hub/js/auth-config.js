@@ -27,7 +27,7 @@
 // The REDIRECT_URI below is auto-detected from window.location — no hardcoding.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com';
+export const CLIENT_ID = '36787254386-o0pikuppj1ebcceh4qrjofu3fvqch6bo.apps.googleusercontent.com';
 
 // Auto-detects current origin + path — works regardless of where folder is moved
 // e.g. http://localhost:8080/app-a-family-hub/
