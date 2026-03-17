@@ -3,15 +3,15 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../shared/db.js';
+import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
 import {
   writeData, downloadLocalBackup, restoreFromLocalFile,
   getMirrorSnapshots, restoreFromMirror, readData
-} from '../../shared/drive.js';
-import { clearAuth, getUser } from '../../shared/auth.js';
+} from '../../../shared/drive.js';
+import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
-import { uuidv4, formatDisplayDate, showToast, isOnline } from '../../shared/utils.js';
-import { renderImportTool } from '../../shared/import-tool.js';
+import { uuidv4, formatDisplayDate, showToast, isOnline } from '../../../shared/utils.js';
+import { renderImportTool } from '../../../shared/import-tool.js';
 
 const MEMBER_EMOJIS  = ['👤','👨','👩','🧑','👦','👧','🧔','👱','🧒'];
 const MEMBER_COLORS  = ['#EEF2FF','#D1FAE5','#FEF3C7','#FCE7F3','#E0F2FE','#F3E8FF'];
@@ -289,139 +289,5 @@ function openImportModal(container, data, members) {
   toolContainer.addEventListener('import:complete', () => {
     modal.classList.add('hidden');
     navigate('travel-log');
-  });
-}
-  const modal = document.getElementById('member-modal');
-  modal.classList.remove('hidden');
-
-  getCachedTravelData().then(data => {
-    const { members = [] } = data || {};
-    const existing = memberId ? members.find(m => m.id === memberId) : null;
-    const state = {
-      name:  existing?.name  || '',
-      emoji: existing?.emoji || '👤',
-      color: existing?.color || MEMBER_COLORS[0]
-    };
-
-    modal.innerHTML = `
-      <div class="modal-sheet">
-        <div class="modal-handle"></div>
-        <div style="padding:0 20px 24px;">
-          <div style="font-size:17px;font-weight:700;margin-bottom:20px;">${existing ? 'Edit Member' : 'Add Member'}</div>
-
-          <div class="form-group">
-            <label class="form-label">Name</label>
-            <input type="text" class="form-input" id="member-name" value="${state.name}" placeholder="Family member name" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Avatar</label>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;" id="emoji-grid">
-              ${MEMBER_EMOJIS.map(e => `
-                <button type="button" style="
-                  width:44px;height:44px;border-radius:50%;font-size:22px;
-                  border:2px solid ${state.emoji === e ? 'var(--primary)' : 'transparent'};
-                  background:${state.emoji === e ? 'var(--primary-bg)' : 'var(--surface-3)'};
-                  cursor:pointer;
-                " data-emoji="${e}">${e}</button>
-              `).join('')}
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Color</label>
-            <div style="display:flex;gap:8px;">
-              ${MEMBER_COLORS.map(c => `
-                <button type="button" style="
-                  width:36px;height:36px;border-radius:50%;background:${c};
-                  border:2px solid ${state.color === c ? 'var(--primary)' : 'transparent'};
-                  cursor:pointer;
-                " data-color="${c}"></button>
-              `).join('')}
-            </div>
-          </div>
-
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            ${existing ? `<button class="btn btn-danger" style="flex:1;" id="delete-member-btn">Delete</button>` : ''}
-            <button class="btn btn-primary" style="flex:2;" id="save-member-btn">
-              ${existing ? 'Save Changes' : 'Add Member'}
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Emoji selection
-    modal.querySelectorAll('[data-emoji]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.emoji = btn.dataset.emoji;
-        modal.querySelectorAll('[data-emoji]').forEach(b => {
-          b.style.border = `2px solid ${b.dataset.emoji === state.emoji ? 'var(--primary)' : 'transparent'}`;
-          b.style.background = b.dataset.emoji === state.emoji ? 'var(--primary-bg)' : 'var(--surface-3)';
-        });
-      });
-    });
-
-    // Color selection
-    modal.querySelectorAll('[data-color]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.color = btn.dataset.color;
-        modal.querySelectorAll('[data-color]').forEach(b => {
-          b.style.border = `2px solid ${b.dataset.color === state.color ? 'var(--primary)' : 'transparent'}`;
-        });
-      });
-    });
-
-    // Save member
-    document.getElementById('save-member-btn').addEventListener('click', async () => {
-      const name = document.getElementById('member-name').value.trim();
-      if (!name) { showToast('Please enter a name', 'warning'); return; }
-
-      const memberData = {
-        id:    existing?.id || uuidv4(),
-        name, emoji: state.emoji, color: state.color
-      };
-
-      try {
-        const newData = await writeData('travel', (remote) => {
-          const mems = remote.members || [];
-          if (existing) {
-            const idx = mems.findIndex(m => m.id === memberData.id);
-            if (idx > -1) mems[idx] = memberData;
-            else mems.push(memberData);
-          } else {
-            mems.push(memberData);
-          }
-          return { ...remote, members: mems };
-        });
-        await setCachedTravelData(newData);
-        showToast(existing ? 'Member updated!' : 'Member added!', 'success');
-        modal.classList.add('hidden');
-        renderSettings(document.querySelector('#screen'));
-      } catch {
-        showToast('Save failed', 'error');
-      }
-    });
-
-    // Delete member
-    document.getElementById('delete-member-btn')?.addEventListener('click', async () => {
-      if (!confirm(`Delete ${existing.name}? Their trip and document records will be kept.`)) return;
-      try {
-        const newData = await writeData('travel', (remote) => ({
-          ...remote,
-          members: (remote.members || []).filter(m => m.id !== memberId)
-        }));
-        await setCachedTravelData(newData);
-        showToast('Member removed', 'success');
-        modal.classList.add('hidden');
-        renderSettings(document.querySelector('#screen'));
-      } catch {
-        showToast('Delete failed', 'error');
-      }
-    });
-
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.classList.add('hidden');
-    });
   });
 }

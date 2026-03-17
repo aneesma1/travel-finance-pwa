@@ -3,14 +3,14 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
-import { writeData } from '../../shared/drive.js';
+import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
+import { writeData } from '../../../shared/drive.js';
 import { navigate } from '../router.js';
 import {
   formatDisplayDate, daysBetween, currentYear,
   getHashParams, setHashParams, clearHashParams,
   showToast, isOnline
-} from '../../shared/utils.js';
+} from '../../../shared/utils.js';
 
 export async function renderTravelLog(container, params = {}) {
   container.innerHTML = `

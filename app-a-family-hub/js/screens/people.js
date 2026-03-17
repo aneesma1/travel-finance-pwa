@@ -3,9 +3,9 @@
 
 'use strict';
 
-import { getCachedTravelData } from '../../shared/db.js';
+import { getCachedTravelData } from '../../../shared/db.js';
 import { navigate } from '../router.js';
-import { daysFromToday, expiryStatus, expiryStatusColor, today, showToast } from '../../shared/utils.js';
+import { daysFromToday, expiryStatus, expiryStatusColor, today, showToast } from '../../../shared/utils.js';
 import { buildFamilyGroups, getMemberRelations } from '../relation-engine.js';
 
 export async function renderPeople(container) {

@@ -4,10 +4,10 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
-import { writeData } from '../../shared/drive.js';
+import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
+import { writeData } from '../../../shared/drive.js';
 import { navigate } from '../router.js';
-import { uuidv4, showToast, copyToClipboard } from '../../shared/utils.js';
+import { uuidv4, showToast, copyToClipboard } from '../../../shared/utils.js';
 import {
   RELATIONS, addRelation, removeRelation, getMemberRelations,
   resolveReverse, buildRelationEmergencyContacts, layoutFamilyTree

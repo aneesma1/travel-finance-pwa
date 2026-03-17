@@ -4,10 +4,10 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
-import { writeData } from '../../shared/drive.js';
+import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
+import { writeData } from '../../../shared/drive.js';
 import { navigate } from '../router.js';
-import { uuidv4, showToast, copyToClipboard, today, daysFromToday, expiryStatus, expiryStatusColor } from '../../shared/utils.js';
+import { uuidv4, showToast, copyToClipboard, today, daysFromToday, expiryStatus, expiryStatusColor } from '../../../shared/utils.js';
 
 const BLOOD_GROUPS    = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
 const RELATIONSHIPS   = ['Spouse','Father','Mother','Brother','Sister','Son','Daughter','Friend','Doctor','Colleague','Other'];
