@@ -110,7 +110,7 @@ export async function renderSettings(container) {
   `;
 
   renderMembersList(members);
-  bindEvents(members, data);
+  bindEvents(members, data, container);
 }
 
 function renderMembersList(members) {
@@ -132,12 +132,12 @@ function renderMembersList(members) {
   `).join('');
 
   list.querySelectorAll('[data-edit-member]').forEach(btn => {
-    btn.addEventListener('click', () => openMemberModal(btn.dataset.editMember));
+    btn.addEventListener('click', () => navigate('person-profile', { memberId: btn.dataset.editMember, mode: 'view' }));
   });
 }
 
-function bindEvents(members, data) {
-  document.getElementById('add-member-btn').addEventListener('click', () => openMemberModal(null));
+function bindEvents(members, data, container) {
+  document.getElementById('add-member-btn').addEventListener('click', () => navigate('person-profile', { mode: 'new' }));
   document.getElementById('signout-btn').addEventListener('click', () => {
     if (confirm('Sign out? You will need to sign in again to sync data.')) {
       clearAuth();

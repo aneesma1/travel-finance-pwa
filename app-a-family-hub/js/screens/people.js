@@ -3,9 +3,9 @@
 
 'use strict';
 
-import { getCachedTravelData } from '../../../shared/db.js';
+import { getCachedTravelData } from '../../shared/db.js';
 import { navigate } from '../router.js';
-import { daysFromToday, expiryStatus, expiryStatusColor, today, showToast } from '../../../shared/utils.js';
+import { daysFromToday, expiryStatus, expiryStatusColor, today, showToast } from '../../shared/utils.js';
 import { buildFamilyGroups, getMemberRelations } from '../relation-engine.js';
 
 export async function renderPeople(container) {
@@ -216,141 +216,6 @@ function buildMemberCard(member, trips, documents, relations, familyDefaults) {
 }
 
 
-export async function renderPeople(container) {
-  container.innerHTML = `
-    <div class="app-header">
-      <span class="app-header-title">👥 People</span>
-      <div style="display:flex;gap:8px;">
-        <button class="app-header-action" id="export-pdf-btn" title="Export contact cards">📄</button>
-        <button class="app-header-action" id="refresh-btn">🔄</button>
-      </div>
-    </div>
-    <div id="people-content" style="padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:80px;">
-      <div style="display:flex;justify-content:center;padding:40px 0;"><div class="spinner"></div></div>
-    </div>
-    <button class="fab" id="add-person-fab" title="Add person">＋</button>
-  `;
-
-  document.getElementById('add-person-fab').addEventListener('click', () => navigate('person-profile', { mode: 'new' }));
-  document.getElementById('refresh-btn').addEventListener('click', () => renderPeople(container));
-  document.getElementById('export-pdf-btn').addEventListener('click', () => openPdfExportModal(container));
-
-  const data = await getCachedTravelData();
-  if (!data) { renderEmpty(); return; }
-
-  const { members = [], trips = [], documents = [] } = data;
-  const content = document.getElementById('people-content');
-
-  if (!members.length) {
-    content.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">👥</div>
-        <div class="empty-state-title">No family members yet</div>
-        <div class="empty-state-text">Tap + to add the first family member profile</div>
-      </div>`;
-    return;
-  }
-
-  content.innerHTML = members.map(member => buildMemberCard(member, trips, documents)).join('');
-
-  content.querySelectorAll('.member-card[data-id]').forEach(card => {
-    card.addEventListener('click', () => navigate('person-profile', { memberId: card.dataset.id, mode: 'view' }));
-  });
-}
-
-function buildMemberCard(member, trips, documents) {
-  // Current location
-  const memberTrips = trips.filter(t => t.personId === member.id)
-    .sort((a,b) => new Date(b.dateOutIndia) - new Date(a.dateOutIndia));
-  const latest = memberTrips[0];
-  let location = 'India', locationColor = '#FEE2E2', locationTextColor = '#991B1B';
-  if (latest?.dateInQatar && !latest?.dateOutQatar) {
-    location = 'Qatar'; locationColor = '#FEF9C3'; locationTextColor = '#854D0E';
-  }
-
-  // Documents
-  const memberDocs = documents.filter(d => d.personId === member.id);
-  const urgentDocs = memberDocs.filter(d => {
-    const s = expiryStatus(d.expiryDate);
-    return s === 'danger' || s === 'expired';
-  });
-  const nextExpiry = memberDocs
-    .map(d => ({ ...d, daysLeft: daysFromToday(d.expiryDate) }))
-    .filter(d => d.daysLeft !== null && d.daysLeft >= 0)
-    .sort((a,b) => a.daysLeft - b.daysLeft)[0];
-
-  const hasPhoto = member.photo && member.photo.startsWith('data:');
-
-  return `
-    <div class="member-card card fade-in" data-id="${member.id}" style="cursor:pointer;padding:0;overflow:hidden;">
-      <div style="display:flex;align-items:center;gap:14px;padding:16px;">
-
-        <!-- Avatar / Photo -->
-        <div style="width:60px;height:60px;border-radius:50%;flex-shrink:0;overflow:hidden;
-          background:${member.color || '#EEF2FF'};
-          display:flex;align-items:center;justify-content:center;font-size:28px;
-          border:2px solid var(--border);">
-          ${hasPhoto
-            ? `<img src="${member.photo}" style="width:100%;height:100%;object-fit:cover;" />`
-            : member.emoji || '👤'}
-        </div>
-
-        <div style="flex:1;min-width:0;">
-          <!-- Name + location -->
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span style="font-size:17px;font-weight:700;color:var(--text);">${member.name}</span>
-            <span style="background:${locationColor};color:${locationTextColor};
-              padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;">
-              ${location === 'Qatar' ? '🇶🇦' : '🇮🇳'} ${location}
-            </span>
-            ${urgentDocs.length > 0 ? `<span style="background:var(--danger-bg);color:var(--danger);
-              padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">⚠️ ${urgentDocs.length} doc</span>` : ''}
-          </div>
-
-          <!-- Personal info pills -->
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;">
-            ${member.bloodGroup ? `<span style="font-size:11px;color:var(--danger);font-weight:700;background:var(--danger-bg);padding:2px 8px;border-radius:6px;">🩸 ${member.bloodGroup}</span>` : ''}
-            ${member.occupation ? `<span style="font-size:11px;color:var(--text-muted);">💼 ${member.occupation}</span>` : ''}
-            ${member.phone ? `<span style="font-size:11px;color:var(--text-muted);">📞 ${member.phone}</span>` : ''}
-          </div>
-
-          <!-- Next expiry -->
-          ${nextExpiry ? `
-            <div style="font-size:11px;color:${expiryStatusColor(expiryStatus(nextExpiry.expiryDate))};margin-top:4px;font-weight:600;">
-              ${nextExpiry.docName}: ${nextExpiry.daysLeft}d left
-            </div>` : ''}
-        </div>
-
-        <!-- Emergency contacts count -->
-        <div style="text-align:center;flex-shrink:0;">
-          <div style="font-size:18px;font-weight:700;color:var(--primary);">
-            ${(member.emergencyContacts || []).length}
-          </div>
-          <div style="font-size:10px;color:var(--text-muted);font-weight:500;">Contacts</div>
-        </div>
-        <span style="color:var(--text-muted);font-size:16px;">›</span>
-      </div>
-
-      <!-- Location row if addresses set -->
-      ${(member.homeQatar?.address || member.homeIndia?.address) ? `
-        <div style="background:var(--surface-3);padding:8px 16px;border-top:1px solid var(--border-light);
-          display:flex;gap:12px;overflow:hidden;">
-          ${member.homeQatar?.address ? `
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:1px;">🇶🇦 Qatar</div>
-              <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${member.homeQatar.label || member.homeQatar.address}</div>
-            </div>` : ''}
-          ${member.homeIndia?.address ? `
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:1px;">🇮🇳 India</div>
-              <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${member.homeIndia.label || member.homeIndia.address}</div>
-            </div>` : ''}
-        </div>` : ''}
-    </div>
-  `;
-}
-
-// ── PDF Export Modal ──────────────────────────────────────────────────────────
 async function openPdfExportModal(container) {
   const data = await getCachedTravelData();
   if (!data?.members?.length) { showToast('No members to export', 'warning'); return; }

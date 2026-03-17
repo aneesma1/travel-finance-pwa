@@ -4,10 +4,10 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
+import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
+import { writeData } from '../../shared/drive.js';
 import { navigate } from '../router.js';
-import { uuidv4, showToast, copyToClipboard } from '../../../shared/utils.js';
+import { uuidv4, showToast, copyToClipboard } from '../../shared/utils.js';
 import {
   RELATIONS, addRelation, removeRelation, getMemberRelations,
   resolveReverse, buildRelationEmergencyContacts, layoutFamilyTree
@@ -529,8 +529,8 @@ export async function renderFamilyDefaults(container) {
       btn.addEventListener('click', () => {
         const [fromId, toId] = btn.dataset.delRel.split('|');
         if (!confirm('Remove this relationship (both directions)?')) return;
-        const { removeRelation: rr } = { removeRelation: (rels, f, t) => rels.filter(r => !(r.fromId === f && r.toId === t) && !(r.fromId === t && r.toId === f)) };
-        draftRelations = rr(draftRelations, fromId, toId);
+        // use imported removeRelation
+        draftRelations = removeRelation(draftRelations, fromId, toId);
         renderTab();
       });
     });

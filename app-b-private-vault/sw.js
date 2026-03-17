@@ -28,10 +28,6 @@ const STATIC_ASSETS = [
   '../shared/sync-queue.js',
   'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap',
 ];
-  '../shared/pill-select.js',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono&display=swap',
-];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
