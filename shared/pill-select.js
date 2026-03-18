@@ -1,3 +1,4 @@
+// v2.1 — 2026-03-18
 // ─── shared/pill-select.js ───────────────────────────────────────────────────
 // PillSelect: tappable pill button selector — single or multi select
 // Usage: new PillSelect(containerEl, { options, selected, multi, onSelect, color })

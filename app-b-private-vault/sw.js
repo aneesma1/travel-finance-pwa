@@ -1,3 +1,4 @@
+// v2.1 — 2026-03-18
 // ─── app-b-private-vault/sw.js ───────────────────────────────────────────────
 // Service Worker for Private Vault PWA
 

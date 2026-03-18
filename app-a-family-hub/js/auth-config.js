@@ -1,3 +1,4 @@
+// v2.1 — 2026-03-18
 // ─── app-a-family-hub/js/auth-config.js ─────────────────────────────────────
 // Google OAuth client configuration for App A
 //

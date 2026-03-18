@@ -1,3 +1,4 @@
+// v2.1 — 2026-03-18
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
 

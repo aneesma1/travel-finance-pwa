@@ -1,3 +1,4 @@
+// v2.1 — 2026-03-18
 // ─── app-a-family-hub/js/screens/people.js ──────────────────────────────────
 // People tab — grouped family view, Family Defaults button, member cards
 

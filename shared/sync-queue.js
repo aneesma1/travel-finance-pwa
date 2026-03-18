@@ -1,3 +1,4 @@
+// v2.1 — 2026-03-18
 // ─── shared/sync-queue.js ────────────────────────────────────────────────────
 // Offline sync queue processor
 // When writes fail offline, they're stored in IndexedDB.
