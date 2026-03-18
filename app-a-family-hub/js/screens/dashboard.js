@@ -1,4 +1,4 @@
-// v2.2 — 2026-03-18
+// v2.3 — 2026-03-18
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
 // Shows: live status per member, days in location, next doc expiry, filter bar

@@ -1,4 +1,4 @@
-// v2.2 — 2026-03-18
+// v2.3 — 2026-03-18
 // ─── shared/auth.js ──────────────────────────────────────────────────────────
 // Google OAuth 2.0 PKCE flow — no client secret, browser-safe
 // Used by both App A and App B

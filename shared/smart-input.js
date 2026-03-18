@@ -1,4 +1,4 @@
-// v2.2 — 2026-03-18
+// v2.3 — 2026-03-18
 // ─── shared/smart-input.js ───────────────────────────────────────────────────
 // SmartInput: text field with real-time pill suggestions from historical data
 // Usage: new SmartInput(containerEl, { suggestions: [], onSelect, onInput, placeholder })

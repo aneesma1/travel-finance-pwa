@@ -1,4 +1,4 @@
-<!-- version: v2.2 — 2026-03-18 -->
+<!-- version: v2.3 — 2026-03-18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -109,11 +109,17 @@
     try {
       // 1. Handle OAuth callback if present
       const urlParams = new URLSearchParams(window.location.search);
+      console.log('Boot: URL params:', window.location.href);
+      console.log('Boot: has code:', urlParams.has('code'));
+      console.log('Boot: has error:', urlParams.has('error'));
       if (urlParams.has('code') || urlParams.has('error')) {
+        console.log('Boot: handling OAuth callback...');
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+        console.log('Boot: callback handled, isAuthenticated:', isAuthenticated());
       }
 
       // 2. Check auth
+      console.log('Boot: isAuthenticated:', isAuthenticated());
       if (!isAuthenticated()) {
         showLogin();
         return;
@@ -156,6 +162,8 @@
 
     } catch (err) {
       console.error('Boot error:', err);
+      console.error('Boot error message:', err.message);
+      console.error('Boot error stack:', err.stack);
       showLogin();
     }
   }

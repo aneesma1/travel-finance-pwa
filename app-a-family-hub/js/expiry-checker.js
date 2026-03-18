@@ -1,4 +1,4 @@
-// v2.2 — 2026-03-18
+// v2.3 — 2026-03-18
 // ─── app-a-family-hub/js/expiry-checker.js ──────────────────────────────────
 // Expiry alert system
 // Runs on every app load:
