@@ -1,4 +1,4 @@
-// v2.1 — 2026-03-18
+// v2.2 — 2026-03-18
 // ─── app-b-private-vault/js/pin.js ──────────────────────────────────────────
 // PIN management for Private Vault
 // SHA-256 hash, 5-attempt lockout, 30-second cooldown

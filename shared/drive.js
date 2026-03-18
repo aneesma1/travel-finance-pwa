@@ -1,4 +1,4 @@
-// v2.1 — 2026-03-18
+// v2.2 — 2026-03-18
 // ─── shared/drive.js ─────────────────────────────────────────────────────────
 // Google Drive API wrapper
 // Handles: folder creation, file create/fetch/update, ETag conflict detection,

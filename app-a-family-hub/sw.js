@@ -1,4 +1,4 @@
-// v2.1 — 2026-03-18
+// v2.2 — 2026-03-18
 // ─── app-a-family-hub/sw.js ──────────────────────────────────────────────────
 // Service Worker for Family Hub PWA
 // Handles: static asset caching, offline fallback, background Drive sync

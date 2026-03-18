@@ -1,4 +1,4 @@
-// v2.1 — 2026-03-18
+// v2.2 — 2026-03-18
 // ─── shared/auth.js ──────────────────────────────────────────────────────────
 // Google OAuth 2.0 PKCE flow — no client secret, browser-safe
 // Used by both App A and App B
@@ -85,8 +85,8 @@ export async function startOAuthFlow(clientId, redirectUri) {
   const verifier  = generateRandomString(64);
   const challenge = await generateCodeChallenge(verifier);
 
-  // Store verifier for later exchange
-  sessionStorage.setItem(PKCE_KEY, verifier);
+  // Store verifier — use localStorage so it survives PWA session boundaries
+  localStorage.setItem(PKCE_KEY, verifier);
 
   const params = new URLSearchParams({
     client_id:             clientId,
@@ -110,7 +110,7 @@ export async function handleOAuthCallback(clientId, redirectUri) {
   if (error) throw new Error(`OAuth error: ${error}`);
   if (!code)  return null; // Not a callback
 
-  const verifier = sessionStorage.getItem(PKCE_KEY);
+  const verifier = localStorage.getItem(PKCE_KEY);
   if (!verifier) throw new Error('PKCE verifier missing. Please sign in again.');
 
   // Exchange code for tokens

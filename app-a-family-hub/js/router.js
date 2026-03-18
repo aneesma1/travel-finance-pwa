@@ -1,4 +1,4 @@
-// v2.1 — 2026-03-18
+// v2.2 — 2026-03-18
 // ─── app-a-family-hub/js/router.js ──────────────────────────────────────────
 // Client-side router for Family Hub
 // Manages screen transitions and bottom nav state

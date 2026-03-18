@@ -1,4 +1,4 @@
-// v2.1 — 2026-03-18
+// v2.2 — 2026-03-18
 // ─── app-a-family-hub/js/screens/person-profile.js ──────────────────────────
 // Full person profile with 4 tabs:
 // Profile | Locations | Emergency | Documents
