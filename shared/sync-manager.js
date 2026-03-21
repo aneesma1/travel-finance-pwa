@@ -1,6 +1,6 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/sync-manager.js ──────────────────────────────────────────────────
-// Core of Phase 3 — Local-first architecture
+// Core of Phase 3 -- Local-first architecture
 // Handles: sequential Drive writes, pending queue, write-ahead safety,
 //          boot integrity checks, sync status broadcasting
 
@@ -29,7 +29,7 @@ async function loadQueue() {
     if (stored && stored.length > 0) {
       _queue = stored;
     } else {
-      // IndexedDB empty (possibly cleared) — try Drive-side queue
+      // IndexedDB empty (possibly cleared) -- try Drive-side queue
       const driveQueue = await readDriveQueue().catch(() => null);
       _queue = driveQueue || [];
       if (_queue.length > 0) {
@@ -45,7 +45,7 @@ async function saveQueue() {
     const serialisable = _queue.map(({ id, appName, queuedAt, status, dataSnapshot }) =>
       ({ id, appName, queuedAt, status, dataSnapshot }));
     await setAppState('syncQueue', serialisable);
-    // Also write to Drive queue file (non-blocking — best effort)
+    // Also write to Drive queue file (non-blocking -- best effort)
     writeDriveQueue(serialisable).catch(() => {});
   } catch { /* non-blocking */ }
 }
@@ -90,7 +90,7 @@ async function readDriveQueue() {
 // ── Public: enqueue a local-first save ───────────────────────────────────────
 // Call this instead of writeData() directly from screens
 export async function localSave(appName, mergeFn) {
-  // ① Write to IndexedDB immediately — user sees result in <10ms
+  // ① Write to IndexedDB immediately -- user sees result in <10ms
   const current = appName === 'travel'
     ? await getCachedTravelData()
     : await getCachedFinanceData();
@@ -137,7 +137,7 @@ export async function processDriveQueue() {
       // Write-ahead: mark safe file before touching main file
       await writeSafeSnapshot(op.appName, op.dataSnapshot);
 
-      // Drive write — use snapshot directly (already merged locally)
+      // Drive write -- use snapshot directly (already merged locally)
       const newData = await writeData(op.appName, () => op.dataSnapshot);
 
       // Update local cache with server-confirmed version
@@ -270,7 +270,7 @@ export async function getPendingCount() {
 
 export function watchConnectivity() {
   window.addEventListener('online', () => {
-    showToast('Back online — syncing…', 'success', 2000);
+    showToast('Back online -- syncing…', 'success', 2000);
     processDriveQueue().catch(() => {});
   });
 }

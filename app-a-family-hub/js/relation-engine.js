@@ -1,8 +1,8 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/relation-engine.js ─────────────────────────────────
 // Family relation engine
 // Handles: bidirectional auto-reverse, tree traversal, emergency contact wiring
-// All functions are pure — they take data in, return new data out
+// All functions are pure -- they take data in, return new data out
 
 'use strict';
 
@@ -48,7 +48,7 @@ const REVERSE_MAP = {
 // Resolve placeholder reverse labels into real relation names
 export function resolveReverse(relation, _toMemberName = '') {
   const base = REVERSE_MAP[relation] || 'Other';
-  // These need context (gender) to resolve fully — we use the clean labels
+  // These need context (gender) to resolve fully -- we use the clean labels
   const map = {
     'Child':        'Child',       // app shows as "Child of [name]"
     'Parent':       'Parent',
@@ -153,7 +153,7 @@ export function buildFamilyGroups(members, relations = []) {
     });
   });
 
-  // 2. Remaining members — solo or sibling groups
+  // 2. Remaining members -- solo or sibling groups
   const unassigned = members.filter(m => !assigned.has(m.id));
   const siblingGroups = buildSiblingGroups(unassigned, relations, assigned);
   groups.push(...siblingGroups);
@@ -206,7 +206,7 @@ export function buildRelationEmergencyContacts(memberId, members, relations) {
       name:         relatedMember.name,
       phone:        relatedMember.phone,
       relationship: rel.relation,
-      description:  `${rel.relation} — linked profile`,
+      description:  `${rel.relation} -- linked profile`,
       priority:     _relationPriority(rel.relation) + idx,
       fromRelation: true,   // flag: sourced from relation tree, not manually entered
       memberId:     rel.toId,
@@ -305,7 +305,7 @@ export function layoutFamilyTree(members, relations) {
     });
   });
 
-  // Build edges — draw lines between related nodes
+  // Build edges -- draw lines between related nodes
   const edgeSet = new Set();
   const edges   = [];
 
@@ -340,7 +340,7 @@ export function layoutFamilyTree(members, relations) {
         label: '',
       });
     } else {
-      // Sibling / other — dashed line between centres
+      // Sibling / other -- dashed line between centres
       edges.push({
         type: 'other',
         x1: nodeA.x + nodeA.w / 2, y1: nodeA.y + nodeA.h / 2,

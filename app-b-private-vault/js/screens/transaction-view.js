@@ -1,6 +1,6 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/transaction-view.js ─────────────────────
-// Transaction View — read-only display with edit button and WhatsApp copy
+// Transaction View -- read-only display with edit button and WhatsApp copy
 
 'use strict';
 
@@ -26,7 +26,7 @@ export async function renderTransactionView(container, params = {}) {
   const amountSign  = isIncome && !isSpend ? '+' : isSpend ? '-' : '';
   const amountVal   = isIncome && !isSpend
     ? formatAmount(Number(t.income))
-    : isSpend ? formatAmount(Number(t.amountSpend)) : '—';
+    : isSpend ? formatAmount(Number(t.amountSpend)) : '--';
 
   container.innerHTML = `
     <div class="app-header">
@@ -52,11 +52,11 @@ export async function renderTransactionView(container, params = {}) {
       <!-- Details card -->
       <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
         ${row('📅', 'Date', formatDisplayDate(t.date))}
-        ${row('📝', 'Description', t.description || '—')}
-        ${row('🏷️', 'Category', [t.category1, t.category2].filter(Boolean).join(' › ') || '—')}
-        ${row('🏦', 'Account', t.account || '—')}
+        ${row('📝', 'Description', t.description || '--')}
+        ${row('🏷️', 'Category', [t.category1, t.category2].filter(Boolean).join(' › ') || '--')}
+        ${row('🏦', 'Account', t.account || '--')}
         ${t.notes1 ? row('💬', 'Notes', t.notes1) : ''}
-        ${row('🕐', 'Recorded', t.timestamp ? new Date(t.timestamp).toLocaleString() : '—')}
+        ${row('🕐', 'Recorded', t.timestamp ? new Date(t.timestamp).toLocaleString() : '--')}
       </div>
 
       <!-- Photos -->
@@ -102,8 +102,8 @@ export async function renderTransactionView(container, params = {}) {
       `📅 Date: ${formatDisplayDate(t.date)}`,
       isSpend  ? `💸 Spend:  ${t.currency} ${formatAmount(Number(t.amountSpend))}` : '',
       isIncome ? `💵 Income: ${t.currency} ${formatAmount(Number(t.income))}` : '',
-      `🏦 Account: ${t.account || '—'}`,
-      `🏷️ Category: ${[t.category1, t.category2].filter(Boolean).join(' › ') || '—'}`,
+      `🏦 Account: ${t.account || '--'}`,
+      `🏷️ Category: ${[t.category1, t.category2].filter(Boolean).join(' › ') || '--'}`,
       t.notes1 ? `💬 Notes: ${t.notes1}` : '',
       `─────────────────`,
       `Shared via Private Vault`,
@@ -113,7 +113,7 @@ export async function renderTransactionView(container, params = {}) {
       await navigator.clipboard.writeText(lines);
       showToast('Copied to clipboard! Paste in WhatsApp.', 'success');
     } catch {
-      showToast('Copy failed — try long-pressing the text', 'warning');
+      showToast('Copy failed -- try long-pressing the text', 'warning');
     }
   });
 

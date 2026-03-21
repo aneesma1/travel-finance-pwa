@@ -1,7 +1,7 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/app-config.js ────────────────────────────────────────────────────
 // Stores app configuration (PIN hash, settings) in Drive app_config.json
-// Survives browser cache clear — config restored on next sign-in
+// Survives browser cache clear -- config restored on next sign-in
 
 'use strict';
 

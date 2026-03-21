@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
 // Summary cards: Income / Spend / Net per currency
@@ -323,7 +323,7 @@ export async function renderDashboard(container) {
     const dateStr = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
     const period  = mo ? `${MONTHS[mo-1]} ${yr}` : String(yr);
 
-    let text = `💰 Finance Summary — ${dateStr}\n`;
+    let text = `💰 Finance Summary -- ${dateStr}\n`;
     text += `─────────────────────────────\n`;
     text += `Period: ${period}\n\n`;
     text += `${cur} Income: ${formatAmount(inc)}   Spend: ${formatAmount(spnd)}   Net: ${net >= 0 ? '+' : ''}${formatAmount(net)}\n`;
@@ -332,7 +332,7 @@ export async function renderDashboard(container) {
       text += `Last ${recent3.length} transactions:\n`;
       recent3.forEach(t => {
         const amt = t.amountSpend ? `${cur} ${formatAmount(t.amountSpend)}` : `+${cur} ${formatAmount(t.income)}`;
-        text += `  • ${t.description || '—'} — ${amt} (${t.account || '—'}) — ${t.date}\n`;
+        text += `  • ${t.description || '--'} -- ${amt} (${t.account || '--'}) -- ${t.date}\n`;
       });
       text += `─────────────────────────────\n`;
     }
@@ -349,7 +349,7 @@ export function txnRow(t, isLast = false) {
   const hasSpend  = t.amountSpend != null && t.amountSpend !== '';
   const hasIncome = t.income      != null && t.income !== '';
   const catEmoji  = categoryEmoji(t.category1);
-  const dateStr   = t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
+  const dateStr   = t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '--';
 
   return `
     <div class="txn-tap" data-id="${t.id}" style="
@@ -361,10 +361,10 @@ export function txnRow(t, isLast = false) {
       <div class="txn-category-badge">${catEmoji}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          ${t.description || '—'}
+          ${t.description || '--'}
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;display:flex;gap:6px;">
-          <span>${t.category1 || '—'}</span>
+          <span>${t.category1 || '--'}</span>
           ${t.category2 ? `<span>· ${t.category2}</span>` : ''}
           ${t.account   ? `<span>· ${t.account}</span>` : ''}
         </div>

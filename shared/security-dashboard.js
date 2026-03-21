@@ -1,6 +1,6 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/security-dashboard.js ───────────────────────────────────────────
-// Security dashboard modal — shared between App A and App B
+// Security dashboard modal -- shared between App A and App B
 
 'use strict';
 

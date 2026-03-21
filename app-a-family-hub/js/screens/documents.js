@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/documents.js ───────────────────────────────
 // Document Tracker: cards grouped by person, life bars, expiry badges
 
@@ -77,7 +77,7 @@ function renderDocCards(container, members, documents) {
 
   // Bind doc card taps for editing
   container.querySelectorAll('.doc-card[data-doc-id]').forEach(card => {
-    card.addEventListener('click', () => navigate('add-document', { docId: card.dataset.docId, mode: 'edit' }));
+    card.addEventListener('click', () => navigate('add-document', { docId: card.dataset.docId, mode: 'view' }));
   });
 }
 
@@ -90,14 +90,14 @@ function renderDocCard(doc) {
     ? doc.docNumber.length > 4
       ? '···' + doc.docNumber.slice(-4)
       : doc.docNumber
-    : '—';
+    : '--';
 
   const statusLabels = {
     expired: 'EXPIRED',
     danger:  daysLeft === 0 ? 'EXPIRES TODAY' : `${daysLeft}d left`,
     warning: `${daysLeft}d left`,
     valid:   `${daysLeft}d left`,
-    unknown: '—'
+    unknown: '--'
   };
 
   const docIcons = {

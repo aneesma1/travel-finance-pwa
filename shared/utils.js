@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/utils.js ────────────────────────────────────────────────────────
 // Shared utility functions used by both App A and App B
 
@@ -41,14 +41,14 @@ export function daysFromToday(dateStr) {
 
 export function formatDisplayDate(dateStr) {
   // YYYY-MM-DD → "15 Mar 2026"
-  if (!dateStr) return '—';
+  if (!dateStr) return '--';
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function formatMonthYear(dateStr) {
   // YYYY-MM-DD → "Mar 2026"
-  if (!dateStr) return '—';
+  if (!dateStr) return '--';
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 }
@@ -63,7 +63,7 @@ export function currentMonth() {
 
 // ── Number formatting ─────────────────────────────────────────────────────────
 export function formatAmount(num, currency = '') {
-  if (num === null || num === undefined || num === '') return '—';
+  if (num === null || num === undefined || num === '') return '--';
   const formatted = Number(num).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2

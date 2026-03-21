@@ -1,6 +1,6 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
-// Family Defaults — shared Qatar/India addresses, shared emergency contacts,
+// Family Defaults -- shared Qatar/India addresses, shared emergency contacts,
 // visual SVG family tree, relation management with auto-reverse + auto-emergency wiring
 
 'use strict';
@@ -50,7 +50,7 @@ export async function renderFamilyDefaults(container) {
   const defaults  = data?.familyDefaults || {};
   const relations = data?.familyRelations || [];
 
-  // Working drafts — saved on explicit Save
+  // Working drafts -- saved on explicit Save
   let draftAddresses = {
     homeQatar: { label:'', address:'', lat:null, lng:null, plusCode:'', mapsUrl:'', ...(defaults.homeQatar || {}) },
     homeIndia: { label:'', address:'', lat:null, lng:null, plusCode:'', mapsUrl:'', ...(defaults.homeIndia  || {}) },
@@ -96,7 +96,7 @@ export async function renderFamilyDefaults(container) {
     body.innerHTML = `
       <div style="background:var(--primary-bg);border-bottom:1px solid var(--primary-border);
         padding:10px 16px;font-size:13px;color:var(--primary);line-height:1.5;">
-        💡 Set once — all members inherit these. Override per-person in their profile.
+        💡 Set once -- all members inherit these. Override per-person in their profile.
       </div>
       <div style="display:flex;gap:8px;padding:10px 16px;flex-wrap:wrap;">
         <span style="background:var(--success-bg);color:var(--success);font-size:11px;font-weight:700;
@@ -327,7 +327,7 @@ export async function renderFamilyDefaults(container) {
     body.innerHTML = `
       <div style="background:var(--primary-bg);border-bottom:1px solid var(--primary-border);
         padding:10px 16px;font-size:13px;color:var(--primary);line-height:1.5;">
-        💡 These appear on <strong>every member's</strong> emergency card under "Family Contacts" — add shared numbers like parents, family doctor, etc.
+        💡 These appear on <strong>every member's</strong> emergency card under "Family Contacts" -- add shared numbers like parents, family doctor, etc.
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px;">
         <span style="font-size:13px;font-weight:600;color:var(--text);">
@@ -419,7 +419,7 @@ export async function renderFamilyDefaults(container) {
             <input type="tel" class="form-input" id="ec-phone" value="${esc(c.phone)}" placeholder="+91 98XXX XXXXX" /></div>
           <div class="form-group"><label class="form-label">Relationship</label>
             <select class="form-input" id="ec-rel" style="padding:11px 12px;">
-              <option value="">— Select —</option>
+              <option value="">-- Select --</option>
               ${RELATIONSHIPS_EC.map(r => `<option value="${r}" ${c.relationship === r ? 'selected' : ''}>${r}</option>`).join('')}
             </select></div>
           <div class="form-group"><label class="form-label">Description</label>
@@ -580,7 +580,7 @@ export async function renderFamilyDefaults(container) {
   function buildRelationsList() {
     if (!draftRelations.length) return `<div style="font-size:13px;color:var(--text-muted);">No relationships defined yet. Tap + Add to start.</div>`;
 
-    // Deduplicate — show only one direction per pair
+    // Deduplicate -- show only one direction per pair
     const shown = new Set();
     return draftRelations.map(r => {
       const pairKey = [r.fromId, r.toId].sort().join('|');
@@ -624,7 +624,7 @@ export async function renderFamilyDefaults(container) {
           <div class="form-group">
             <label class="form-label">Person A</label>
             <select class="form-input" id="rel-from" style="padding:11px 12px;">
-              <option value="">— Select person —</option>
+              <option value="">-- Select person --</option>
               ${members.map(m => `<option value="${m.id}" ${m.id === preselectedFromId ? 'selected' : ''}>${m.emoji||'👤'} ${esc(m.name)}</option>`).join('')}
             </select>
           </div>
@@ -632,7 +632,7 @@ export async function renderFamilyDefaults(container) {
           <div class="form-group">
             <label class="form-label">Is the</label>
             <select class="form-input" id="rel-type" style="padding:11px 12px;">
-              <option value="">— Select relationship —</option>
+              <option value="">-- Select relationship --</option>
               ${RELATIONS.map(r => `<option value="${r}">${r}</option>`).join('')}
             </select>
           </div>
@@ -640,7 +640,7 @@ export async function renderFamilyDefaults(container) {
           <div class="form-group">
             <label class="form-label">Of (Person B)</label>
             <select class="form-input" id="rel-to" style="padding:11px 12px;">
-              <option value="">— Select person —</option>
+              <option value="">-- Select person --</option>
               ${members.map(m => `<option value="${m.id}">${m.emoji||'👤'} ${esc(m.name)}</option>`).join('')}
             </select>
           </div>
@@ -718,7 +718,7 @@ export async function renderFamilyDefaults(container) {
               </div>
               <div style="display:flex;flex-direction:column;gap:8px;">
                 <button class="btn btn-primary" id="ec-yes">✅ Yes, add both</button>
-                <button class="btn btn-secondary" id="ec-no">Skip — I'll manage contacts manually</button>
+                <button class="btn btn-secondary" id="ec-no">Skip -- I'll manage contacts manually</button>
               </div>
             </div>
           </div>`;
@@ -756,7 +756,7 @@ export async function renderFamilyDefaults(container) {
       if (!already) {
         contacts.push({
           id: uuidv4(), name: contactMember.name, phone: contactMember.phone || '',
-          relationship, description: `${relationship} — linked profile`,
+          relationship, description: `${relationship} -- linked profile`,
           priority: contacts.length + 1, fromRelation: true, memberId: contactMember.id
         });
         member.personalEmergencyContacts = contacts;
@@ -803,7 +803,7 @@ function extractCoords(url) {
   m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);            if (m) return { lat: +m[1], lng: +m[2] };
   m = url.match(/mlat=(-?\d+\.\d+).*mlon=(-?\d+\.\d+)/);   if (m) return { lat: +m[1], lng: +m[2] };
   m = url.match(/#map=\d+\/(-?\d+\.\d+)\/(-?\d+\.\d+)/);   if (m) return { lat: +m[1], lng: +m[2] };
-  // Google Plus Code — e.g. "7HQG+XR Doha" or "7HQG+XR"
+  // Google Plus Code -- e.g. "7HQG+XR Doha" or "7HQG+XR"
   const plusCodeMatch = url.match(/([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3})(?:\s+(.+))?/i);
   if (plusCodeMatch) {
     const decoded = decodePlusCode(plusCodeMatch[1]);

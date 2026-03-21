@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/add-document.js ────────────────────────────
 // Add / Edit Document: person pill, doc type, expiry, alert toggles, Calendar sync
 
@@ -20,9 +20,11 @@ const ALERT_DAYS = [90, 60, 30];
 export async function renderAddDocument(container, params = {}) {
   const { docId, mode, personId: defaultPersonId } = params;
   const isEdit = mode === 'edit' && docId;
+  let isViewMode = isEdit && mode !== 'edit';  // view by default, except when explicitly editing
 
   const data = await getCachedTravelData();
   const { members = [], documents = [], customDocTypes = [] } = data || {};
+  const allDocTypes = [...DOC_TYPES_DEFAULT, ...customDocTypes.filter(t => !DOC_TYPES_DEFAULT.includes(t))];
 
   const existing = isEdit ? documents.find(d => d.id === docId) : null;
   const allDocNumbers = [...new Set(documents.map(d => d.docNumber).filter(Boolean))];
@@ -44,8 +46,16 @@ export async function renderAddDocument(container, params = {}) {
     container.innerHTML = `
       <div class="app-header">
         <button class="app-header-action" id="back-btn">←</button>
-        <span class="app-header-title">${isEdit ? 'Edit Document' : 'Add Document'}</span>
-        ${isEdit ? `<button class="app-header-action" id="delete-btn" style="color:#FCA5A5;">🗑️</button>` : '<span style="width:32px;"></span>'}
+        <span class="app-header-title">${isViewMode ? 'Document' : isEdit ? 'Edit Document' : 'Add Document'}</span>
+        <div style="display:flex;gap:4px;">
+          ${isViewMode
+            ? `<button class="app-header-action" id="share-doc-btn" title="Share" style="font-size:18px;">💬</button>
+               <button class="app-header-action" id="edit-doc-btn" style="font-size:13px;font-weight:700;">✏️ Edit</button>`
+            : isEdit
+              ? `<button class="app-header-action" id="delete-btn" style="color:#FCA5A5;">🗑️</button>`
+              : '<span style="width:32px;"></span>'
+          }
+        </div>
       </div>
 
       <div style="padding:20px;display:flex;flex-direction:column;gap:20px;">
@@ -66,7 +76,7 @@ export async function renderAddDocument(container, params = {}) {
         </div>
 
         <div class="form-group" style="margin:0;">
-          <label class="form-label">Document Photos <span style="color:var(--text-muted);font-weight:400;">(optional — front & back)</span></label>
+          <label class="form-label">Document Photos <span style="color:var(--text-muted);font-weight:400;">(optional -- front & back)</span></label>
           <div id="doc-photo-slots" style="margin-bottom:4px;"></div>
 
           <label class="form-label">Expiry Date</label>
@@ -120,6 +130,19 @@ export async function renderAddDocument(container, params = {}) {
 
     // Back
     document.getElementById('back-btn').addEventListener('click', () => navigate('documents'));
+
+    // View / Edit / Share mode
+    if (isViewMode) {
+      document.getElementById('edit-doc-btn')?.addEventListener('click', () => {
+        isViewMode = false; render();
+      });
+      document.getElementById('share-doc-btn')?.addEventListener('click', () => shareDocText());
+      setTimeout(() => {
+        container.querySelectorAll('input, select, textarea, button:not(#back-btn):not(#share-doc-btn):not(#edit-doc-btn)').forEach(el => {
+          el.disabled = true; el.style.opacity = '0.75'; el.style.cursor = 'default';
+        });
+      }, 0);
+    }
 
     // Delete
     document.getElementById('delete-btn')?.addEventListener('click', () => deleteDoc());
@@ -259,7 +282,7 @@ export async function renderAddDocument(container, params = {}) {
         try {
           docData.calEventIds = await syncDocumentAlerts(docData, member.name);
         } catch (calErr) {
-          showToast('Saved — calendar sync had an error', 'warning');
+          showToast('Saved -- calendar sync had an error', 'warning');
           console.warn('Calendar sync error:', calErr);
         }
       }
@@ -285,6 +308,38 @@ export async function renderAddDocument(container, params = {}) {
       document.getElementById('save-btn').disabled = false;
       document.getElementById('save-btn').textContent = isEdit ? '💾 Save Changes' : '✅ Save Document';
     }
+  }
+
+  // ── Share document as WhatsApp text ──────────────────────────────────────
+  async function shareDocText() {
+    if (!existing) return;
+    const member = (data?.members || []).find(m => m.id === existing.personId);
+    const days = existing.expiryDate
+      ? Math.floor((new Date(existing.expiryDate) - new Date()) / 86400000) : null;
+    const status = days == null ? '' : days < 0 ? '⛔ EXPIRED' : days < 30 ? '⚠️ Expires in ' + days + 'd' : days < 90 ? '⏰ ' + days + ' days left' : '✅ Valid (' + days + 'd left)';
+
+    const lines = [
+      '🪪 *Document Details*',
+      '',
+      '👤 Person: ' + (member?.name || 'Unknown'),
+      '📄 Type: ' + (existing.docName || '—'),
+      '🔢 Number: ' + (existing.docNumber || '—'),
+      '📅 Expires: ' + (existing.expiryDate || '—') + (status ? '  ' + status : ''),
+    ];
+    if (existing.alertDays?.length) {
+      lines.push('🔔 Alerts: ' + existing.alertDays.join('d, ') + 'd before');
+    }
+    lines.push('');
+    lines.push('_Shared from Family Hub_');
+
+    const text = lines.join('
+');
+    const { copyToClipboard } = await import('../../../shared/utils.js');
+    if (navigator.share) {
+      try { await navigator.share({ title: existing.docName + ' — ' + member?.name, text }); return; } catch {}
+    }
+    const ok = await copyToClipboard(text);
+    showToast(ok ? '✅ Copied! Paste in WhatsApp' : 'Copy failed', ok ? 'success' : 'error', 3000);
   }
 
   async function deleteDoc() {

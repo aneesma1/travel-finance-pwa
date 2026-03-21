@@ -1,6 +1,6 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
-// CSV / Excel import tool — used by both App A (travel) and App B (finance)
+// CSV / Excel import tool -- used by both App A (travel) and App B (finance)
 // Steps: (1) Pick file → (2) Map columns → (3) Preview + validate → (4) Import
 
 'use strict';
@@ -63,7 +63,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         </div>
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6;">
           Accepts <strong>.xlsx</strong>, <strong>.xls</strong>, or <strong>.csv</strong> files.<br>
-          Your existing ${appType === 'travel' ? 'trips' : 'transactions'} will be preserved — duplicates are skipped.
+          Your existing ${appType === 'travel' ? 'trips' : 'transactions'} will be preserved -- duplicates are skipped.
         </div>
 
         <!-- Drop zone -->
@@ -233,7 +233,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
           background:var(--surface);color:var(--text);font-size:13px;
           min-width:160px;max-width:200px;font-family:inherit;
         ">
-          <option value="">— Skip —</option>
+          <option value="">-- Skip --</option>
           ${headers.map((h, i) => `
             <option value="${i}" ${Number(currentIdx) === i && currentIdx !== '' ? 'selected' : ''}>${h || `Column ${i+1}`}</option>
           `).join('')}
@@ -379,7 +379,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
                 <tr style="border-bottom:1px solid var(--border-light);background:${row._errors.length > 0 ? '#FFF5F5' : 'transparent'};">
                   <td style="padding:6px 10px;color:var(--text-muted);">${row._rowIndex}</td>
                   ${COLUMNS.filter(c => columnMap[c.key] !== undefined).map(c =>
-                    `<td style="padding:6px 10px;color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${row[c.key] || '—'}</td>`
+                    `<td style="padding:6px 10px;color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${row[c.key] || '--'}</td>`
                   ).join('')}
                   <td style="padding:6px 10px;">
                     ${row._errors.length === 0

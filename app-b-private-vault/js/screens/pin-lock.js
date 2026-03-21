@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/pin-lock.js ─────────────────────────────
 // PIN lock and PIN setup screens
 
@@ -28,7 +28,7 @@ export function renderPinLock(container, { onSuccess, onForgot }) {
 
         ${locked
           ? `<p id="lockout-msg" style="color:#FCA5A5;font-size:14px;font-weight:600;margin-bottom:20px;">
-               Too many attempts — wait <span id="countdown">${remaining}</span>s
+               Too many attempts -- wait <span id="countdown">${remaining}</span>s
              </p>`
           : `<p id="error-msg" style="color:#FCA5A5;font-size:13px;min-height:20px;margin-bottom:12px;"></p>`
         }
@@ -109,7 +109,7 @@ export function renderPinLock(container, { onSuccess, onForgot }) {
       if (msg.startsWith('WRONG:')) {
         const remaining = msg.split(':')[1];
         const errorEl = document.getElementById('error-msg');
-        if (errorEl) errorEl.textContent = `Incorrect PIN — ${remaining} attempt${remaining === '1' ? '' : 's'} remaining`;
+        if (errorEl) errorEl.textContent = `Incorrect PIN -- ${remaining} attempt${remaining === '1' ? '' : 's'} remaining`;
         [0,1,2,3].forEach(i => {
           const dot = document.getElementById(`dot-${i}`);
           if (dot) dot.classList.add('error');
@@ -200,7 +200,7 @@ export function renderPinSetup(container, { onComplete }) {
             } else {
               if (digits !== firstPin) {
                 const errorEl = document.getElementById('error-msg');
-                if (errorEl) errorEl.textContent = 'PINs do not match — try again';
+                if (errorEl) errorEl.textContent = 'PINs do not match -- try again';
                 [0,1,2,3].forEach(i => {
                   const dot = document.getElementById(`dot-${i}`);
                   if (dot) dot.classList.add('error');

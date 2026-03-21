@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/drive.js ─────────────────────────────────────────────────────────
 // Google Drive API wrapper
 // Handles: folder creation, file create/fetch/update, ETag conflict detection,
@@ -123,7 +123,7 @@ async function updateJsonFile(fileId, data, expectedEtag = null) {
   );
 
   if (res.status === 412) {
-    // Precondition failed — mid-air collision
+    // Precondition failed -- mid-air collision
     throw new Error('ETAG_CONFLICT');
   }
 
@@ -225,7 +225,7 @@ export async function writeData(appName, mergeFn) {
   throw new Error('Failed to save after maximum retries. Please try again.');
 }
 
-// ── Tiered mirror backup — 3 tiers: edits(5), daily(5), monthly(3) ──────────
+// ── Tiered mirror backup -- 3 tiers: edits(5), daily(5), monthly(3) ──────────
 // Each tier stores JSON. XLSX export is queued as best-effort after JSON write.
 const TIER_EDITS   = 5;   // last N individual saves
 const TIER_DAYS    = 5;   // last N edit-days (one file per day, overwritten)
@@ -252,21 +252,21 @@ async function writeMirrorSnapshot(appName, fullData) {
     const today    = ts.slice(0, 10);               // YYYY-MM-DD
     const month    = ts.slice(0, 7);                // YYYY-MM
 
-    // ── Tier 1: edits/ — timestamped per save ──────────────────────────────
+    // ── Tier 1: edits/ -- timestamped per save ──────────────────────────────
     await createMirrorFile(editsFolder, `${label}_${ts}.json`, jsonBlob, token);
     await pruneFolder(editsFolder, TIER_EDITS, token);
 
-    // ── Tier 2: daily/ — one file per edit-day, overwrite same day ──────────
+    // ── Tier 2: daily/ -- one file per edit-day, overwrite same day ──────────
     const dailyName = `${label}_${today}.json`;
     await upsertMirrorFile(dailyFolder, dailyName, jsonBlob, token);
     await pruneFolder(dailyFolder, TIER_DAYS, token);
 
-    // ── Tier 3: monthly/ — one file per edit-month, overwrite same month ────
+    // ── Tier 3: monthly/ -- one file per edit-month, overwrite same month ────
     const monthlyName = `${label}_${month}.json`;
     await upsertMirrorFile(monthlyFolder, monthlyName, jsonBlob, token);
     await pruneFolder(monthlyFolder, TIER_MONTHS, token);
 
-  } catch { /* non-blocking mirror — never fail main save */ }
+  } catch { /* non-blocking mirror -- never fail main save */ }
 }
 
 async function createMirrorFile(folderId, name, jsonBlob, token) {
@@ -358,7 +358,7 @@ export function downloadLocalBackup(appName, data) {
   URL.revokeObjectURL(url);
 }
 
-// ── Timestamp suffix helper — YYYY-MM-DD_HH-MM ───────────────────────────────
+// ── Timestamp suffix helper -- YYYY-MM-DD_HH-MM ───────────────────────────────
 export function timestampSuffix() {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');

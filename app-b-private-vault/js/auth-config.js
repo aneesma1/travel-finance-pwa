@@ -1,9 +1,9 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/auth-config.js ──────────────────────────────────
 // Google OAuth client configuration for App B
 //
 // ── SETUP (one-time only) ────────────────────────────────────────────────────
-// Same Google Cloud project as App A — just add App B redirect URIs too:
+// Same Google Cloud project as App A -- just add App B redirect URIs too:
 //   Authorised redirect URIs to add:
 //      http://localhost:8080/app-b-private-vault/
 //      http://localhost:5500/app-b-private-vault/
@@ -15,7 +15,7 @@
 // Paste the same Client ID as App A below. That's it.
 //
 // ── MOVING THE FOLDER ────────────────────────────────────────────────────────
-// Move travel-finance-pwa/ anywhere — relative paths and auto-detected
+// Move travel-finance-pwa/ anywhere -- relative paths and auto-detected
 // REDIRECT_URI will keep working without any changes.
 // ─────────────────────────────────────────────────────────────────────────────
 

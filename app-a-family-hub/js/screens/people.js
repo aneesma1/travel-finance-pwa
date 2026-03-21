@@ -1,6 +1,6 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/people.js ──────────────────────────────────
-// People tab — grouped family view, Family Defaults button, member cards
+// People tab -- grouped family view, Family Defaults button, member cards
 
 'use strict';
 
@@ -100,7 +100,7 @@ export async function renderPeople(container) {
         cardsContainer.appendChild(card.firstElementChild);
       });
     } else {
-      // Solo member — no group wrapper
+      // Solo member -- no group wrapper
       const card = document.createElement('div');
       card.innerHTML = buildMemberCard(group.members[0], trips, documents, familyRelations, familyDefaults);
       groupEl.appendChild(card.firstElementChild);
@@ -390,7 +390,7 @@ function renderMemberPage(doc, member, memberDocs, W, H, margin, contentW) {
   doc.setTextColor(30, 30, 30);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(member.name || '—', x + 36, y + 14);
+  doc.text(member.name || '--', x + 36, y + 14);
 
   if (member.bloodGroup) {
     doc.setFillColor(239, 68, 68);
@@ -459,7 +459,7 @@ function renderMemberPage(doc, member, memberDocs, W, H, margin, contentW) {
 
     contacts.slice(0, 4).forEach((contact, i) => {
       const label = `${i + 1}. ${contact.relationship || 'Contact'}`;
-      const value = `${contact.name} — ${contact.phone}${contact.description ? '\n    ' + contact.description : ''}`;
+      const value = `${contact.name} -- ${contact.phone}${contact.description ? '\n    ' + contact.description : ''}`;
       y = infoRow(doc, label, value, x, y, contentW);
     });
   }
@@ -471,10 +471,10 @@ function renderMemberPage(doc, member, memberDocs, W, H, margin, contentW) {
 
     memberDocs.forEach(d => {
       const daysLeft = daysFromToday(d.expiryDate);
-      const status = daysLeft === null ? '—'
+      const status = daysLeft === null ? '--'
         : daysLeft < 0 ? `EXPIRED ${Math.abs(daysLeft)}d ago`
         : `${daysLeft}d remaining`;
-      const masked = d.docNumber ? '···' + d.docNumber.slice(-4) : '—';
+      const masked = d.docNumber ? '···' + d.docNumber.slice(-4) : '--';
       y = infoRow(doc, d.docName, `${masked}  |  Expires: ${d.expiryDate}  |  ${status}`, x, y, contentW);
     });
   }
@@ -516,7 +516,7 @@ function infoRow(doc, label, value, x, y, contentW, wrap = false) {
     return y + Math.max(7, lines.length * 4.5);
   }
 
-  const displayValue = value && value.length > 65 ? value.slice(0, 62) + '…' : (value || '—');
+  const displayValue = value && value.length > 65 ? value.slice(0, 62) + '…' : (value || '--');
   doc.text(displayValue, x + labelW, y + 4.5);
   return y + 7;
 }
@@ -531,7 +531,7 @@ function locationBlock(doc, countryLabel, location, x, y, contentW) {
   doc.setTextColor(30, 30, 30);
 
   const addrLines = doc.splitTextToSize(
-    [location.label, location.address].filter(Boolean).join(' — '),
+    [location.label, location.address].filter(Boolean).join(' -- '),
     contentW - 36
   );
   doc.text(addrLines, x + 36, y + 4.5);

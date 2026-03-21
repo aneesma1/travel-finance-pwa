@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
 
@@ -8,6 +8,7 @@ import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js'
 import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
+import { openTravelExportSheet } from './travel-export.js';
 import {
   formatDisplayDate, daysBetween, currentYear,
   getHashParams, setHashParams, clearHashParams,
@@ -131,7 +132,7 @@ export async function renderTravelLog(container, params = {}) {
         ? `${trip.daysInQatar}d in Qatar`
         : trip.dateInQatar && !trip.dateOutQatar
           ? `${daysBetween(trip.dateInQatar, new Date().toISOString().split('T')[0])}d so far`
-          : '—';
+          : '--';
 
       const statusDot = !trip.dateOutQatar
         ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--success);margin-right:5px;"></span>`
@@ -157,7 +158,7 @@ export async function renderTravelLog(container, params = {}) {
           </div>
           <div style="text-align:right;flex-shrink:0;">
             <div style="font-size:14px;font-weight:700;color:var(--primary);">${daysLabel}</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${trip.flightInward || '—'}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${trip.flightInward || '--'}</div>
           </div>
           <span style="color:var(--text-muted);font-size:16px;margin-left:4px;">›</span>
         </div>
@@ -204,7 +205,7 @@ export async function renderTravelLog(container, params = {}) {
       showToast('Trip deleted', 'success');
       renderTravelLog(container);
     } catch {
-      showToast('Delete failed — try again', 'error');
+      showToast('Delete failed -- try again', 'error');
     }
   }
 }

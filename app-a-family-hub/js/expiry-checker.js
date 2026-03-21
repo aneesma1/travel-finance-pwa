@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/expiry-checker.js ──────────────────────────────────
 // Expiry alert system
 // Runs on every app load:
@@ -14,7 +14,7 @@ import { writeData } from '../../shared/drive.js';
 import { syncDocumentAlerts } from './calendar.js';
 import { daysFromToday, expiryStatus, showToast, isOnline } from '../../shared/utils.js';
 
-const CHECKED_KEY = 'expiry_last_checked'; // localStorage — avoid re-alerting same day
+const CHECKED_KEY = 'expiry_last_checked'; // localStorage -- avoid re-alerting same day
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 export async function runExpiryCheck() {
@@ -111,7 +111,7 @@ function showExpiryBanner(urgent) {
 
   document.getElementById('expiry-banner-view').addEventListener('click', () => {
     banner.remove();
-    // Navigate to documents — import navigate dynamically to avoid circular dep
+    // Navigate to documents -- import navigate dynamically to avoid circular dep
     import('./router.js').then(m => m.navigate('documents'));
   });
 
@@ -134,8 +134,8 @@ async function requestBrowserNotificationPermission(urgent, memberMap) {
   // Fire one notification per urgent doc
   urgent.slice(0, 3).forEach(({ doc, member, daysLeft }) => {
     const title = daysLeft < 0
-      ? `⚠️ ${doc.docName} EXPIRED — ${member.name}`
-      : `🛂 ${doc.docName} expiring soon — ${member.name}`;
+      ? `⚠️ ${doc.docName} EXPIRED -- ${member.name}`
+      : `🛂 ${doc.docName} expiring soon -- ${member.name}`;
     const body = daysLeft < 0
       ? `${member.name}'s ${doc.docName} expired on ${doc.expiryDate}. Please renew immediately.`
       : `${member.name}'s ${doc.docName} expires in ${daysLeft} days (${doc.expiryDate}).`;

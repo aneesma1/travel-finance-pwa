@@ -1,13 +1,13 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/roles.js ───────────────────────────────────────────
-// Admin / Viewer role system for App A — Family Hub
+// Admin / Viewer role system for App A -- Family Hub
 // Roles stored in travel_data.json under data.roles: { email: 'admin'|'viewer' }
 // The signed-in account's email is checked on every boot.
 // Only admin can edit, add, delete, import, export.
 
 'use strict';
 
-let _currentRole = 'viewer'; // default safe — upgraded after data loads
+let _currentRole = 'viewer'; // default safe -- upgraded after data loads
 
 export function setCurrentRole(role) {
   _currentRole = role || 'viewer';
@@ -56,7 +56,7 @@ export function resolveRole(data, userEmail) {
   if (!data || !userEmail) return 'viewer';
   const roles = data.roles || {};
 
-  // If no roles defined yet — first run — treat signed-in user as admin
+  // If no roles defined yet -- first run -- treat signed-in user as admin
   if (Object.keys(roles).length === 0) {
     return 'admin';
   }

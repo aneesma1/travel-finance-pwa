@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
 // Shows: live status per member, days in location, next doc expiry, filter bar
@@ -485,7 +485,7 @@ export async function renderDashboard(container) {
     const { members = [], trips = [], documents = [] } = data;
     const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-    let text = `✈️ Family Travel Status — ${dateStr}\n`;
+    let text = `✈️ Family Travel Status -- ${dateStr}\n`;
     text += `─────────────────────────────\n`;
 
     members.forEach(m => {
@@ -509,6 +509,6 @@ export async function renderDashboard(container) {
 
     const ok = await copyToClipboard(text);
     if (ok) showToast('Copied to clipboard!', 'success');
-    else    showToast('Copy failed — try again', 'error');
+    else    showToast('Copy failed -- try again', 'error');
   }
 }

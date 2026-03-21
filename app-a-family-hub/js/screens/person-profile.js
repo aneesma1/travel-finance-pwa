@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/person-profile.js ──────────────────────────
 // Full person profile with 4 tabs:
 // Profile | Locations | Emergency | Documents
@@ -18,6 +18,7 @@ const NATIONALITIES   = ['Indian','Qatari','Pakistani','Filipino','Bangladeshi',
 export async function renderPersonProfile(container, params = {}) {
   const { memberId, mode = 'view' } = params;
   const isNew = mode === 'new';
+  let isViewMode = !isNew && mode !== 'edit';  // view by default, edit on demand
 
   const data = await getCachedTravelData();
   const { members = [], documents = [] } = data || {};
@@ -28,7 +29,7 @@ export async function renderPersonProfile(container, params = {}) {
     return;
   }
 
-  // Working copy — edits happen here, saved on explicit "Save"
+  // Working copy -- edits happen here, saved on explicit "Save"
   let draft = JSON.parse(JSON.stringify(member));
   let activeTab = 'profile';
   let hasUnsavedChanges = false;
@@ -40,7 +41,13 @@ export async function renderPersonProfile(container, params = {}) {
       <div class="app-header" style="background:${draft.color || 'var(--primary)'};">
         <button class="app-header-action" id="back-btn" style="color:#fff;">←</button>
         <span class="app-header-title">${isNew ? 'New Profile' : draft.name || 'Profile'}</span>
-        <button class="app-header-action" id="save-btn" style="color:#fff;font-size:14px;font-weight:700;">💾 Save</button>
+        <div style="display:flex;gap:4px;">
+          ${isViewMode
+            ? `<button class="app-header-action" id="share-profile-btn" title="Share" style="color:#fff;font-size:18px;">💬</button>
+               <button class="app-header-action" id="edit-profile-btn" title="Edit" style="color:#fff;font-size:14px;font-weight:700;">✏️ Edit</button>`
+            : `<button class="app-header-action" id="save-btn" style="color:#fff;font-size:14px;font-weight:700;">💾 Save</button>`
+          }
+        </div>
       </div>
 
       <!-- Inner tab bar -->
@@ -69,7 +76,30 @@ export async function renderPersonProfile(container, params = {}) {
       navigate('people');
     });
 
-    document.getElementById('save-btn').addEventListener('click', () => saveMember());
+    if (isViewMode) {
+      // View mode buttons
+      document.getElementById('edit-profile-btn')?.addEventListener('click', () => {
+        isViewMode = false;
+        render();
+      });
+      document.getElementById('share-profile-btn')?.addEventListener('click', () => {
+        shareProfileText();
+      });
+      // Disable all inputs in view mode
+      setTimeout(() => {
+        container.querySelectorAll('input, textarea, select, button:not(#back-btn):not(.profile-tab):not(.photo-thumb):not(.photo-remove)').forEach(el => {
+          if (!el.id?.includes('share') && !el.id?.includes('edit')) {
+            el.disabled = true;
+            el.style.opacity = '0.75';
+            el.style.cursor = 'default';
+          }
+        });
+        // Hide FAB-like action buttons in view mode
+        container.querySelectorAll('.edit-only').forEach(el => el.style.display = 'none');
+      }, 0);
+    } else {
+      document.getElementById('save-btn').addEventListener('click', () => saveMember());
+    }
 
     document.querySelectorAll('.profile-tab').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -176,14 +206,14 @@ export async function renderPersonProfile(container, params = {}) {
           <div class="form-group" style="margin:0;">
             <label class="form-label">Nationality</label>
             <select class="form-input" id="nationality" style="padding:11px 12px;">
-              <option value="">— Select —</option>
+              <option value="">-- Select --</option>
               ${NATIONALITIES.map(n => `<option value="${n}" ${draft.nationality === n ? 'selected' : ''}>${n}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" style="margin:0;">
             <label class="form-label">Blood Group</label>
             <select class="form-input" id="blood-group" style="padding:11px 12px;">
-              <option value="">— Select —</option>
+              <option value="">-- Select --</option>
               ${BLOOD_GROUPS.map(b => `<option value="${b}" ${draft.bloodGroup === b ? 'selected' : ''}>${b}</option>`).join('')}
             </select>
           </div>
@@ -340,7 +370,7 @@ export async function renderPersonProfile(container, params = {}) {
       btn.addEventListener('click', () => { draft.color = btn.dataset.color; markDirty(); render(); });
     });
 
-    // All text fields — live update draft
+    // All text fields -- live update draft
     const fieldMap = {
       'member-name': 'name', 'dob': 'dateOfBirth', 'nationality': 'nationality',
       'blood-group': 'bloodGroup', 'email': 'email',
@@ -627,7 +657,7 @@ export async function renderPersonProfile(container, params = {}) {
     m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);          if (m) return { lat: +m[1], lng: +m[2] };
     m = url.match(/mlat=(-?\d+\.\d+).*mlon=(-?\d+\.\d+)/); if (m) return { lat: +m[1], lng: +m[2] };
     m = url.match(/#map=\d+\/(-?\d+\.\d+)\/(-?\d+\.\d+)/); if (m) return { lat: +m[1], lng: +m[2] };
-    // Google Plus Code — e.g. "7HQG+XR Doha"
+    // Google Plus Code -- e.g. "7HQG+XR Doha"
     const pcm = url.match(/([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3})/i);
     if (pcm) {
       const decoded = decodePlusCode(pcm[1]);
@@ -730,7 +760,7 @@ export async function renderPersonProfile(container, params = {}) {
               display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">▣</div>
             <div style="flex:1;">
               <div style="font-size:15px;font-weight:600;">QR Code</div>
-              <div style="font-size:12px;color:var(--text-muted);">Scan in emergency — no app needed</div>
+              <div style="font-size:12px;color:var(--text-muted);">Scan in emergency -- no app needed</div>
             </div>
             <span style="color:var(--text-muted);">›</span>
           </div>
@@ -860,7 +890,7 @@ export async function renderPersonProfile(container, params = {}) {
           <div class="form-group">
             <label class="form-label">Relationship</label>
             <select class="form-input" id="ec-relationship" style="padding:11px 12px;">
-              <option value="">— Select —</option>
+              <option value="">-- Select --</option>
               ${RELATIONSHIPS.map(r => `<option value="${r}" ${c.relationship === r ? 'selected' : ''}>${r}</option>`).join('')}
             </select>
           </div>
@@ -918,7 +948,7 @@ export async function renderPersonProfile(container, params = {}) {
     const memberDocs  = documents.filter(d => d.personId === draft.id);
     const contacts    = (draft.emergencyContacts || []).sort((a,b) => a.priority - b.priority);
     const cardEl      = document.getElementById('emergency-card-preview');
-    const currentLoc  = draft.homeQatar; // simplified — could detect from trips
+    const currentLoc  = draft.homeQatar; // simplified -- could detect from trips
 
     cardEl.style.cssText = `
       position:fixed;left:-9999px;top:0;width:340px;
@@ -988,7 +1018,7 @@ export async function renderPersonProfile(container, params = {}) {
     canvas.toBlob(async (blob) => {
       const file = new File([blob], `${draft.name.replace(/\s+/g,'-')}-Emergency-Card.png`, { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${draft.name} — Emergency Card` });
+        await navigator.share({ files: [file], title: `${draft.name} -- Emergency Card` });
       } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1032,7 +1062,7 @@ export async function renderPersonProfile(container, params = {}) {
       qrDiv.innerHTML = `
         <div style="padding:16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
           <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text);">
-            ▣ Emergency QR Code — ${draft.name}
+            ▣ Emergency QR Code -- ${draft.name}
           </div>
           <div id="qr-canvas" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
           <div style="font-size:11px;color:var(--text-muted);text-align:center;line-height:1.5;margin-bottom:12px;">
@@ -1098,13 +1128,13 @@ export async function renderPersonProfile(container, params = {}) {
                       <div>
                         <div style="font-size:14px;font-weight:700;">${doc.docName}</div>
                         <div style="font-size:12px;color:var(--text-muted);font-family:monospace;">
-                          ···${(doc.docNumber || '').slice(-4) || '—'}
+                          ···${(doc.docNumber || '').slice(-4) || '--'}
                         </div>
                       </div>
                     </div>
                     <div style="text-align:right;">
                       <div style="font-size:13px;font-weight:700;color:${color};">
-                        ${daysLeft === null ? '—' : daysLeft < 0 ? 'EXPIRED' : `${daysLeft}d left`}
+                        ${daysLeft === null ? '--' : daysLeft < 0 ? 'EXPIRED' : `${daysLeft}d left`}
                       </div>
                       <div style="font-size:11px;color:var(--text-muted);">${doc.expiryDate}</div>
                     </div>
@@ -1188,6 +1218,69 @@ export async function renderPersonProfile(container, params = {}) {
     }
   }
 
+  // ── Share profile as WhatsApp text ──────────────────────────────────────────
+  async function shareProfileText() {
+    const data2 = await import('../../../shared/db.js').then(m => m.getCachedTravelData());
+    const docs = (data2?.documents || []).filter(d => d.personId === draft.id);
+    const trips = (data2?.trips || []).filter(t => t.personId === draft.id);
+    const totalDays = trips.reduce((s, t) => s + (t.daysInQatar || 0), 0);
+
+    const lines = [
+      '👤 *' + draft.name + '*',
+    ];
+    if (draft.nationality)  lines.push('🌍 ' + draft.nationality);
+    if (draft.bloodGroup)   lines.push('🩸 Blood Group: ' + draft.bloodGroup);
+    if (draft.phone)        lines.push('📞 ' + draft.phone);
+    if (draft.email)        lines.push('📧 ' + draft.email);
+    if (draft.occupation || draft.employer) {
+      lines.push('💼 ' + [draft.occupation, draft.employer].filter(Boolean).join(' @ '));
+    }
+
+    if (docs.length) {
+      lines.push('');
+      lines.push('🪪 *Documents*');
+      docs.forEach(d => {
+        const days = d.expiryDate
+          ? Math.floor((new Date(d.expiryDate) - new Date()) / 86400000) : null;
+        const exp = days == null ? '' : days < 0 ? ' ⛔ EXPIRED' : ' (' + days + 'd left)';
+        lines.push('  ' + d.docName + ': ' + (d.docNumber || '—') + exp);
+      });
+    }
+
+    if (trips.length) {
+      lines.push('');
+      lines.push('✈️ *Travel: ' + trips.length + ' trips · ' + totalDays + 'd in Qatar*');
+      const yr = {};
+      trips.forEach(t => { const y = t.dateOutIndia?.slice(0,4)||'?'; yr[y] = (yr[y]||0)+(t.daysInQatar||0); });
+      lines.push('  ' + Object.keys(yr).sort((a,b)=>b-a).map(y => y+': '+yr[y]+'d').join(' · '));
+    }
+
+    if (draft.homeQatar?.address || draft.homeQatar?.lat) {
+      lines.push('');
+      lines.push('🇶🇦 *Qatar*: ' + (draft.homeQatar.label || draft.homeQatar.address || ''));
+      if (draft.homeQatar.plusCode) lines.push('  Plus Code: ' + draft.homeQatar.plusCode);
+      if (draft.homeQatar.mapsUrl)  lines.push('  ' + draft.homeQatar.mapsUrl);
+    }
+    if (draft.homeIndia?.address || draft.homeIndia?.lat) {
+      lines.push('');
+      lines.push('🇮🇳 *India*: ' + (draft.homeIndia.label || draft.homeIndia.address || ''));
+      if (draft.homeIndia.plusCode) lines.push('  Plus Code: ' + draft.homeIndia.plusCode);
+      if (draft.homeIndia.mapsUrl)  lines.push('  ' + draft.homeIndia.mapsUrl);
+    }
+
+    lines.push('');
+    lines.push('_Shared from Family Hub_');
+
+    const text = lines.join('
+');
+    const { copyToClipboard } = await import('../../../shared/utils.js');
+    if (navigator.share) {
+      try { await navigator.share({ title: draft.name + ' Profile', text }); return; } catch {}
+    }
+    const ok = await copyToClipboard(text);
+    showToast(ok ? '✅ Profile copied! Paste in WhatsApp' : 'Copy failed', ok ? 'success' : 'error', 3000);
+  }
+
   render();
 }
 
@@ -1231,7 +1324,7 @@ function buildEmergencyText(member, documents) {
   const memberDocs = documents.filter(d => d.personId === member.id);
   const date       = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
 
-  let text = `🆘 EMERGENCY INFORMATION — ${member.name}\n`;
+  let text = `🆘 EMERGENCY INFORMATION -- ${member.name}\n`;
   text += `Generated: ${date}\n`;
   text += `─────────────────────────────\n`;
   if (member.bloodGroup) text += `🩸 Blood Group: ${member.bloodGroup}\n`;
@@ -1243,7 +1336,7 @@ function buildEmergencyText(member, documents) {
   if (contacts.length) {
     text += `🚨 Emergency Contacts:\n`;
     contacts.forEach((c, i) => {
-      text += `  ${i+1}. ${c.name} (${c.relationship}) — ${c.phone}\n`;
+      text += `  ${i+1}. ${c.name} (${c.relationship}) -- ${c.phone}\n`;
       if (c.description) text += `     ${c.description}\n`;
     });
     text += `─────────────────────────────\n`;

@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
 
@@ -19,6 +19,7 @@ const STEPS = ['Person', 'Dates', 'Flights', 'Reason', 'Review'];
 export async function renderAddTrip(container, params = {}) {
   const { tripId, mode } = params;
   const isEdit = mode === 'edit' && tripId;
+  let isViewMode = isEdit;  // existing trips open in view mode by default
 
   const data = await getCachedTravelData();
   const { members = [], trips = [] } = data || {};
@@ -39,7 +40,7 @@ export async function renderAddTrip(container, params = {}) {
     travelWith:   existingTrip?.travelWith   || [],
   };
 
-  let currentStep = 0;
+  let currentStep = isViewMode ? (STEPS.length - 1) : 0;  // view starts on Review
 
   // Suggestions from history
   const allFlights = [...new Set(trips.flatMap(t => [t.flightInward, t.flightOutward]).filter(Boolean))];
@@ -58,18 +59,29 @@ export async function renderAddTrip(container, params = {}) {
         `).join('')}
       </div>
       <div style="padding:0 20px 4px 20px;font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">
-        Step ${currentStep + 1} of ${STEPS.length} — ${STEPS[currentStep]}
+        Step ${currentStep + 1} of ${STEPS.length} -- ${STEPS[currentStep]}
       </div>
       <div id="step-content" style="padding:20px;"></div>
+      ${isViewMode ? '' : `
       <div style="padding:16px 20px 32px;display:flex;gap:10px;">
-        ${currentStep > 0 ? `<button class="btn btn-secondary" style="flex:1;" id="prev-btn">← Back</button>` : ''}
+        ${currentStep > 0 ? '<button class="btn btn-secondary" style="flex:1;" id="prev-btn">← Back</button>' : ''}
         <button class="btn btn-primary" style="flex:2;" id="next-btn">
           ${currentStep === STEPS.length - 1 ? (isEdit ? '💾 Save Changes' : '✅ Save Trip') : 'Next →'}
         </button>
       </div>
+      `}
     `;
 
     document.getElementById('back-btn').addEventListener('click', () => navigate('travel-log'));
+
+    if (isViewMode) {
+      document.getElementById('edit-trip-btn')?.addEventListener('click', () => {
+        isViewMode = false;
+        currentStep = 0;
+        render();
+      });
+      document.getElementById('share-trip-btn')?.addEventListener('click', () => shareTripText());
+    }
     document.getElementById('prev-btn')?.addEventListener('click', () => { currentStep--; render(); });
     document.getElementById('next-btn').addEventListener('click', () => handleNext());
 
@@ -169,7 +181,7 @@ export async function renderAddTrip(container, params = {}) {
         <label class="form-label">Outward Flight back to India</label>
         <div id="flight-outward-input"></div>
       </div>
-      <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">e.g. QR512, AI351 — tap a suggestion or type new</p>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">e.g. QR512, AI351 -- tap a suggestion or type new</p>
     `;
 
     new SmartInput(document.getElementById('flight-inward-input'), {
@@ -344,7 +356,7 @@ export async function renderAddTrip(container, params = {}) {
       if (errEl) errEl.textContent = 'Save failed: ' + err.message;
       document.getElementById('next-btn').disabled = false;
       document.getElementById('next-btn').textContent = isEdit ? '💾 Save Changes' : '✅ Save Trip';
-      showToast('Save failed — check connection', 'error');
+      showToast('Save failed -- check connection', 'error');
     }
   }
 

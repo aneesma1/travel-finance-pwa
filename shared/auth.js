@@ -1,6 +1,6 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/auth.js ──────────────────────────────────────────────────────────
-// Google OAuth 2.0 — Implicit flow (token response)
+// Google OAuth 2.0 -- Implicit flow (token response)
 // No client secret needed. Token returned directly in URL hash.
 // Safe for public browser PWAs with Web Application client type.
 
@@ -63,7 +63,7 @@ export async function startOAuthFlow(clientId, redirectUri) {
   const params = new URLSearchParams({
     client_id:     clientId,
     redirect_uri:  redirectUri,
-    response_type: 'token',   // implicit — token returned in hash, no secret needed
+    response_type: 'token',   // implicit -- token returned in hash, no secret needed
     scope:         SCOPES,
     state,
     prompt:        'consent',
@@ -97,7 +97,7 @@ export async function handleOAuthCallback(clientId, redirectUri) {
   // Validate state
   const savedState = localStorage.getItem(STATE_KEY);
   if (savedState && state && state !== savedState) {
-    throw new Error('OAuth state mismatch — possible CSRF attack');
+    throw new Error('OAuth state mismatch -- possible CSRF attack');
   }
 
   // Save token
@@ -107,7 +107,7 @@ export async function handleOAuthCallback(clientId, redirectUri) {
   // Fetch user profile
   await fetchAndSaveProfile();
 
-  // Clean URL — remove hash
+  // Clean URL -- remove hash
   window.history.replaceState({}, '', window.location.pathname);
   return { access_token: accessToken };
 }

@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
 
@@ -114,7 +114,7 @@ export async function renderSettings(container) {
         </div>
       </div>
 
-      <!-- Access Control — admin only -->
+      <!-- Access Control -- admin only -->
       ${isAdmin() ? `
       <div class="section-title">Family Access</div>
       <div class="card" style="margin:0 16px;">
@@ -158,8 +158,8 @@ export async function renderSettings(container) {
       <!-- App info -->
       <div class="section-title">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.2.2 — 2026-03-21 — Phase 1A</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.2.2 — 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
       </div>
 
       <!-- Hidden file inputs -->
@@ -452,7 +452,7 @@ function bindEvents(members, data, container) {
     if (!confirm('Clear local cache? Your Drive data is safe. The app will re-download everything from Drive on next open.')) return;
     try {
       await clearAllCachedData();
-      showToast('Cache cleared — reloading…', 'success');
+      showToast('Cache cleared -- reloading…', 'success');
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
       showToast('Clear failed: ' + err.message, 'error');
@@ -561,12 +561,12 @@ function openImportModal(container, data, members) {
       statusBar.textContent = `Saving ${resolved.length} records to Drive…`;
 
       try {
-        const newData = await writeData('travel', (remote) => {
-          const trips = remote.trips || [];
-          const existingKeys = new Set(trips.map(t => `${t.personId}|${t.dateOutIndia}`));
+        const newData = await localSave('travel', (remote) => {
+          const trips = [...(remote.trips || [])];
+          const existingKeys = new Set(trips.map(t => t.personId + '|' + t.dateOutIndia));
 
           resolved.forEach(rec => {
-            const key = `${rec.personId}|${rec.dateOutIndia}`;
+            const key = rec.personId + '|' + rec.dateOutIndia;
             if (existingKeys.has(key)) { skipped++; return; }
             trips.push(rec);
             existingKeys.add(key);
@@ -591,7 +591,7 @@ function openImportModal(container, data, members) {
     }
   });
 
-  // Handle import complete — close modal and navigate
+  // Handle import complete -- close modal and navigate
   toolContainer.addEventListener('import:complete', () => {
     setTimeout(() => {
       modal.classList.add('hidden');

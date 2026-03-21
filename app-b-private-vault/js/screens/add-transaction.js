@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form
 
@@ -104,7 +104,7 @@ export async function renderAddTransaction(container, params = {}) {
 
         <!-- Notes -->
         <div class="form-group" style="margin:0;">
-          <label class="form-label">Photos <span style="color:var(--text-muted);font-weight:400;">(receipt, cheque — optional)</span></label>
+          <label class="form-label">Photos <span style="color:var(--text-muted);font-weight:400;">(receipt, cheque -- optional)</span></label>
           <div id="txn-photo-slots" style="margin-bottom:4px;"></div>
 
           <label class="form-label">Notes <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>

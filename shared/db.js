@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/db.js ────────────────────────────────────────────────────────────
 // IndexedDB offline cache
 // Stores the full data JSON locally so app works without internet
@@ -26,7 +26,7 @@ export function openDB() {
 
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      // Key-value stores — all use 'key' as keyPath
+      // Key-value stores -- all use 'key' as keyPath
       Object.values(STORES).forEach(storeName => {
         if (!db.objectStoreNames.contains(storeName)) {
           db.createObjectStore(storeName, { keyPath: 'key' });

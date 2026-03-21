@@ -1,4 +1,4 @@
-// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/calendar.js ────────────────────────────────────────
 // Google Calendar API wrapper
 // Handles: create / update / delete expiry alert events
@@ -42,7 +42,7 @@ export async function updateAlertEvent(eventId, doc, memberName, daysBeforeExpir
   }, CLIENT_ID);
 
   if (res.status === 404) {
-    // Event was deleted externally — create fresh
+    // Event was deleted externally -- create fresh
     return createAlertEvent(doc, memberName, daysBeforeExpiry);
   }
   if (!res.ok) throw new Error(`Calendar update failed: ${res.status}`);
@@ -107,7 +107,7 @@ export async function deleteAllDocumentAlerts(doc) {
 }
 
 // ── Check for documents expiring soon and send alerts ────────────────────────
-// Called on app load — creates calendar events for newly expiring docs
+// Called on app load -- creates calendar events for newly expiring docs
 export async function runExpiryCheck(data) {
   if (!data) return;
   const { members = [], documents = [] } = data;
@@ -150,10 +150,10 @@ function buildEventBody(doc, memberName, daysBeforeExpiry, alertDate) {
   const icon = docIcons[doc.docName] || '📄';
 
   return {
-    summary: `${icon} ${memberName} — ${doc.docName} expires in ${daysBeforeExpiry} days`,
+    summary: `${icon} ${memberName} -- ${doc.docName} expires in ${daysBeforeExpiry} days`,
     description: [
       `Document: ${doc.docName}`,
-      `Number: ${doc.docNumber || '—'}`,
+      `Number: ${doc.docNumber || '--'}`,
       `Expiry Date: ${doc.expiryDate}`,
       `Person: ${memberName}`,
       `Alert: ${daysBeforeExpiry} days before expiry`,
