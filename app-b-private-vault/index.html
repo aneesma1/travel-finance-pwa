@@ -1,4 +1,4 @@
-<!-- version: v2.3 — 2026-03-18 -->
+<!-- version: v2.6 — 2026-03-18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -116,9 +116,13 @@
   // ── Boot sequence ──────────────────────────────────────────────────
   async function boot() {
     try {
-      // Handle OAuth callback
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.has('code') || urlParams.has('error')) {
+      // Handle OAuth callback — implicit flow returns token in URL hash
+      const urlHash    = window.location.hash;
+      const urlSearch  = window.location.search;
+      const isCallback = urlHash.includes('access_token') ||
+                         urlSearch.includes('error') ||
+                         urlHash.includes('error');
+      if (isCallback) {
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
       }
 

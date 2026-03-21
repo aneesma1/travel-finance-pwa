@@ -1,4 +1,4 @@
-// v2.3 — 2026-03-18
+// v2.6 — 2026-03-18
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool — used by both App A (travel) and App B (finance)
 // Steps: (1) Pick file → (2) Map columns → (3) Preview + validate → (4) Import

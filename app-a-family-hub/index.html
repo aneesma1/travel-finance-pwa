@@ -1,4 +1,4 @@
-<!-- version: v2.3 — 2026-03-18 -->
+<!-- version: v2.6 — 2026-03-18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -107,19 +107,21 @@
   // ── Auth + boot sequence ───────────────────────────────────────────
   async function boot() {
     try {
-      // 1. Handle OAuth callback if present
-      const urlParams = new URLSearchParams(window.location.search);
-      console.log('Boot: URL params:', window.location.href);
-      console.log('Boot: has code:', urlParams.has('code'));
-      console.log('Boot: has error:', urlParams.has('error'));
-      if (urlParams.has('code') || urlParams.has('error')) {
+      // 1. Handle OAuth callback — implicit flow returns token in URL hash
+      const urlHash    = window.location.hash;
+      const urlSearch  = window.location.search;
+      const isCallback = urlHash.includes('access_token') || 
+                         urlSearch.includes('error') ||
+                         urlHash.includes('error');
+
+      console.log('Boot: hash:', urlHash.slice(0,60));
+      console.log('Boot: isCallback:', isCallback);
+
+      if (isCallback) {
         console.log('Boot: handling OAuth callback...');
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        console.log('Boot: callback handled, isAuthenticated:', isAuthenticated());
+        console.log('Boot: callback done, isAuthenticated:', isAuthenticated());
       }
-
-      // 2. Check auth
-      console.log('Boot: isAuthenticated:', isAuthenticated());
       if (!isAuthenticated()) {
         showLogin();
         return;

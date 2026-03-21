@@ -1,4 +1,4 @@
-// v2.3 — 2026-03-18
+// v2.6 — 2026-03-18
 // ─── app-a-family-hub/js/auth-config.js ─────────────────────────────────────
 // Google OAuth client configuration for App A
 //
@@ -28,7 +28,7 @@
 // The REDIRECT_URI below is auto-detected from window.location — no hardcoding.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CLIENT_ID = '36787254386-o0pikuppj1ebcceh4qrjofu3fvqch6bo.apps.googleusercontent.com';
+export const CLIENT_ID = '36787254386-n0ee36r22mhr3g5620q10ob4phe6i59o.apps.googleusercontent.com';
 
 // Auto-detects current origin + path — works regardless of where folder is moved
 // e.g. http://localhost:8080/app-a-family-hub/

@@ -1,4 +1,4 @@
-// v2.3 — 2026-03-18
+// v2.6 — 2026-03-18
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
 // Summary cards: Income / Spend / Net per currency

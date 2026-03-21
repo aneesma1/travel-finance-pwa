@@ -1,4 +1,4 @@
-// v2.3 — 2026-03-18
+// v2.6 — 2026-03-18
 // ─── app-a-family-hub/js/calendar.js ────────────────────────────────────────
 // Google Calendar API wrapper
 // Handles: create / update / delete expiry alert events

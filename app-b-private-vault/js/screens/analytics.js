@@ -1,4 +1,4 @@
-// v2.3 — 2026-03-18
+// v2.6 — 2026-03-18
 // ─── app-b-private-vault/js/screens/analytics.js ────────────────────────────
 // Analytics: monthly bar chart, category donut, year-over-year comparison
 // Pure Canvas API — no external chart library needed

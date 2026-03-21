@@ -1,4 +1,4 @@
-// v2.3 — 2026-03-18
+// v2.6 — 2026-03-18
 // ─── app-b-private-vault/js/auth-config.js ──────────────────────────────────
 // Google OAuth client configuration for App B
 //
@@ -19,7 +19,7 @@
 // REDIRECT_URI will keep working without any changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CLIENT_ID = '36787254386-o0pikuppj1ebcceh4qrjofu3fvqch6bo.apps.googleusercontent.com';
+export const CLIENT_ID = '36787254386-n0ee36r22mhr3g5620q10ob4phe6i59o.apps.googleusercontent.com';
 
 function detectRedirectUri() {
   const loc = window.location;
