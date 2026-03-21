@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
 // Summary cards: Income / Spend / Net per currency
@@ -237,7 +237,7 @@ export async function renderDashboard(container) {
     }
     list.innerHTML = txns.map((t, i) => txnRow(t, i === txns.length - 1)).join('');
     list.querySelectorAll('.txn-tap').forEach(row => {
-      row.addEventListener('click', () => navigate('add-transaction', { txnId: row.dataset.id, mode: 'edit' }));
+      row.addEventListener('click', () => navigate('transaction-view', { txnId: row.dataset.id }));
     });
   }
 

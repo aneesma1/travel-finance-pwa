@@ -1,10 +1,11 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/router.js ───────────────────────────────────────
 'use strict';
 
 import { renderDashboard }      from './screens/dashboard.js';
 import { renderTransactions }   from './screens/transactions.js';
 import { renderAddTransaction } from './screens/add-transaction.js';
+import { renderTransactionView } from './screens/transaction-view.js';
 import { renderAnalytics }      from './screens/analytics.js';
 import { renderSettings }       from './screens/settings.js';
 
@@ -12,6 +13,7 @@ const SCREENS = {
   dashboard:       renderDashboard,
   transactions:    renderTransactions,
   'add-transaction': renderAddTransaction,
+  'transaction-view': renderTransactionView,
   analytics:       renderAnalytics,
   settings:        renderSettings,
 };
@@ -33,6 +35,7 @@ function updateNav(screenName) {
   const navMap = {
     'dashboard':       'dashboard',
     'add-transaction': 'transactions',
+    'transaction-view': 'transactions',
     'transactions':    'transactions',
     'analytics':       'analytics',
     'settings':        'settings',

@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/documents.js ───────────────────────────────
 // Document Tracker: cards grouped by person, life bars, expiry badges
 
@@ -6,6 +6,7 @@
 
 import { getCachedTravelData } from '../../../shared/db.js';
 import { navigate } from '../router.js';
+import { renderPhotoThumbnails } from '../../../shared/photo-picker.js';
 import {
   daysFromToday, formatDisplayDate,
   expiryStatus, expiryStatusColor, expiryLifePercent

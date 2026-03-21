@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
 
@@ -6,7 +6,7 @@
 
 import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '../../../shared/db.js';
 import {
-  writeData, downloadLocalBackup, restoreFromLocalFile,
+  writeData, downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
   getMirrorSnapshots, restoreFromMirror
 } from '../../../shared/drive.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
@@ -102,6 +102,14 @@ export async function renderSettings(container, params = {}) {
           </div>
           <span style="color:var(--text-muted);">›</span>
         </div>
+        <div class="list-row" id="photo-zip-btn">
+          <span style="font-size:20px;">📦</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Export Transaction Photos as ZIP</div>
+            <div style="font-size:12px;color:var(--text-muted);">Receipts, cheques, screenshots</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
         <div class="list-row" id="clear-cache" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
           <span style="font-size:20px;">🧹</span>
           <div style="flex:1;">
@@ -112,10 +120,12 @@ export async function renderSettings(container, params = {}) {
         </div>
       </div>
 
-      <div class="section-title">Categories</div>
-      <div id="cat-list" style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:12px 16px;">
-        <div style="display:flex;flex-wrap:wrap;gap:8px;" id="cat-chips"></div>
-        <button class="btn btn-secondary" style="margin-top:10px;font-size:13px;padding:8px 16px;" id="add-cat-btn">+ Add Category</button>
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>Categories</span>
+        <button class="btn btn-primary" style="padding:5px 12px;font-size:12px;" id="add-cat-btn">+ Add</button>
+      </div>
+      <div id="cat-list" style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
+        <div id="cat-chips"></div>
       </div>
 
       <div class="section-title" style="margin-top:16px;">Sync Status</div>
@@ -130,33 +140,127 @@ export async function renderSettings(container, params = {}) {
       </div>
     `;
 
-    // Render category chips
-    const allCats = [...new Set([...savedCats])];
+    // Category Manager — full list with count, rename, reassign, delete
+    const DEFAULT_CATS = ['Food','Groceries','Rent','Salary','Transport','Medical','Education','Shopping','Utilities','Travel','Entertainment','Transfer','Investment','Insurance','Freelance','Other'];
+    const allCats = [...new Set([...DEFAULT_CATS, ...savedCats])];
     const chips = document.getElementById('cat-chips');
-    chips.innerHTML = allCats.map(c => `
-      <span style="background:var(--primary-bg);color:var(--primary);padding:5px 12px;border-radius:999px;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:5px;">
-        ${c}
-        <button data-cat="${c}" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;padding:0;line-height:1;">×</button>
-      </span>
-    `).join('') || `<span style="font-size:13px;color:var(--text-muted);">No custom categories</span>`;
 
-    chips.querySelectorAll('[data-cat]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const cat = btn.dataset.cat;
-        if (!confirm(`Remove category "${cat}"?`)) return;
-        const newData = await writeData('finance', r => ({ ...r, categories: (r.categories||[]).filter(c => c !== cat) }));
-        await setCachedFinanceData(newData);
-        renderSettings(container, { tab: 'data' });
+    function getCatCount(cat) {
+      return transactions.filter(t => t.category1 === cat || t.category2 === cat).length;
+    }
+
+    function renderCatList() {
+      if (!allCats.length) {
+        chips.innerHTML = `<div style="padding:16px;font-size:13px;color:var(--text-muted);">No categories yet</div>`;
+        return;
+      }
+      chips.innerHTML = allCats.map((c, idx) => {
+        const count = getCatCount(c);
+        const isDefault = DEFAULT_CATS.includes(c);
+        return `
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;${idx < allCats.length-1 ? 'border-bottom:1px solid var(--border-light);' : ''}">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:600;color:var(--text);">${c}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">${count} transaction${count !== 1 ? 's' : ''}${isDefault ? ' · built-in' : ''}</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              ${!isDefault ? `<button data-rename="${c}" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--text-secondary);cursor:pointer;">Rename</button>` : ''}
+              ${count > 0 ? `<button data-reassign="${c}" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--text-secondary);cursor:pointer;">Reassign</button>` : ''}
+              ${!isDefault ? `<button data-delete="${c}" style="background:none;border:1px solid var(--danger-bg);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--danger);cursor:pointer;">Delete</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      chips.querySelectorAll('[data-rename]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const oldName = btn.dataset.rename;
+          const newName = prompt(`Rename "${oldName}" to:`, oldName);
+          if (!newName?.trim() || newName.trim() === oldName) return;
+          const nn = newName.trim();
+          const newData = await writeData('finance', r => ({
+            ...r,
+            categories: (r.categories||[]).map(c => c === oldName ? nn : c),
+            transactions: (r.transactions||[]).map(t => ({
+              ...t,
+              category1: t.category1 === oldName ? nn : t.category1,
+              category2: t.category2 === oldName ? nn : t.category2,
+            }))
+          }));
+          await setCachedFinanceData(newData);
+          showToast(`Renamed to "${nn}" — all transactions updated`, 'success');
+          renderSettings(container, { tab: 'data' });
+        });
       });
-    });
+
+      chips.querySelectorAll('[data-reassign]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const fromCat = btn.dataset.reassign;
+          const others = allCats.filter(c => c !== fromCat);
+          if (!others.length) { showToast('No other categories to reassign to', 'warning'); return; }
+          const target = prompt(`Reassign all "${fromCat}" transactions to:
+${others.map((c,i)=>`${i+1}. ${c}`).join('
+')}
+
+Enter name:`);
+          if (!target?.trim() || !others.includes(target.trim())) {
+            showToast('Invalid category name', 'warning'); return;
+          }
+          const tt = target.trim();
+          const newData = await writeData('finance', r => ({
+            ...r,
+            transactions: (r.transactions||[]).map(t => ({
+              ...t,
+              category1: t.category1 === fromCat ? tt : t.category1,
+              category2: t.category2 === fromCat ? tt : t.category2,
+            }))
+          }));
+          await setCachedFinanceData(newData);
+          showToast(`All "${fromCat}" reassigned to "${tt}"`, 'success');
+          renderSettings(container, { tab: 'data' });
+        });
+      });
+
+      chips.querySelectorAll('[data-delete]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const cat = btn.dataset.delete;
+          const count = getCatCount(cat);
+          const msg = count > 0
+            ? `Delete "${cat}"? ${count} transactions will lose this category.`
+            : `Delete category "${cat}"?`;
+          if (!confirm(msg)) return;
+          const idx = allCats.indexOf(cat);
+          if (idx > -1) allCats.splice(idx, 1);
+          const newData = await writeData('finance', r => ({
+            ...r,
+            categories: (r.categories||[]).filter(c => c !== cat),
+            transactions: (r.transactions||[]).map(t => ({
+              ...t,
+              category1: t.category1 === cat ? '' : t.category1,
+              category2: t.category2 === cat ? '' : t.category2,
+            }))
+          }));
+          await setCachedFinanceData(newData);
+          showToast(`"${cat}" deleted`, 'success');
+          renderCatList();
+        });
+      });
+    }
+
+    renderCatList();
 
     document.getElementById('add-cat-btn').addEventListener('click', async () => {
       const name = prompt('New category name:');
       if (!name?.trim()) return;
-      const newData = await writeData('finance', r => ({ ...r, categories: [...new Set([...(r.categories||[]), name.trim()])] }));
+      const nn = name.trim();
+      if (allCats.includes(nn)) { showToast('Category already exists', 'warning'); return; }
+      allCats.push(nn);
+      const newData = await writeData('finance', r => ({
+        ...r, categories: [...new Set([...(r.categories||[]), nn])]
+      }));
       await setCachedFinanceData(newData);
-      showToast('Category added', 'success');
-      renderSettings(container, { tab: 'data' });
+      showToast(`"${nn}" added`, 'success');
+      renderCatList();
     });
 
     document.getElementById('backup-now').addEventListener('click', async () => {
@@ -359,7 +463,8 @@ export async function renderSettings(container, params = {}) {
     const mo  = document.getElementById('exp-month')?.value;
     const cur = document.getElementById('exp-currency')?.value || 'All';
     const moLabel = mo ? MONTHS[Number(mo)-1] : 'All';
-    const filename = `Finance_Export_${moLabel}${yr}_${cur}.xlsx`;
+    const ts = timestampSuffix();
+    const filename = `Finance_Export_${cur}_${yr}${moLabel ? '_'+moLabel : ''}_${ts}.xlsx`;
 
     if (!sendEmail) {
       // Direct download
@@ -407,7 +512,37 @@ export async function renderSettings(container, params = {}) {
   function renderSecurityTab() {
     const tab = document.getElementById('tab-content');
     tab.innerHTML = `
-      <div class="section-title">Change PIN</div>
+      <div class="section-title">Security Dashboard</div>
+      <div style="margin:0 16px 0;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
+        <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg);">
+          <span style="font-size:20px;">🛡️</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Security & Access</div>
+            <div style="font-size:12px;color:var(--text-muted);">Sessions · Activity log · Revoke access</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:16px;">Auto-lock</div>
+      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:16px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Lock app after inactivity</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;" id="lock-timeout-pills">
+          ${[
+            { label:'1 min',  ms: 60000 },
+            { label:'5 min',  ms: 300000 },
+            { label:'15 min', ms: 900000 },
+            { label:'30 min', ms: 1800000 },
+            { label:'Never',  ms: 0 }
+          ].map(opt => {
+            const current = Number(localStorage.getItem('vault_lock_timeout_ms') || 300000);
+            const active = opt.ms === current || (opt.ms === 300000 && !localStorage.getItem('vault_lock_timeout_ms'));
+            return \`<button class="pill-btn \${active ? 'active' : ''}" data-ms="\${opt.ms}" style="padding:8px 16px;border-radius:20px;border:1.5px solid \${active ? 'var(--primary)' : 'var(--border)'};background:\${active ? 'var(--primary-bg)' : 'transparent'};color:\${active ? 'var(--primary)' : 'var(--text)'};font-size:14px;cursor:pointer;">\${opt.label}</button>\`;
+          }).join('')}
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:16px;">Change PIN</div>
       <div class="card" style="margin:0 16px;padding:20px;">
         <div class="form-group" style="margin:0 0 16px;">
           <label class="form-label">Current PIN</label>
@@ -424,15 +559,25 @@ export async function renderSettings(container, params = {}) {
         <div id="pin-error" style="color:var(--danger);font-size:13px;text-align:center;min-height:18px;margin-bottom:12px;"></div>
         <button class="btn btn-primary btn-full" id="change-pin-btn">🔑 Change PIN</button>
       </div>
-
-      <div class="section-title" style="margin-top:16px;">Auto-lock</div>
-      <div style="margin:0 16px;padding:14px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;">
-          App locks automatically after <strong>5 minutes</strong> in background.<br>
-          5 wrong PIN attempts triggers a <strong>30-second lockout</strong>.
-        </div>
-      </div>
     `;
+
+    document.getElementById('security-dashboard-btn')?.addEventListener('click', () => {
+      openSecurityDashboard(container);
+    });
+
+    document.querySelectorAll('#lock-timeout-pills .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ms = Number(btn.dataset.ms);
+        localStorage.setItem('vault_lock_timeout_ms', String(ms));
+        document.querySelectorAll('#lock-timeout-pills .pill-btn').forEach(b => {
+          const active = b === btn;
+          b.style.border = `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`;
+          b.style.background = active ? 'var(--primary-bg)' : 'transparent';
+          b.style.color = active ? 'var(--primary)' : 'var(--text)';
+        });
+        showToast(`Auto-lock set to ${btn.textContent}`, 'success');
+      });
+    });
 
     document.getElementById('change-pin-btn').addEventListener('click', async () => {
       const cur  = document.getElementById('current-pin').value;
@@ -477,11 +622,70 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v1.0 — Phase 1B</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.2 — 2026-03-21 — Phase 1B</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.2 — 2026-03-21 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
       </div>
     `;
+    document.getElementById('safe-exit-btn').addEventListener('click', async () => {
+      showToast('Syncing before locking…', 'info', 1500);
+      try {
+        await new Promise(r => setTimeout(r, 800));
+        showToast('Vault locked. Stay safe! 🔒', 'success', 1500);
+        setTimeout(() => {
+          // Fire the lock — set appUnlocked to false and reload to PIN screen
+          window.location.reload();
+        }, 1600);
+      } catch (err) {
+        showToast('Lock failed: ' + err.message, 'error');
+      }
+    });
+
+    document.getElementById('photo-zip-btn')?.addEventListener('click', async () => {
+      try {
+        showToast('Preparing photos…', 'info', 2000);
+        const cached = await getCachedFinanceData();
+        if (!cached) { showToast('No data found', 'warning'); return; }
+
+        if (!window.JSZip) {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+            s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+
+        const zip = new JSZip();
+        let count = 0;
+
+        (cached.transactions || []).forEach(t => {
+          (t.photos || []).forEach((p, i) => {
+            if (p?.startsWith('data:')) {
+              const b64 = p.split(',')[1];
+              const date = t.date || 'unknown';
+              const desc = (t.description || 'txn').replace(/[^a-zA-Z0-9]/g,'_').slice(0,20);
+              zip.folder('transactions').file(`${date}_${desc}_${i+1}.jpg`, b64, { base64: true });
+              count++;
+            }
+          });
+        });
+
+        if (count === 0) { showToast('No photos found to export', 'warning'); return; }
+
+        const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
+        const blob = await zip.generateAsync({ type:'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Finance_Photos_${ts}.zip`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast(`✅ ${count} photos exported`, 'success');
+      } catch (err) {
+        showToast('ZIP export failed: ' + err.message, 'error');
+      }
+    });
+
     document.getElementById('signout-btn').addEventListener('click', () => {
       if (confirm('Sign out? You will need to re-authenticate to sync data.')) {
         clearAuth();

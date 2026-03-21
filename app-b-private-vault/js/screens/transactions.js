@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
 
@@ -6,6 +6,7 @@
 
 import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
 import { writeData } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { txnRow } from './dashboard.js';
 import {
@@ -30,7 +31,158 @@ export async function renderTransactions(container) {
   `;
 
   document.getElementById('add-fab').addEventListener('click', () => navigate('add-transaction'));
-  document.getElementById('export-btn').addEventListener('click', () => navigate('settings', { tab: 'export' }));
+  document.getElementById('export-btn').addEventListener('click', () => {
+    openExportSheet();
+  });
+
+  function openExportSheet() {
+    document.getElementById('export-sheet')?.remove();
+    document.getElementById('export-backdrop')?.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'export-sheet';
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 40px;box-shadow:0 -4px 24px rgba(0,0,0,0.15);';
+
+    const { timestampSuffix } = window._driveHelpers || {};
+    const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
+
+    // Summary of active filters
+    const filterSummary = [
+      activeCurrency,
+      activeYear,
+      activeMonth ? MONTHS[activeMonth-1] : null,
+      activeCategory || null,
+      activeAccount || null,
+    ].filter(Boolean).join(' · ');
+
+    sheet.innerHTML = \`
+      <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Export</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Active filters: \${filterSummary}</div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Format</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="export-format-pills">
+        <button class="sheet-pill active" data-fmt="xlsx">📊 Excel</button>
+        <button class="sheet-pill" data-fmt="csv">📄 CSV</button>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Scope</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;" id="export-scope-pills">
+        <button class="sheet-pill active" data-scope="filtered">Current filters</button>
+        <button class="sheet-pill" data-scope="all">All data</button>
+      </div>
+
+      <div id="export-status" style="font-size:13px;color:var(--text-muted);min-height:20px;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button id="export-download" class="btn btn-primary" style="flex:1;">📥 Download</button>
+        <button id="export-share" class="btn btn-secondary" style="flex:1;">📤 Share</button>
+      </div>
+    \`;
+
+    const style = document.createElement('style');
+    style.textContent = '.sheet-pill{padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer;} .sheet-pill.active{border-color:var(--primary);background:var(--primary-bg);color:var(--primary);font-weight:600;}';
+    sheet.appendChild(style);
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'export-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:999;';
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener('click', close);
+
+    let selectedFmt   = 'xlsx';
+    let selectedScope = 'filtered';
+
+    sheet.querySelectorAll('#export-format-pills .sheet-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedFmt = btn.dataset.fmt;
+        sheet.querySelectorAll('#export-format-pills .sheet-pill').forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+
+    sheet.querySelectorAll('#export-scope-pills .sheet-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedScope = btn.dataset.scope;
+        sheet.querySelectorAll('#export-scope-pills .sheet-pill').forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+
+    async function doExport(deliver) {
+      const status = document.getElementById('export-status');
+      status.textContent = 'Preparing export…';
+
+      const allTxns = (await getCachedFinanceData())?.transactions || [];
+      const scopedTxns = selectedScope === 'filtered'
+        ? allTxns.filter(t => {
+            if (t.currency !== activeCurrency) return false;
+            if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
+            if (activeMonth && Number(t.date?.slice(5,7)) !== activeMonth) return false;
+            if (activeCategory && t.category1 !== activeCategory) return false;
+            if (activeAccount && t.account !== activeAccount) return false;
+            return true;
+          })
+        : allTxns;
+
+      const scopeLabel = selectedScope === 'filtered' ? filterSummary.replace(/ · /g,'_') : 'All';
+      const filename = \`Finance_\${scopeLabel}_\${ts}.\${selectedFmt}\`;
+
+      status.textContent = \`Exporting \${scopedTxns.length} records…\`;
+
+      if (selectedFmt === 'csv') {
+        const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Currency'];
+        const rows = scopedTxns.map(t => [
+          t.timestamp||'', t.date||'', t.description||'',
+          t.amountSpend??'', t.income??'', t.category1||'',
+          t.category2||'', t.notes1||'', t.account||'', t.currency||''
+        ]);
+        const csv = [headers, ...rows].map(r => r.map(v => \`"\${String(v).replace(/"/g,'""')}"\`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        if (deliver === 'download') {
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+          a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+        } else if (navigator.share) {
+          await navigator.share({ files: [new File([blob], filename, { type: 'text/csv' })] }).catch(()=>{});
+        }
+        status.textContent = \`✅ \${filename}\`;
+        return;
+      }
+
+      // XLSX export via SheetJS
+      if (!window.XLSX) {
+        await new Promise((res,rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+      const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Currency'];
+      const rows = scopedTxns.map(t => [
+        t.timestamp||'', t.date||'', t.description||'',
+        t.amountSpend??'', t.income??'', t.category1||'',
+        t.category2||'', t.notes1||'', t.account||'', t.currency||''
+      ]);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+
+      if (deliver === 'download') {
+        XLSX.writeFile(wb, filename);
+      } else if (navigator.share) {
+        const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+        const blob = new Blob([wbout], { type:'application/octet-stream' });
+        await navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(()=>{});
+      }
+      status.textContent = \`✅ \${filename}\`;
+      setTimeout(close, 1500);
+    }
+
+    document.getElementById('export-download').addEventListener('click', () => doExport('download'));
+    document.getElementById('export-share').addEventListener('click', () => doExport('share'));
+  }
 
   const data = await getCachedFinanceData();
   if (!data) { renderEmpty(document.getElementById('txn-list-wrap')); return; }
@@ -54,8 +206,16 @@ export async function renderTransactions(container) {
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
     const activeCount = [activeCategory, activeAccount, activeMonth !== 0].filter(Boolean).length;
 
+    // Collapsed summary chips + filter icon
+    const summaryParts = [];
+    if (activeMonth) summaryParts.push(MONTHS[activeMonth-1]);
+    if (activeCategory) summaryParts.push(activeCategory);
+    if (activeAccount) summaryParts.push(activeAccount);
+    const summaryText = summaryParts.length ? summaryParts.join(' · ') : 'All transactions';
+
     document.getElementById('filter-bar-wrap').innerHTML = `
       <div style="background:var(--surface);border-bottom:1px solid var(--border);">
+        <!-- Currency tabs -->
         <div style="padding:10px 16px 0;">
           <div class="currency-tabs">
             ${CURRENCIES.map(c => `
@@ -63,46 +223,166 @@ export async function renderTransactions(container) {
             `).join('')}
           </div>
         </div>
-        <div class="filter-bar" style="border-bottom:none;padding-top:8px;">
-          <div class="filter-chips">
-            ${years.map(y => `
-              <button class="filter-chip ${activeYear === Number(y) ? 'active' : ''}" data-year="${y}">${y}</button>
-            `).join('')}
-            <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 2px;"></div>
-            <button class="filter-chip ${!activeMonth ? 'active' : ''}" data-month="0">All</button>
-            ${MONTHS.map((m,i) => `
-              <button class="filter-chip ${activeMonth === i+1 ? 'active' : ''}" data-month="${i+1}">${m}</button>
-            `).join('')}
-            ${allCategories.length ? `
-              <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 2px;"></div>
-              ${allCategories.map(c => `
-                <button class="filter-chip ${activeCategory === c ? 'active' : ''}" data-category="${c}">🏷 ${c}</button>
-              `).join('')}
-            ` : ''}
-            <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 2px;"></div>
-            ${allAccounts.map(a => `
-              <button class="filter-chip ${activeAccount === a ? 'active' : ''}" data-account="${a}">${a}</button>
-            `).join('')}
-            ${activeCount > 0 ? `<button id="clear-filters" class="filter-clear">✕ Clear</button>` : ''}
+        <!-- Collapsed filter summary row -->
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;" id="filter-summary-row">
+          <div style="flex:1;font-size:13px;color:${activeCount > 0 ? 'var(--primary)' : 'var(--text-muted)'};">
+            ${activeYear} · ${summaryText}
           </div>
+          ${activeCount > 0 ? `<button id="clear-filters-quick" style="font-size:12px;color:var(--danger);background:none;border:none;cursor:pointer;padding:0;">✕ Clear</button>` : ''}
+          <button id="open-filter-sheet" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1px solid ${activeCount > 0 ? 'var(--primary)' : 'var(--border)'};background:${activeCount > 0 ? 'var(--primary-bg)' : 'transparent'};color:${activeCount > 0 ? 'var(--primary)' : 'var(--text-secondary)'};font-size:13px;font-weight:500;cursor:pointer;">
+            ⚙️ Filters${activeCount > 0 ? ` (${activeCount})` : ''}
+          </button>
         </div>
       </div>
     `;
 
+    // Currency tab handlers
     document.querySelectorAll('[data-currency]').forEach(btn =>
-      btn.addEventListener('click', () => { setHashParams({ currency: btn.dataset.currency }); renderTransactions(container); }));
-    document.querySelectorAll('[data-year]').forEach(btn =>
-      btn.addEventListener('click', () => { setHashParams({ year: btn.dataset.year }); renderTransactions(container); }));
-    document.querySelectorAll('[data-month]').forEach(btn =>
-      btn.addEventListener('click', () => { setHashParams({ month: Number(btn.dataset.month) || null }); renderTransactions(container); }));
-    document.querySelectorAll('[data-category]').forEach(btn =>
-      btn.addEventListener('click', () => { setHashParams({ category: activeCategory === btn.dataset.category ? null : btn.dataset.category }); renderTransactions(container); }));
-    document.querySelectorAll('[data-account]').forEach(btn =>
-      btn.addEventListener('click', () => { setHashParams({ account: activeAccount === btn.dataset.account ? null : btn.dataset.account }); renderTransactions(container); }));
-    document.getElementById('clear-filters')?.addEventListener('click', () => { clearHashParams(); renderTransactions(container); });
+      btn.addEventListener('click', () => {
+        _txnPage = 1;
+        setHashParams({ currency: btn.dataset.currency });
+        renderTransactions(container);
+      }));
+
+    document.getElementById('clear-filters-quick')?.addEventListener('click', () => {
+      _txnPage = 1;
+      clearHashParams();
+      renderTransactions(container);
+    });
+
+    // Open filter bottom sheet
+    document.getElementById('open-filter-sheet').addEventListener('click', () => {
+      openFilterSheet(years, allCategories, allAccounts);
+    });
   }
 
-  function renderList() {
+  function openFilterSheet(years, categories, accounts) {
+    document.getElementById('filter-sheet')?.remove();
+    document.getElementById('filter-backdrop')?.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'filter-sheet';
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);max-height:70vh;display:flex;flex-direction:column;box-shadow:0 -4px 24px rgba(0,0,0,0.15);';
+
+    // Working copies
+    let wYear     = activeYear;
+    let wMonth    = activeMonth;
+    let wCats     = activeCategory ? [activeCategory] : [];
+    let wAccount  = activeAccount;
+
+    sheet.innerHTML = `
+      <div style="padding:12px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto;position:absolute;left:50%;transform:translateX(-50%);top:8px;"></div>
+        <span style="font-size:16px;font-weight:700;">Filters</span>
+        <button id="sheet-clear-all" style="font-size:13px;color:var(--danger);background:none;border:none;cursor:pointer;">Clear all</button>
+      </div>
+      <div style="overflow-y:auto;flex:1;padding:16px 20px 0;">
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Year</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" id="sheet-years">
+          ${years.map(y => `<button class="sheet-pill ${Number(y)===wYear?'active':''}" data-year="${y}">${y}</button>`).join('')}
+        </div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Month</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" id="sheet-months">
+          <button class="sheet-pill ${!wMonth?'active':''}" data-month="0">All</button>
+          ${MONTHS.map((m,i) => `<button class="sheet-pill ${wMonth===i+1?'active':''}" data-month="${i+1}">${m}</button>`).join('')}
+        </div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Category <span style="font-weight:400;text-transform:none;font-size:11px;">(multi-select)</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" id="sheet-cats">
+          ${categories.map(c => `<button class="sheet-pill ${wCats.includes(c)?'active':''}" data-cat="${c}">${c}</button>`).join('')}
+        </div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Account</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:80px;" id="sheet-accounts">
+          <button class="sheet-pill ${!wAccount?'active':''}" data-acc="">All</button>
+          ${accounts.map(a => `<button class="sheet-pill ${wAccount===a?'active':''}" data-acc="${a}">${a}</button>`).join('')}
+        </div>
+      </div>
+
+      <div style="padding:16px 20px;border-top:1px solid var(--border-light);flex-shrink:0;display:flex;gap:10px;background:var(--surface);">
+        <button id="sheet-apply" class="btn btn-primary" style="flex:1;">Apply Filters</button>
+      </div>
+    `;
+
+    // Inject pill styles
+    const style = document.createElement('style');
+    style.textContent = '.sheet-pill{padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer;} .sheet-pill.active{border-color:var(--primary);background:var(--primary-bg);color:var(--primary);font-weight:600;}';
+    sheet.appendChild(style);
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'filter-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:999;';
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener('click', close);
+
+    // Year pills
+    sheet.querySelectorAll('[data-year]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        wYear = Number(btn.dataset.year);
+        sheet.querySelectorAll('[data-year]').forEach(b => b.classList.toggle('active', Number(b.dataset.year) === wYear));
+      });
+    });
+
+    // Month pills
+    sheet.querySelectorAll('[data-month]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        wMonth = Number(btn.dataset.month);
+        sheet.querySelectorAll('[data-month]').forEach(b => b.classList.toggle('active', Number(b.dataset.month) === wMonth));
+      });
+    });
+
+    // Category pills (multi-select)
+    sheet.querySelectorAll('[data-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cat = btn.dataset.cat;
+        if (wCats.includes(cat)) wCats = wCats.filter(c => c !== cat);
+        else wCats.push(cat);
+        btn.classList.toggle('active', wCats.includes(cat));
+      });
+    });
+
+    // Account pills
+    sheet.querySelectorAll('[data-acc]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        wAccount = btn.dataset.acc;
+        sheet.querySelectorAll('[data-acc]').forEach(b => b.classList.toggle('active', b.dataset.acc === wAccount));
+      });
+    });
+
+    document.getElementById('sheet-clear-all').addEventListener('click', () => {
+      wYear = currentYear(); wMonth = 0; wCats = []; wAccount = '';
+      close();
+      _txnPage = 1;
+      clearHashParams();
+      renderTransactions(container);
+    });
+
+    document.getElementById('sheet-apply').addEventListener('click', () => {
+      close();
+      _txnPage = 1;
+      setHashParams({
+        year:     wYear !== currentYear() ? wYear : null,
+        month:    wMonth || null,
+        category: wCats.length === 1 ? wCats[0] : null, // single for URL
+        account:  wAccount || null,
+      });
+      // Store multi-cat in sessionStorage for this session
+      if (wCats.length > 1) sessionStorage.setItem('txn_multi_cats', JSON.stringify(wCats));
+      else sessionStorage.removeItem('txn_multi_cats');
+      renderTransactions(container);
+    });
+  }
+
+  let _txnPage = 1;
+  const TXN_PAGE_SIZE = 30;
+
+  function renderList(resetPage = true) {
+    if (resetPage) _txnPage = 1;
     // Filter
     let filtered = transactions.filter(t => {
       if (t.currency !== activeCurrency) return false;
@@ -113,9 +393,13 @@ export async function renderTransactions(container) {
       return true;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    const totalFiltered = filtered.length;
+    const allFiltered   = filtered; // keep full for balance calc
+    filtered = filtered.slice(0, _txnPage * TXN_PAGE_SIZE);
+
     // Running balance bar
-    const totalIncome = filtered.reduce((s,t) => s + (Number(t.income)      || 0), 0);
-    const totalSpend  = filtered.reduce((s,t) => s + (Number(t.amountSpend) || 0), 0);
+    const totalIncome = allFiltered.reduce((s,t) => s + (Number(t.income)      || 0), 0);
+    const totalSpend  = allFiltered.reduce((s,t) => s + (Number(t.amountSpend) || 0), 0);
     const net = totalIncome - totalSpend;
 
     const balanceBar = document.getElementById('balance-bar');
@@ -138,7 +422,7 @@ export async function renderTransactions(container) {
           </div>
         </div>
         <div style="margin-left:auto;font-size:12px;color:var(--primary);font-weight:600;align-self:center;">
-          ${filtered.length} records
+          ${totalFiltered} records
         </div>
       `;
     }
@@ -176,8 +460,31 @@ export async function renderTransactions(container) {
 
     // Bind tap events
     wrap.querySelectorAll('.txn-tap').forEach(row => {
-      row.addEventListener('click', () => navigate('add-transaction', { txnId: row.dataset.id, mode: 'edit' }));
+      row.addEventListener('click', () => navigate('transaction-view', { txnId: row.dataset.id }));
     });
+
+    // Load-more sentinel
+    document.getElementById('txn-sentinel')?.remove();
+    if (filtered.length < totalFiltered) {
+      const sentinel = document.createElement('div');
+      sentinel.id = 'txn-sentinel';
+      sentinel.style.cssText = 'height:60px;display:flex;align-items:center;justify-content:center;';
+      sentinel.innerHTML = '<span style="font-size:13px;color:var(--text-muted);">Loading more…</span>';
+      wrap.appendChild(sentinel);
+      const obs = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) {
+          obs.disconnect();
+          _txnPage++;
+          renderList(false);
+        }
+      }, { threshold: 0.1 });
+      obs.observe(sentinel);
+    } else if (totalFiltered > TXN_PAGE_SIZE) {
+      const end = document.createElement('div');
+      end.style.cssText = 'padding:16px;text-align:center;font-size:12px;color:var(--text-muted);';
+      end.textContent = `All ${totalFiltered} records shown`;
+      wrap.appendChild(end);
+    }
   }
 
   function buildSwipeRow(t, isLast) {
@@ -228,7 +535,7 @@ export async function renderTransactions(container) {
     if (!confirm('Delete this transaction?')) return;
     const id = del.dataset.id;
     try {
-      const newData = await writeData('finance', (remote) => ({
+      const newData = await localSave('finance', (remote) => ({
         ...remote,
         transactions: (remote.transactions || []).filter(t => t.id !== id)
       }));

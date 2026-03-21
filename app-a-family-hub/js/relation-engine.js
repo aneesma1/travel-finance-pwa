@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/relation-engine.js ─────────────────────────────────
 // Family relation engine
 // Handles: bidirectional auto-reverse, tree traversal, emergency contact wiring
@@ -235,9 +235,11 @@ export function layoutFamilyTree(members, relations) {
 
   const NODE_W = 90, NODE_H = 52, H_GAP = 24, V_GAP = 70;
 
-  // Build generations using BFS from root (first Husband/Wife pair, or first member)
-  const coupleRelation = relations.find(r => ['Husband','Wife','Partner'].includes(r.relation));
-  const rootId = coupleRelation?.fromId || members[0]?.id;
+  // Build generations using BFS from root
+  // Head of household takes priority as root; fallback to first couple or first member
+  const headOfHousehold = members.find(m => m.headOfHousehold);
+  const coupleRelation  = relations.find(r => ['Husband','Wife','Partner'].includes(r.relation));
+  const rootId = headOfHousehold?.id || coupleRelation?.fromId || members[0]?.id;
 
   // Assign generations
   const genMap = new Map(); // id → generation (0 = root)

@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
 
@@ -6,6 +6,7 @@
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
 import { writeData } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { PillSelect }  from '../../../shared/pill-select.js';
 import { SmartInput }  from '../../../shared/smart-input.js';
@@ -323,7 +324,7 @@ export async function renderAddTrip(container, params = {}) {
       document.getElementById('next-btn').disabled = true;
       document.getElementById('next-btn').textContent = 'Saving…';
 
-      const newData = await writeData('travel', (remote) => {
+      const newData = await localSave('travel', (remote) => {
         const trips = remote.trips || [];
         if (isEdit) {
           const idx = trips.findIndex(t => t.id === tripData.id);

@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/people.js ──────────────────────────────────
 // People tab — grouped family view, Family Defaults button, member cards
 
@@ -163,6 +163,7 @@ function buildMemberCard(member, trips, documents, relations, familyDefaults) {
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-size:16px;font-weight:700;color:var(--text);">${member.name}</span>
+            ${member.headOfHousehold ? '<span title="Head of Household" style="font-size:14px;">👑</span>' : ''}
             <span style="background:${locationColor};color:${locationTextColor};
               padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">
               ${location === 'Qatar' ? '🇶🇦' : '🇮🇳'} ${location}

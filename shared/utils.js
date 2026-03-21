@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/utils.js ────────────────────────────────────────────────────────
 // Shared utility functions used by both App A and App B
 

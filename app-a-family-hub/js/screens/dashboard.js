@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
 // Shows: live status per member, days in location, next doc expiry, filter bar
@@ -137,7 +137,7 @@ export async function renderDashboard(container) {
       <div class="filter-bar">
         <div class="filter-chips">
           <!-- Person pills -->
-          ${members.map(m => {
+          ${[...members].sort((a,b) => (b.headOfHousehold?1:0) - (a.headOfHousehold?1:0)).map(m => {
             const active = filterPerson.includes(m.id);
             return `<button class="filter-chip ${active ? 'active' : ''}" data-filter="person" data-value="${m.id}">
               ${m.emoji || '👤'} ${m.name}

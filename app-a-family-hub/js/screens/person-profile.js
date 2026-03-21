@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/person-profile.js ──────────────────────────
 // Full person profile with 4 tabs:
 // Profile | Locations | Emergency | Documents
@@ -7,6 +7,7 @@
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
 import { writeData } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { uuidv4, showToast, copyToClipboard, today, daysFromToday, expiryStatus, expiryStatusColor } from '../../../shared/utils.js';
 
@@ -155,6 +156,20 @@ export async function renderPersonProfile(container, params = {}) {
         <div class="form-group" style="margin:0;">
           <label class="form-label">Date of Birth</label>
           <input type="date" class="form-input" id="dob" value="${draft.dateOfBirth || ''}" max="${today()}" />
+          <label class="form-label" style="margin-top:14px;">Role</label>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);">
+            <span style="font-size:20px;">👑</span>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:600;">Head of Household</div>
+              <div style="font-size:12px;color:var(--text-muted);">Shown at top of family tree with crown</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
+              <input type="checkbox" id="head-of-household" ${draft.headOfHousehold ? 'checked' : ''} style="opacity:0;width:0;height:0;">
+              <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:${draft.headOfHousehold ? 'var(--primary)' : '#ccc'};border-radius:24px;transition:0.2s;">
+                <span style="position:absolute;content:'';height:18px;width:18px;left:${draft.headOfHousehold ? '23px' : '3px'};bottom:3px;background:#fff;border-radius:50%;transition:0.2s;display:block;"></span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -176,12 +191,53 @@ export async function renderPersonProfile(container, params = {}) {
 
         <div class="form-group" style="margin:0;">
           <label class="form-label">Phone Number</label>
-          <input type="tel" class="form-input" id="phone" value="${draft.phone || ''}" placeholder="+974 XXXX XXXX" />
+          <div style="display:flex;gap:8px;">
+            <select id="phone-cc" style="width:110px;padding:10px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;flex-shrink:0;">
+              ${[
+                {code:'+974',flag:'🇶🇦',label:'QAR +974'},
+                {code:'+91', flag:'🇮🇳',label:'IND +91'},
+                {code:'+1',  flag:'🇺🇸',label:'USA +1'},
+                {code:'+44', flag:'🇬🇧',label:'GBR +44'},
+                {code:'+971',flag:'🇦🇪',label:'UAE +971'},
+                {code:'+966',flag:'🇸🇦',label:'SAU +966'},
+                {code:'+968',flag:'🇴🇲',label:'OMN +968'},
+                {code:'+965',flag:'🇰🇼',label:'KWT +965'},
+                {code:'+973',flag:'🇧🇭',label:'BHR +973'},
+                {code:'+92', flag:'🇵🇰',label:'PAK +92'},
+                {code:'+880',flag:'🇧🇩',label:'BGD +880'},
+                {code:'+94', flag:'🇱🇰',label:'LKA +94'},
+                {code:'+63', flag:'🇵🇭',label:'PHL +63'},
+              ].map(c => {
+                const currentCC = (draft.phone||'').match(/^(\+\d+)/)?.[1] || '+974';
+                return \`<option value="\${c.code}" \${currentCC === c.code ? 'selected' : ''}>\${c.flag} \${c.code}</option>\`;
+              }).join('')}
+            </select>
+            <input type="tel" class="form-input" id="phone" style="flex:1;"
+              value="${(draft.phone||'').replace(/^\+\d+\s?/,'')}"
+              placeholder="XXXX XXXX" inputmode="numeric" />
+          </div>
         </div>
 
         <div class="form-group" style="margin:0;">
           <label class="form-label">Email</label>
           <input type="email" class="form-input" id="email" value="${draft.email || ''}" placeholder="name@email.com" />
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;">
+            <div>
+              <div style="font-size:14px;font-weight:600;">👑 Head of Household</div>
+              <div style="font-size:12px;color:var(--text-muted);">Shown at top of family tree with crown</div>
+            </div>
+            <label style="position:relative;width:44px;height:24px;cursor:pointer;">
+              <input type="checkbox" id="head-of-household" ${draft.headOfHousehold ? 'checked' : ''}
+                style="opacity:0;width:0;height:0;" />
+              <span id="hoh-slider" style="position:absolute;inset:0;border-radius:12px;transition:0.2s;
+                background:${draft.headOfHousehold ? 'var(--primary)' : 'var(--border)'};"></span>
+              <span id="hoh-thumb" style="position:absolute;left:${draft.headOfHousehold ? '22' : '2'}px;top:2px;
+                width:20px;height:20px;border-radius:50%;background:#fff;transition:0.2s;"></span>
+            </label>
+          </div>
         </div>
 
         <div class="divider"></div>
@@ -201,7 +257,20 @@ export async function renderPersonProfile(container, params = {}) {
 
         <div class="form-group" style="margin:0;">
           <label class="form-label">Employer Phone</label>
-          <input type="tel" class="form-input" id="employer-phone" value="${draft.employerPhone || ''}" placeholder="+974 XXXX XXXX" />
+          <div style="display:flex;gap:8px;">
+            <select id="employer-phone-cc" style="width:110px;padding:10px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;flex-shrink:0;">
+              ${[
+                {code:'+974',flag:'🇶🇦'},{code:'+91',flag:'🇮🇳'},{code:'+1',flag:'🇺🇸'},
+                {code:'+44',flag:'🇬🇧'},{code:'+971',flag:'🇦🇪'},{code:'+966',flag:'🇸🇦'},
+              ].map(c => {
+                const currentCC = (draft.employerPhone||'').match(/^(\+\d+)/)?.[1] || '+974';
+                return \`<option value="\${c.code}" \${currentCC === c.code ? 'selected' : ''}>\${c.flag} \${c.code}</option>\`;
+              }).join('')}
+            </select>
+            <input type="tel" class="form-input" id="employer-phone" style="flex:1;"
+              value="${(draft.employerPhone||'').replace(/^\+\d+\s?/,'')}"
+              placeholder="XXXX XXXX" inputmode="numeric" />
+          </div>
         </div>
 
         <div class="divider"></div>
@@ -229,6 +298,19 @@ export async function renderPersonProfile(container, params = {}) {
     `;
 
     // Photo handlers
+    // Head of Household toggle
+    document.getElementById('head-of-household')?.addEventListener('change', (e) => {
+      draft.headOfHousehold = e.target.checked;
+      // Update toggle visuals
+      const track = e.target.nextElementSibling;
+      if (track) {
+        track.style.background = draft.headOfHousehold ? 'var(--primary)' : 'var(--border)';
+        const thumb = document.getElementById('hoh-thumb');
+        if (thumb) thumb.style.left = draft.headOfHousehold ? '22px' : '2px';
+      }
+      markDirty();
+    });
+
     document.getElementById('change-photo-btn').addEventListener('click', () =>
       document.getElementById('photo-input').click()
     );
@@ -259,7 +341,7 @@ export async function renderPersonProfile(container, params = {}) {
     // All text fields — live update draft
     const fieldMap = {
       'member-name': 'name', 'dob': 'dateOfBirth', 'nationality': 'nationality',
-      'blood-group': 'bloodGroup', 'phone': 'phone', 'email': 'email',
+      'blood-group': 'bloodGroup', 'email': 'email',
       'occupation': 'occupation', 'employer': 'employer',
       'employer-phone': 'employerPhone', 'medical-notes': 'medicalNotes',
       'personal-notes': 'personalNotes'
@@ -327,7 +409,7 @@ export async function renderPersonProfile(container, params = {}) {
               </button>
               <div style="display:flex;gap:8px;align-items:center;">
                 <input type="text" class="form-input" id="paste-link-${fieldKey}"
-                  placeholder="Paste Google Maps link here…" style="font-size:13px;padding:10px 12px;" />
+                  placeholder="Paste Google Maps link or Plus Code (7HQG+XR)…" style="font-size:13px;padding:10px 12px;" />
                 <button class="btn btn-primary" style="padding:10px 14px;font-size:13px;flex-shrink:0;"
                   data-action="paste" data-loc="${fieldKey}">Extract</button>
               </div>
@@ -352,6 +434,14 @@ export async function renderPersonProfile(container, params = {}) {
 
           <!-- Address search results -->
           <div id="search-results-${fieldKey}"></div>
+
+          <!-- Address photos -->
+          <div style="margin-top:8px;padding:0 16px 16px;">
+            <label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px;">
+              📸 Address Photos <span style="font-weight:400;text-transform:none;">(ID board · building)</span>
+            </label>
+            <div id="addr-photos-${fieldKey}"></div>
+          </div>
         </div>
       </div>
     `;
@@ -407,6 +497,15 @@ export async function renderPersonProfile(container, params = {}) {
   }
 
   function bindLocationEvents(countryName, fieldKey) {
+    // Address photos
+    const photoEl = document.getElementById(`addr-photos-${fieldKey}`);
+    if (photoEl) {
+      if (!draft[fieldKey]) draft[fieldKey] = {};
+      if (!draft[fieldKey].photos) draft[fieldKey].photos = [];
+      renderPhotoSlots(photoEl, draft[fieldKey].photos, 2, (newPhotos) => {
+        draft[fieldKey].photos = newPhotos;
+      });
+    }
     // Label + address live update
     document.querySelector(`.loc-label[data-loc="${fieldKey}"]`)?.addEventListener('input', e => {
       if (!draft[fieldKey]) draft[fieldKey] = {};
@@ -446,10 +545,10 @@ export async function renderPersonProfile(container, params = {}) {
     document.querySelector(`[data-action="paste"][data-loc="${fieldKey}"]`)?.addEventListener('click', async () => {
       const input = document.getElementById(`paste-link-${fieldKey}`);
       const text  = input.value.trim();
-      if (!text) { showToast('Paste a Google Maps or OpenStreetMap link first', 'warning'); return; }
+      if (!text) { showToast('Paste a Google Maps link, coordinates, or Plus Code', 'warning'); return; }
 
       const coords = extractCoordsFromUrl(text);
-      if (!coords) { showToast('Could not extract coordinates from that link', 'error'); return; }
+      if (!coords) { showToast('Format not recognised. Try: Google Maps link, coordinates (25.28, 51.53), or Plus Code (7HQG+XR)', 'error'); return; }
 
       await applyCoordinates(fieldKey, coords.lat, coords.lng);
       input.value = '';
@@ -520,60 +619,41 @@ export async function renderPersonProfile(container, params = {}) {
   }
 
   function extractCoordsFromUrl(url) {
-    // Google Maps: @lat,lng or ?q=lat,lng or /place/.../@lat,lng
-    let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
-    m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
-    m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
-    // OpenStreetMap: ?mlat=lat&mlon=lng or #map=zoom/lat/lng
-    m = url.match(/mlat=(-?\d+\.\d+).*mlon=(-?\d+\.\d+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
-    m = url.match(/#map=\d+\/(-?\d+\.\d+)\/(-?\d+\.\d+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
-    // Bare coordinates: "25.2854, 51.5310"
-    m = url.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
+    let m;
+    m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);           if (m) return { lat: +m[1], lng: +m[2] };
+    m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);      if (m) return { lat: +m[1], lng: +m[2] };
+    m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);          if (m) return { lat: +m[1], lng: +m[2] };
+    m = url.match(/mlat=(-?\d+\.\d+).*mlon=(-?\d+\.\d+)/); if (m) return { lat: +m[1], lng: +m[2] };
+    m = url.match(/#map=\d+\/(-?\d+\.\d+)\/(-?\d+\.\d+)/); if (m) return { lat: +m[1], lng: +m[2] };
+    // Google Plus Code — e.g. "7HQG+XR Doha"
+    const pcm = url.match(/([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3})/i);
+    if (pcm) {
+      const decoded = decodePlusCode(pcm[1]);
+      if (decoded) return decoded;
+    }
+    m = url.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);      if (m) return { lat: +m[1], lng: +m[2] };
     return null;
   }
 
-  async function applyCoordinates(fieldKey, lat, lng, knownAddress = null) {
-    if (!draft[fieldKey]) draft[fieldKey] = {};
-    draft[fieldKey].lat = lat;
-    draft[fieldKey].lng = lng;
-    draft[fieldKey].mapsUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=17`;
-
-    // Reverse geocode via Nominatim
+  function decodePlusCode(code) {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-        { headers: { 'Accept-Language': 'en', 'User-Agent': 'FamilyHubApp/1.0' } }
-      );
-      const place = await res.json();
-
-      draft[fieldKey].formattedAddress = knownAddress || place.display_name || '';
-      if (!draft[fieldKey].address) draft[fieldKey].address = place.display_name || '';
-
-      // Generate Plus Code approximation (Open Location Code)
-      draft[fieldKey].plusCode = generatePlusCode(lat, lng);
-    } catch {
-      draft[fieldKey].formattedAddress = knownAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    }
-
-    markDirty();
-    // Re-render location section
-    renderLocationsTab();
-    showToast('Location set!', 'success');
+      const ALPHA = '23456789CFGHJMPQRVWX';
+      const clean = code.toUpperCase().replace(/\+/,'');
+      if (clean.length < 6) return null;
+      let lat = -90, lng = -180, latDeg = 20, lngDeg = 40;
+      for (let i = 0; i < Math.min(clean.length, 8); i += 2) {
+        const c1 = ALPHA.indexOf(clean[i]);
+        const c2 = i+1 < clean.length ? ALPHA.indexOf(clean[i+1]) : 0;
+        if (c1 < 0 || c2 < 0) return null;
+        latDeg /= 20; lngDeg /= 20;
+        lat += c1 * latDeg;
+        lng += c2 * lngDeg;
+      }
+      return { lat: +(lat + latDeg/2).toFixed(6), lng: +(lng + lngDeg/2).toFixed(6) };
+    } catch { return null; }
   }
 
-  // Simple Plus Code generator (OLC format)
+
   function generatePlusCode(lat, lng) {
     try {
       // Approximate Open Location Code (first 8 chars)
@@ -1066,7 +1146,13 @@ export async function renderPersonProfile(container, params = {}) {
       draft.dateOfBirth   = document.getElementById('dob')?.value                  || draft.dateOfBirth;
       draft.nationality   = document.getElementById('nationality')?.value           || draft.nationality;
       draft.bloodGroup    = document.getElementById('blood-group')?.value           || draft.bloodGroup;
-      draft.phone         = document.getElementById('phone')?.value.trim()          || draft.phone;
+      // Phone: combine country code + number
+      const _pNum = document.getElementById('phone')?.value.trim();
+      const _pCC  = document.getElementById('phone-cc')?.value || '+974';
+      if (_pNum) draft.phone = _pCC + ' ' + _pNum;
+      const _eNum = document.getElementById('employer-phone')?.value.trim();
+      const _eCC  = document.getElementById('employer-phone-cc')?.value || '+974';
+      if (_eNum) draft.employerPhone = _eCC + ' ' + _eNum;
       draft.email         = document.getElementById('email')?.value.trim()          || draft.email;
       draft.occupation    = document.getElementById('occupation')?.value.trim()     || draft.occupation;
       draft.employer      = document.getElementById('employer')?.value.trim()       || draft.employer;
@@ -1080,7 +1166,7 @@ export async function renderPersonProfile(container, params = {}) {
       btn.textContent = '⏳';
       btn.disabled = true;
 
-      const newData = await writeData('travel', (remote) => {
+      const newData = await localSave('travel', (remote) => {
         const mems = remote.members || [];
         const idx  = mems.findIndex(m => m.id === draft.id);
         if (idx > -1) mems[idx] = draft;

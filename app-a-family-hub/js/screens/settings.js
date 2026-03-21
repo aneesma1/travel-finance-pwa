@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
 
@@ -7,10 +7,13 @@
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
 import {
   writeData, downloadLocalBackup, restoreFromLocalFile,
-  getMirrorSnapshots, restoreFromMirror, readData
+  getMirrorSnapshots, restoreFromMirror, readData, timestampSuffix
 } from '../../../shared/drive.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
+import { isAdmin, renderAccessControl } from '../roles.js';
+import { getActiveSessions, getActivityLog, revokeSession, revokeAllSessions } from '../../../shared/security-log.js';
+import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
 import { uuidv4, formatDisplayDate, showToast, isOnline } from '../../../shared/utils.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 
@@ -85,11 +88,68 @@ export async function renderSettings(container) {
           </div>
           <span style="color:var(--text-muted);">›</span>
         </div>
-        <div class="list-row" id="import-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
+        <div class="list-row" id="import-btn">
           <span style="font-size:20px;">📥</span>
           <div style="flex:1;">
             <div style="font-size:14px;font-weight:600;">Import from Excel / CSV</div>
             <div style="font-size:12px;color:var(--text-muted);">Migrate existing travel data</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
+        <div class="list-row" id="photo-zip-btn">
+          <span style="font-size:20px;">📦</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Export All Photos as ZIP</div>
+            <div style="font-size:12px;color:var(--text-muted);">Document scans, address photos</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
+        <div class="list-row" id="clear-cache-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
+          <span style="font-size:20px;">🗑️</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Clear Local Cache</div>
+            <div style="font-size:12px;color:var(--text-muted);">Force fresh re-download from Drive</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
+      </div>
+
+      <!-- Access Control — admin only -->
+      ${isAdmin() ? `
+      <div class="section-title">Family Access</div>
+      <div class="card" style="margin:0 16px;">
+        <div class="list-row" id="access-control-btn" style="border-radius:var(--radius-lg);">
+          <span style="font-size:20px;">👥</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Manage Access</div>
+            <div style="font-size:12px;color:var(--text-muted);">Set Admin or Viewer roles</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Security -->
+      <div class="section-title">Security</div>
+      <div class="card" style="margin:0 16px;">
+        <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg);">
+          <span style="font-size:20px;">🛡️</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Security & Access</div>
+            <div style="font-size:12px;color:var(--text-muted);">Sessions, activity log, revoke access</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
+      </div>
+
+      <!-- Safe Exit -->
+      <div class="section-title">Session</div>
+      <div class="card" style="margin:0 16px;">
+        <div class="list-row" id="safe-exit-btn" style="border-radius:var(--radius-lg);">
+          <span style="font-size:20px;">🚪</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Save &amp; Exit</div>
+            <div style="font-size:12px;color:var(--text-muted);">Sync data then close cleanly</div>
           </div>
           <span style="color:var(--text-muted);">›</span>
         </div>
@@ -98,8 +158,8 @@ export async function renderSettings(container) {
       <!-- App info -->
       <div class="section-title">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v1.0 — Phase 1A</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.2 — 2026-03-21 — Phase 1A</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.2 — 2026-03-21 · Travel & Finance PWA Suite</div>
       </div>
 
       <!-- Hidden file inputs -->
@@ -188,6 +248,216 @@ function bindEvents(members, data, container) {
   document.getElementById('import-btn').addEventListener('click', () => {
     openImportModal(container, data, members);
   });
+
+  document.getElementById('security-dashboard-btn')?.addEventListener('click', async () => {
+    const modal = document.getElementById('member-modal');
+    modal.classList.remove('hidden');
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:90vh;">
+        <div class="modal-handle"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">
+          <span style="font-size:16px;font-weight:700;">🛡️ Security</span>
+          <button id="close-sec" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+        </div>
+        <div id="security-content" style="overflow-y:auto;max-height:70vh;padding:0 20px 24px;">
+          <div style="font-size:13px;color:var(--text-muted);padding:8px 0;">Loading…</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('close-sec').addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+
+    const [sessions, log] = await Promise.all([
+      getActiveSessions().catch(() => []),
+      getActivityLog(30).catch(() => [])
+    ]);
+    const sc = document.getElementById('security-content');
+    const riskColor = r => r==='high'?'var(--danger)':r==='medium'?'var(--warning)':r==='low'?'var(--primary)':'var(--text-muted)';
+    const riskEmoji = r => r==='high'?'🔴':r==='medium'?'🟠':r==='low'?'🟡':'🟢';
+
+    sc.innerHTML = `
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions (${sessions.length})</div>
+      ${sessions.length ? sessions.map(s => `
+        <div style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+            <div>
+              <div style="font-size:13px;font-weight:600;">${s.userEmail}</div>
+              <div style="font-size:12px;color:var(--text-muted);">${s.device} · ${s.app}</div>
+              <div style="font-size:11px;color:var(--text-muted);">Last active: ${new Date(s.lastActive).toLocaleString()}</div>
+            </div>
+            <button data-revoke="${s.id}" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--danger-bg);background:none;color:var(--danger);cursor:pointer;">Revoke</button>
+          </div>
+        </div>
+      `).join('') : '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No other active sessions</div>'}
+
+      ${sessions.length > 1 ? `<button id="revoke-all-btn" style="width:100%;padding:10px;border-radius:var(--radius-md);border:1px solid var(--danger);background:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:16px;">🚫 Revoke all other sessions</button>` : ''}
+
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;">Activity Log (last 30)</div>
+      ${log.length ? log.map(e => `
+        <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light);">
+          <span style="font-size:16px;">${riskEmoji(e.risk)}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;color:${riskColor(e.risk)};">${e.action}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${e.detail} · ${e.device}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${new Date(e.time).toLocaleString()}</div>
+          </div>
+        </div>
+      `).join('') : '<div style="font-size:13px;color:var(--text-muted);">No activity logged yet</div>'}
+    `;
+
+    sc.querySelectorAll('[data-revoke]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Revoke this session?')) return;
+        await revokeSession(btn.dataset.revoke);
+        showToast('Session revoked', 'success');
+        btn.closest('div[style]').remove();
+      });
+    });
+
+    document.getElementById('revoke-all-btn')?.addEventListener('click', async () => {
+      if (!confirm('Revoke all other sessions?')) return;
+      await revokeAllSessions();
+      showToast('All other sessions revoked', 'success');
+      modal.classList.add('hidden');
+    });
+  });
+
+  if (isAdmin()) {
+    document.getElementById('access-control-btn')?.addEventListener('click', () => {
+      // Open modal with access control UI
+      const modal = document.getElementById('member-modal');
+      modal.classList.remove('hidden');
+      modal.innerHTML = `
+        <div class="modal-sheet" style="max-height:85vh;">
+          <div class="modal-handle"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">
+            <span style="font-size:16px;font-weight:700;">👥 Family Access</span>
+            <button id="close-access" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+          </div>
+          <div id="access-control-container" style="overflow-y:auto;max-height:60vh;"></div>
+        </div>
+      `;
+      document.getElementById('close-access').addEventListener('click', () => modal.classList.add('hidden'));
+      modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+      renderAccessControl(
+        document.getElementById('access-control-container'),
+        data,
+        getUser()?.email || '',
+        async (newData) => {
+          const saved = await writeData('travel', () => newData);
+          await setCachedTravelData(saved);
+          showToast('Access updated', 'success');
+          // Re-render access control
+          renderAccessControl(
+            document.getElementById('access-control-container'),
+            saved,
+            getUser()?.email || '',
+            arguments.callee
+          );
+        }
+      );
+    });
+  }
+
+  document.getElementById('photo-zip-btn')?.addEventListener('click', async () => {
+    try {
+      showToast('Preparing photos…', 'info', 2000);
+      const cached = await getCachedTravelData();
+      if (!cached) { showToast('No data found', 'warning'); return; }
+
+      // Load JSZip
+      if (!window.JSZip) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+
+      const zip = new JSZip();
+      let count = 0;
+
+      // Member profile photos
+      (cached.members || []).forEach(m => {
+        if (m.photo?.startsWith('data:')) {
+          const b64 = m.photo.split(',')[1];
+          zip.folder('profiles').file(`${m.name || 'member'}_profile.jpg`, b64, { base64: true });
+          count++;
+        }
+      });
+
+      // Document photos
+      (cached.documents || []).forEach(doc => {
+        const member = (cached.members || []).find(m => m.id === doc.personId);
+        const name = member?.name || 'unknown';
+        const docType = doc.docName || 'doc';
+        (doc.photos || []).forEach((p, i) => {
+          if (p?.startsWith('data:')) {
+            const b64 = p.split(',')[1];
+            const side = i === 0 ? 'front' : 'back';
+            zip.folder('documents').file(`${name}_${docType}_${side}.jpg`, b64, { base64: true });
+            count++;
+          }
+        });
+      });
+
+      // Address photos
+      ['homeQatar','homeIndia'].forEach(key => {
+        const loc = cached.familyDefaults?.[key];
+        (loc?.photos || []).forEach((p, i) => {
+          if (p?.startsWith('data:')) {
+            const b64 = p.split(',')[1];
+            zip.folder('addresses').file(`${key}_photo${i+1}.jpg`, b64, { base64: true });
+            count++;
+          }
+        });
+      });
+
+      if (count === 0) { showToast('No photos found to export', 'warning'); return; }
+
+      const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
+      const blob = await zip.generateAsync({ type:'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Travel_Photos_${ts}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast(`✅ ${count} photos exported`, 'success');
+    } catch (err) {
+      showToast('ZIP export failed: ' + err.message, 'error');
+    }
+  });
+
+  document.getElementById('safe-exit-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('safe-exit-btn');
+    btn.querySelector('.list-row div:first-child + div div:first-child') &&
+      (btn.querySelector('div:nth-child(2) div:first-child').textContent = 'Syncing…');
+    showToast('Syncing before exit…', 'info', 2000);
+    try {
+      // Give any pending IndexedDB writes a moment to flush
+      await new Promise(r => setTimeout(r, 500));
+      showToast('All data saved. Goodbye! 👋', 'success', 2000);
+      setTimeout(() => {
+        // Clear navigation history and show login
+        window.history.pushState(null, '', window.location.pathname);
+        window.location.reload();
+      }, 2000);
+    } catch (err) {
+      showToast('Exit failed: ' + err.message, 'error');
+    }
+  });
+
+  document.getElementById('clear-cache-btn').addEventListener('click', async () => {
+    if (!confirm('Clear local cache? Your Drive data is safe. The app will re-download everything from Drive on next open.')) return;
+    try {
+      await clearAllCachedData();
+      showToast('Cache cleared — reloading…', 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      showToast('Clear failed: ' + err.message, 'error');
+    }
+  });
 }
 
 function showMirrorModal(snapshots) {
@@ -245,50 +515,88 @@ function openImportModal(container, data, members) {
         <span style="font-size:16px;font-weight:700;">Import Travel Data</span>
         <button id="close-import" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
       </div>
+      <div id="import-status" style="display:none;padding:8px 20px;font-size:13px;color:var(--text-secondary);"></div>
       <div id="import-tool-container" style="overflow-y:auto;max-height:70vh;"></div>
     </div>
   `;
-  document.getElementById('close-import').addEventListener('click', () => modal.classList.add('hidden'));
-  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+
+  let importInProgress = false;
+
+  const closeBtn = document.getElementById('close-import');
+  closeBtn.addEventListener('click', () => {
+    if (importInProgress) {
+      if (!confirm('Import in progress. Close anyway?')) return;
+    }
+    modal.classList.add('hidden');
+  });
+  modal.addEventListener('click', e => {
+    if (e.target !== modal) return;
+    if (importInProgress) return; // Block backdrop close during import
+    modal.classList.add('hidden');
+  });
 
   const toolContainer = document.getElementById('import-tool-container');
+  const statusBar = document.getElementById('import-status');
 
   renderImportTool(toolContainer, {
     appType: 'travel',
     existingData: data,
     onImportComplete: async (records, progressCb) => {
-      // Resolve person names to IDs, skip unknowns
+      importInProgress = true;
+      statusBar.style.display = 'block';
+      statusBar.style.color = 'var(--text-secondary)';
+      statusBar.textContent = 'Resolving members…';
+
+      // Resolve person names to IDs
       const memberMap = Object.fromEntries(members.map(m => [m.name.toLowerCase(), m.id]));
       let imported = 0, skipped = 0;
 
-      const newData = await writeData('travel', (remote) => {
-        const trips = remote.trips || [];
-        const existingKeys = new Set(trips.map(t => `${t.personId}|${t.dateOutIndia}`));
-
-        records.forEach(rec => {
-          const personId = memberMap[rec.personName?.toLowerCase()];
-          if (!personId) { skipped++; return; } // Person not found
-
-          const key = `${personId}|${rec.dateOutIndia}`;
-          if (existingKeys.has(key)) { skipped++; return; } // Duplicate
-
-          trips.push({ ...rec, id: rec.id || uuidv4(), personId });
-          existingKeys.add(key);
-          imported++;
-        });
-
-        return { ...remote, trips };
+      const resolved = [];
+      records.forEach(rec => {
+        const personId = memberMap[rec.personName?.toLowerCase()];
+        if (!personId) { skipped++; return; }
+        resolved.push({ ...rec, id: rec.id || uuidv4(), personId });
       });
 
-      await setCachedTravelData(newData);
-      progressCb(imported, skipped);
-      return { imported, skipped };
+      statusBar.textContent = `Saving ${resolved.length} records to Drive…`;
+
+      try {
+        const newData = await writeData('travel', (remote) => {
+          const trips = remote.trips || [];
+          const existingKeys = new Set(trips.map(t => `${t.personId}|${t.dateOutIndia}`));
+
+          resolved.forEach(rec => {
+            const key = `${rec.personId}|${rec.dateOutIndia}`;
+            if (existingKeys.has(key)) { skipped++; return; }
+            trips.push(rec);
+            existingKeys.add(key);
+            imported++;
+          });
+
+          return { ...remote, trips };
+        });
+
+        await setCachedTravelData(newData);
+        statusBar.style.color = 'var(--success)';
+        statusBar.textContent = `✅ Saved ${imported} records to Drive`;
+        progressCb(imported, skipped);
+        importInProgress = false;
+        return { imported, skipped };
+      } catch (err) {
+        importInProgress = false;
+        statusBar.style.color = 'var(--danger)';
+        statusBar.textContent = `❌ Save failed: ${err.message}`;
+        throw err;
+      }
     }
   });
 
-  // Handle import complete navigation
+  // Handle import complete — close modal and navigate
   toolContainer.addEventListener('import:complete', () => {
-    modal.classList.add('hidden');
-    navigate('travel-log');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      navigate('travel-log');
+      showToast('Import complete! Travel log updated.', 'success');
+    }, 1200); // Brief delay so user sees the success status
   });
 }

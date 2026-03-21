@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/db.js ────────────────────────────────────────────────────────────
 // IndexedDB offline cache
 // Stores the full data JSON locally so app works without internet

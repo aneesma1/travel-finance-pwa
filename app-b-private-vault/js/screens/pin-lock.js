@@ -1,10 +1,11 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/screens/pin-lock.js ─────────────────────────────
 // PIN lock and PIN setup screens
 
 'use strict';
 
 import { verifyPin, setPin, getLockoutSecondsRemaining } from '../pin.js';
+import { syncPinToDrive } from '../app-config.js';
 
 // ── PIN Lock Screen ───────────────────────────────────────────────────────────
 export function renderPinLock(container, { onSuccess, onForgot }) {
@@ -211,6 +212,7 @@ export function renderPinSetup(container, { onComplete }) {
                 }, 1000);
               } else {
                 await setPin(digits);
+                syncPinToDrive().catch(() => {}); // backup to Drive
                 onComplete();
               }
             }

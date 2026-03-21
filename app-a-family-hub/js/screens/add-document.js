@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/add-document.js ────────────────────────────
 // Add / Edit Document: person pill, doc type, expiry, alert toggles, Calendar sync
 
@@ -6,13 +6,15 @@
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
 import { writeData } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { PillSelect } from '../../../shared/pill-select.js';
+import { renderPhotoSlots } from '../../../shared/photo-picker.js';
 import { SmartInput } from '../../../shared/smart-input.js';
 import { uuidv4, today, daysFromToday, expiryStatus, showToast } from '../../../shared/utils.js';
 import { syncDocumentAlerts, deleteAllDocumentAlerts } from '../calendar.js';
 
-const DOC_TYPES  = ['Passport','QID','Visa','Driving Licence','Other'];
+const DOC_TYPES_DEFAULT = ['Passport','QID','Visa','Driving Licence'];
 const ALERT_DAYS = [90, 60, 30];
 
 export async function renderAddDocument(container, params = {}) {
@@ -20,7 +22,7 @@ export async function renderAddDocument(container, params = {}) {
   const isEdit = mode === 'edit' && docId;
 
   const data = await getCachedTravelData();
-  const { members = [], documents = [] } = data || {};
+  const { members = [], documents = [], customDocTypes = [] } = data || {};
 
   const existing = isEdit ? documents.find(d => d.id === docId) : null;
   const allDocNumbers = [...new Set(documents.map(d => d.docNumber).filter(Boolean))];
@@ -28,6 +30,7 @@ export async function renderAddDocument(container, params = {}) {
   const state = {
     personId:   existing?.personId   || defaultPersonId || '',
     docName:    existing?.docName    || 'Passport',
+    photos:     existing?.photos     || [],
     docNumber:  existing?.docNumber  || '',
     expiryDate: existing?.expiryDate || '',
     alertDays:  existing?.alertDays  || [90, 60, 30],
@@ -63,6 +66,9 @@ export async function renderAddDocument(container, params = {}) {
         </div>
 
         <div class="form-group" style="margin:0;">
+          <label class="form-label">Document Photos <span style="color:var(--text-muted);font-weight:400;">(optional — front & back)</span></label>
+          <div id="doc-photo-slots" style="margin-bottom:4px;"></div>
+
           <label class="form-label">Expiry Date</label>
           <input type="date" class="form-input" id="expiry-date" value="${state.expiryDate}" />
           ${state.expiryDate ? `
@@ -118,6 +124,14 @@ export async function renderAddDocument(container, params = {}) {
     // Delete
     document.getElementById('delete-btn')?.addEventListener('click', () => deleteDoc());
 
+    // Photo slots
+    const photoContainer = document.getElementById('doc-photo-slots');
+    if (photoContainer) {
+      renderPhotoSlots(photoContainer, state.photos, 2, (newPhotos) => {
+        state.photos = newPhotos;
+      });
+    }
+
     // Person pills
     new PillSelect(document.getElementById('person-pills'), {
       options: members.map(m => ({ value: m.id, label: m.name, emoji: m.emoji || '👤' })),
@@ -128,7 +142,7 @@ export async function renderAddDocument(container, params = {}) {
 
     // Doc type pills
     new PillSelect(document.getElementById('doctype-pills'), {
-      options: DOC_TYPES.map(t => ({ value: t, label: t })),
+      options: allDocTypes.map(t => ({ value: t, label: t })),
       selected: state.docName,
       color: 'indigo',
       onSelect: v => { state.docName = v || 'Passport'; }
@@ -226,6 +240,7 @@ export async function renderAddDocument(container, params = {}) {
         timestamp:   isEdit ? existing.timestamp : new Date().toISOString(),
         personId:    state.personId,
         docName:     state.docName,
+        photos:      state.photos || [],
         docNumber:   state.docNumber,
         expiryDate:  state.expiryDate,
         alertDays:   state.alertDays,
@@ -249,7 +264,7 @@ export async function renderAddDocument(container, params = {}) {
         }
       }
 
-      const newData = await writeData('travel', (remote) => {
+      const newData = await localSave('travel', (remote) => {
         const docs = remote.documents || [];
         if (isEdit) {
           const idx = docs.findIndex(d => d.id === docData.id);

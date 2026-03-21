@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
 // Family Defaults — shared Qatar/India addresses, shared emergency contacts,
 // visual SVG family tree, relation management with auto-reverse + auto-emergency wiring
@@ -7,6 +7,7 @@
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
 import { writeData } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { uuidv4, showToast, copyToClipboard } from '../../../shared/utils.js';
 import {
@@ -181,11 +182,28 @@ export async function renderFamilyDefaults(container) {
               width="100%" height="150" style="border:none;display:block;" loading="lazy"></iframe>
           </div>
         ` : ''}
+
+        <!-- Address photos -->
+        <div style="margin-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
+            📸 Address Photos
+            <span style="font-weight:400;text-transform:none;font-size:11px;">(ID board · building exterior)</span>
+          </div>
+          <div id="${key}-photo-slots"></div>
+        </div>
       </div>
     `;
   }
 
   function bindAddressEvents(key, locObj) {
+    // Photo slots
+    const photoContainer = document.getElementById(`${key}-photo-slots`);
+    if (photoContainer) {
+      if (!locObj.photos) locObj.photos = [];
+      renderPhotoSlots(photoContainer, locObj.photos, 2, (newPhotos) => {
+        locObj.photos = newPhotos;
+      });
+    }
     // Live field updates
     document.getElementById(`${key}-label`)?.addEventListener('input', e => {
       locObj.label = e.target.value;
@@ -315,7 +333,10 @@ export async function renderFamilyDefaults(container) {
         <span style="font-size:13px;font-weight:600;color:var(--text);">
           ${contacts.length} shared contact${contacts.length !== 1 ? 's' : ''}
         </span>
-        <button class="btn btn-primary" style="padding:7px 14px;font-size:12px;" id="add-ec-btn">+ Add</button>
+        <div style="display:flex;gap:8px;">
+          ${'contacts' in navigator ? `<button class="btn btn-secondary" style="padding:7px 12px;font-size:12px;" id="pick-contact-btn">📱 From Contacts</button>` : ''}
+          <button class="btn btn-primary" style="padding:7px 14px;font-size:12px;" id="add-ec-btn">+ Add</button>
+        </div>
       </div>
       <div style="padding:0 16px;display:flex;flex-direction:column;gap:8px;" id="ec-list">
         ${contacts.length === 0
@@ -325,6 +346,25 @@ export async function renderFamilyDefaults(container) {
     `;
 
     document.getElementById('add-ec-btn').addEventListener('click', () => openECModal(null));
+
+    document.getElementById('pick-contact-btn')?.addEventListener('click', async () => {
+      try {
+        if (!('contacts' in navigator)) { showToast('Contact Picker not supported on this device', 'warning'); return; }
+        const props = ['name','tel'];
+        const opts  = { multiple: true };
+        const picked = await navigator.contacts.select(props, opts);
+        if (!picked || !picked.length) return;
+        picked.forEach(p => {
+          const name  = p.name?.[0] || '';
+          const phone = p.tel?.[0]  || '';
+          if (!name && !phone) return;
+          const prefill = { id: uuidv4(), name, phone, relationship: '', description: '', priority: draftContacts.length + 1 };
+          openECModal(prefill);
+        });
+      } catch (err) {
+        showToast('Could not open contacts: ' + err.message, 'warning');
+      }
+    });
 
     body.querySelectorAll('[data-edit-ec]').forEach(btn => {
       btn.addEventListener('click', e => {
@@ -706,7 +746,7 @@ export async function renderFamilyDefaults(container) {
 
   async function addRelationAsEmergencyContact(memberId, contactMember, relationship) {
     const currentData = await getCachedTravelData();
-    const newData = await writeData('travel', remote => {
+    const newData = await localSave('travel', remote => {
       const mems = remote.members || [];
       const idx  = mems.findIndex(m => m.id === memberId);
       if (idx === -1) return remote;
@@ -733,7 +773,7 @@ export async function renderFamilyDefaults(container) {
       const btn = document.getElementById('save-btn');
       btn.textContent = '⏳'; btn.disabled = true;
 
-      const newData = await writeData('travel', remote => ({
+      const newData = await localSave('travel', remote => ({
         ...remote,
         familyDefaults: {
           homeQatar:          draftAddresses.homeQatar,
@@ -757,13 +797,40 @@ export async function renderFamilyDefaults(container) {
 // ── Shared helpers ────────────────────────────────────────────────────────────
 function extractCoords(url) {
   let m;
+  // Google Maps / OSM coordinate patterns
   m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);             if (m) return { lat: +m[1], lng: +m[2] };
   m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);        if (m) return { lat: +m[1], lng: +m[2] };
   m = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);            if (m) return { lat: +m[1], lng: +m[2] };
   m = url.match(/mlat=(-?\d+\.\d+).*mlon=(-?\d+\.\d+)/);   if (m) return { lat: +m[1], lng: +m[2] };
   m = url.match(/#map=\d+\/(-?\d+\.\d+)\/(-?\d+\.\d+)/);   if (m) return { lat: +m[1], lng: +m[2] };
+  // Google Plus Code — e.g. "7HQG+XR Doha" or "7HQG+XR"
+  const plusCodeMatch = url.match(/([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3})(?:\s+(.+))?/i);
+  if (plusCodeMatch) {
+    const decoded = decodePlusCode(plusCodeMatch[1]);
+    if (decoded) return decoded;
+  }
+  // Raw coordinates
   m = url.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);        if (m) return { lat: +m[1], lng: +m[2] };
   return null;
+}
+
+// ── Decode a Google Plus Code to approximate lat/lng ─────────────────────────
+function decodePlusCode(code) {
+  try {
+    const ALPHA = '23456789CFGHJMPQRVWX';
+    const clean = code.toUpperCase().replace(/\+/,'');
+    if (clean.length < 6) return null;
+    let lat = -90, lng = -180, latDeg = 20, lngDeg = 40;
+    for (let i = 0; i < Math.min(clean.length, 8); i += 2) {
+      const c1 = ALPHA.indexOf(clean[i]);
+      const c2 = i+1 < clean.length ? ALPHA.indexOf(clean[i+1]) : 0;
+      if (c1 < 0 || c2 < 0) return null;
+      latDeg /= 20; lngDeg /= 20;
+      lat += c1 * latDeg;
+      lng += c2 * lngDeg;
+    }
+    return { lat: +(lat + latDeg/2).toFixed(6), lng: +(lng + lngDeg/2).toFixed(6) };
+  } catch { return null; }
 }
 
 function generatePlusCode(lat, lng) {

@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
 
@@ -6,6 +6,7 @@
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
 import { writeData } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import {
   formatDisplayDate, daysBetween, currentYear,
@@ -78,7 +79,11 @@ export async function renderTravelLog(container, params = {}) {
     });
   }
 
-  function renderTrips(members, trips, filterPerson, filterYear) {
+  let _tripPage = 1;
+  const PAGE_SIZE = 25;
+
+  function renderTrips(members, trips, filterPerson, filterYear, resetPage = true) {
+    if (resetPage) _tripPage = 1;
     const logContent = document.getElementById('log-content');
     const memberMap  = Object.fromEntries(members.map(m => [m.id, m]));
 
@@ -92,6 +97,9 @@ export async function renderTravelLog(container, params = {}) {
       showEmpty(logContent, 'No trips found for this filter');
       return;
     }
+
+    const totalCount = filtered.length;
+    filtered = filtered.slice(0, _tripPage * PAGE_SIZE);
 
     // Year totals per person
     const yearlyTotals = {};
@@ -158,7 +166,6 @@ export async function renderTravelLog(container, params = {}) {
         </div>
       `;
 
-      // Expand detail
       row.querySelector('.trip-row').addEventListener('click', () => {
         navigate('add-trip', { tripId: trip.id, mode: 'edit' });
       });
@@ -189,7 +196,7 @@ export async function renderTravelLog(container, params = {}) {
   async function deleteTrip(tripId) {
     if (!confirm('Delete this trip record? This cannot be undone.')) return;
     try {
-      const newData = await writeData('travel', (remote) => ({
+      const newData = await localSave('travel', (remote) => ({
         ...remote,
         trips: (remote.trips || []).filter(t => t.id !== tripId)
       }));

@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form
 
@@ -6,8 +6,10 @@
 
 import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
 import { writeData } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { PillSelect }  from '../../../shared/pill-select.js';
+import { renderPhotoSlots } from '../../../shared/photo-picker.js';
 import { SmartInput }  from '../../../shared/smart-input.js';
 import { uuidv4, today, showToast, formatAmount } from '../../../shared/utils.js';
 
@@ -41,6 +43,7 @@ export async function renderAddTransaction(container, params = {}) {
     category2:   existing?.category2   || '',
     notes1:      existing?.notes1      || '',
     account:     existing?.account     || 'Card',
+    photos:      existing?.photos      || [],
   };
 
   function render() {
@@ -101,6 +104,9 @@ export async function renderAddTransaction(container, params = {}) {
 
         <!-- Notes -->
         <div class="form-group" style="margin:0;">
+          <label class="form-label">Photos <span style="color:var(--text-muted);font-weight:400;">(receipt, cheque — optional)</span></label>
+          <div id="txn-photo-slots" style="margin-bottom:4px;"></div>
+
           <label class="form-label">Notes <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
           <div id="notes-input"></div>
         </div>
@@ -143,6 +149,14 @@ export async function renderAddTransaction(container, params = {}) {
     // Amounts
     document.getElementById('amount-spend').addEventListener('input', e => { state.amountSpend = e.target.value; updatePreview(); });
     document.getElementById('amount-income').addEventListener('input', e => { state.income = e.target.value; updatePreview(); });
+
+    // Photo slots
+    const photoContainer = document.getElementById('txn-photo-slots');
+    if (photoContainer) {
+      renderPhotoSlots(photoContainer, state.photos, 3, (newPhotos) => {
+        state.photos = newPhotos;
+      });
+    }
 
     // Currency pills
     new PillSelect(document.getElementById('currency-pills'), {
@@ -227,7 +241,74 @@ export async function renderAddTransaction(container, params = {}) {
   }
 
   function promptAddOption(type, pillsId, list, catNum) {
-    const name = prompt(`New ${type} name:`);
+    // Use bottom sheet instead of prompt()
+    showCategoryBottomSheet(type, (name) => {
+      if (!name?.trim()) return;
+      list.push(name.trim());
+      // Save to Drive in background
+      if (type === 'category') {
+        writeData('finance', r => ({
+          ...r, categories: [...new Set([...(r.categories||[]), name.trim()])]
+        })).then(d => setCachedFinanceData(d)).catch(() => {});
+      } else {
+        writeData('finance', r => ({
+          ...r, accounts: [...new Set([...(r.accounts||[]), name.trim()])]
+        })).then(d => setCachedFinanceData(d)).catch(() => {});
+      }
+      // Re-render the pill select with new option selected
+      renderAddTransaction(container, { txnId: catNum === 1 ? undefined : txnId, mode });
+    });
+  }
+
+  function showCategoryBottomSheet(type, onConfirm) {
+    // Remove existing sheet if any
+    document.getElementById('cat-sheet')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'cat-sheet';
+    sheet.style.cssText = `
+      position:fixed;bottom:0;left:0;right:0;z-index:1000;
+      background:var(--surface);border-radius:20px 20px 0 0;
+      border-top:1px solid var(--border);
+      padding:16px 20px 40px;
+      box-shadow:0 -4px 24px rgba(0,0,0,0.12);
+      animation:slideUp 0.25s ease;
+    `;
+    sheet.innerHTML = `
+      <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:16px;">New ${type === 'category' ? 'Category' : 'Account'}</div>
+      <input id="cat-sheet-input" type="text" class="form-input"
+        placeholder="Enter name…"
+        style="margin-bottom:12px;"
+        autofocus />
+      <div style="display:flex;gap:10px;">
+        <button id="cat-sheet-cancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
+        <button id="cat-sheet-confirm" class="btn btn-primary" style="flex:2;">Add &amp; Select</button>
+      </div>
+    `;
+    document.body.appendChild(sheet);
+
+    // Backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = 'cat-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:999;';
+    document.body.appendChild(backdrop);
+
+    const close = () => { sheet.remove(); backdrop.remove(); };
+
+    backdrop.addEventListener('click', close);
+    document.getElementById('cat-sheet-cancel').addEventListener('click', close);
+    document.getElementById('cat-sheet-confirm').addEventListener('click', () => {
+      const val = document.getElementById('cat-sheet-input').value.trim();
+      close();
+      onConfirm(val);
+    });
+    document.getElementById('cat-sheet-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('cat-sheet-confirm').click();
+    });
+
+    // Dummy to satisfy old code path
+    const name = null;
+    if (false) {
     if (!name || !name.trim()) return;
     const val = name.trim();
     if (!list.includes(val)) list.push(val);
@@ -255,13 +336,14 @@ export async function renderAddTransaction(container, params = {}) {
       category2:   state.category2 || null,
       notes1:      state.notes1    || null,
       account:     state.account,
+      photos:      state.photos    || [],
     };
 
     try {
       document.getElementById('save-btn').disabled = true;
       document.getElementById('save-btn').textContent = 'Saving…';
 
-      const newData = await writeData('finance', (remote) => {
+      const newData = await localSave('finance', (remote) => {
         const txns = remote.transactions || [];
         // Persist any new custom categories/accounts
         const cats = [...new Set([...(remote.categories || []), ...allCategories.filter(c => !DEFAULT_CATEGORIES.includes(c))])];
@@ -289,7 +371,7 @@ export async function renderAddTransaction(container, params = {}) {
   async function deleteTxn() {
     if (!confirm('Delete this transaction?')) return;
     try {
-      const newData = await writeData('finance', (remote) => ({
+      const newData = await localSave('finance', (remote) => ({
         ...remote,
         transactions: (remote.transactions || []).filter(t => t.id !== txnId)
       }));

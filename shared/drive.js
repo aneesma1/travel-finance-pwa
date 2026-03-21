@@ -1,4 +1,4 @@
-// v2.6 — 2026-03-18
+// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/drive.js ─────────────────────────────────────────────────────────
 // Google Drive API wrapper
 // Handles: folder creation, file create/fetch/update, ETag conflict detection,
@@ -225,35 +225,106 @@ export async function writeData(appName, mergeFn) {
   throw new Error('Failed to save after maximum retries. Please try again.');
 }
 
-// ── Mirror snapshot write ─────────────────────────────────────────────────────
+// ── Tiered mirror backup — 3 tiers: edits(5), daily(5), monthly(3) ──────────
+// Each tier stores JSON. XLSX export is queued as best-effort after JSON write.
+const TIER_EDITS   = 5;   // last N individual saves
+const TIER_DAYS    = 5;   // last N edit-days (one file per day, overwritten)
+const TIER_MONTHS  = 3;   // last N edit-months (one file per month, overwritten)
+
 async function writeMirrorSnapshot(appName, fullData) {
-  const mirrorId = localStorage.getItem(
-    appName === 'travel' ? KEYS.travelMirrorId : KEYS.financeMirrorId
-  );
-  if (!mirrorId) return;
+  if (!isOnline()) return;
+  const mirrorFolderId = localStorage.getItem(KEYS.mirrorFolderId);
+  if (!mirrorFolderId) return;
 
-  let snapshots = [];
+  const ts    = timestampSuffix();
+  const label = appName === 'travel' ? 'travel' : 'finance';
+  const token = getToken();
+  if (!token) return;
+
   try {
-    const { data } = await fetchJsonFile(mirrorId);
-    snapshots = Array.isArray(data) ? data : [];
-  } catch { snapshots = []; }
+    // Ensure subfolder structure exists
+    const appFolder = await findOrCreateFolder(label, mirrorFolderId);
+    const editsFolder   = await findOrCreateFolder('edits',   appFolder);
+    const dailyFolder   = await findOrCreateFolder('daily',   appFolder);
+    const monthlyFolder = await findOrCreateFolder('monthly', appFolder);
 
-  const recordCount = appName === 'travel'
-    ? (fullData.trips?.length || 0) + (fullData.documents?.length || 0)
-    : (fullData.transactions?.length || 0);
+    const jsonBlob = JSON.stringify(fullData, null, 2);
+    const today    = ts.slice(0, 10);               // YYYY-MM-DD
+    const month    = ts.slice(0, 7);                // YYYY-MM
 
-  // Prepend new snapshot, keep last N
-  snapshots.unshift({
-    timestamp:   new Date().toISOString(),
-    recordCount,
-    data:        fullData
-  });
-  snapshots = snapshots.slice(0, MIRROR_SNAPSHOTS);
+    // ── Tier 1: edits/ — timestamped per save ──────────────────────────────
+    await createMirrorFile(editsFolder, `${label}_${ts}.json`, jsonBlob, token);
+    await pruneFolder(editsFolder, TIER_EDITS, token);
 
-  await updateJsonFile(mirrorId, snapshots);
+    // ── Tier 2: daily/ — one file per edit-day, overwrite same day ──────────
+    const dailyName = `${label}_${today}.json`;
+    await upsertMirrorFile(dailyFolder, dailyName, jsonBlob, token);
+    await pruneFolder(dailyFolder, TIER_DAYS, token);
+
+    // ── Tier 3: monthly/ — one file per edit-month, overwrite same month ────
+    const monthlyName = `${label}_${month}.json`;
+    await upsertMirrorFile(monthlyFolder, monthlyName, jsonBlob, token);
+    await pruneFolder(monthlyFolder, TIER_MONTHS, token);
+
+  } catch { /* non-blocking mirror — never fail main save */ }
 }
 
-// ── Restore from mirror ───────────────────────────────────────────────────────
+async function createMirrorFile(folderId, name, jsonBlob, token) {
+  const meta    = JSON.stringify({ name, parents: [folderId] });
+  const form    = new FormData();
+  form.append('metadata', new Blob([meta], { type: 'application/json' }));
+  form.append('file', new Blob([jsonBlob], { type: 'application/json' }));
+  await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: form
+  });
+}
+
+async function upsertMirrorFile(folderId, name, jsonBlob, token) {
+  // Search for existing file with this name in folder
+  const searchRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${name}'+and+'${folderId}'+in+parents+and+trashed=false&fields=files(id)`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  if (!searchRes.ok) return;
+  const { files } = await searchRes.json();
+
+  if (files && files.length > 0) {
+    // Update existing
+    await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`,
+      {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: jsonBlob
+      }
+    );
+  } else {
+    // Create new
+    await createMirrorFile(folderId, name, jsonBlob, token);
+  }
+}
+
+async function pruneFolder(folderId, keepCount, token) {
+  const listRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&orderBy=name+desc&fields=files(id,name)`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  if (!listRes.ok) return;
+  const { files } = await listRes.json();
+  if (!files || files.length <= keepCount) return;
+  // Delete oldest files beyond keepCount
+  const toDelete = files.slice(keepCount);
+  for (const f of toDelete) {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).catch(() => {});
+  }
+}
+
+
 export async function getMirrorSnapshots(appName) {
   const mirrorId = localStorage.getItem(
     appName === 'travel' ? KEYS.travelMirrorId : KEYS.financeMirrorId
@@ -275,8 +346,9 @@ export async function restoreFromMirror(appName, snapshotIndex) {
 
 // ── Local device backup ───────────────────────────────────────────────────────
 export function downloadLocalBackup(appName, data) {
-  const date     = new Date().toISOString().split('T')[0];
-  const filename = `${appName}_backup_${date}.json`;
+  const ts       = timestampSuffix();
+  const label    = appName === 'travel' ? 'Travel' : 'Finance';
+  const filename = `${label}_Backup_${ts}.json`;
   const blob     = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url      = URL.createObjectURL(blob);
   const a        = document.createElement('a');
@@ -284,6 +356,13 @@ export function downloadLocalBackup(appName, data) {
   a.download     = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── Timestamp suffix helper — YYYY-MM-DD_HH-MM ───────────────────────────────
+export function timestampSuffix() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
 }
 
 export async function restoreFromLocalFile(file, appName) {
