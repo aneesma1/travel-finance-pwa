@@ -1,4 +1,4 @@
-// v3.2.1 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/pwa-install.js ───────────────────────────────────────────────────
 // PWA install prompt management
 // Handles the beforeinstallprompt event and shows a custom install banner

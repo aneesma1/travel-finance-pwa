@@ -1,4 +1,4 @@
-// v3.2.1 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form
 
@@ -306,18 +306,7 @@ export async function renderAddTransaction(container, params = {}) {
       if (e.key === 'Enter') document.getElementById('cat-sheet-confirm').click();
     });
 
-    // Dummy to satisfy old code path
-    const name = null;
-    if (false) {
-    if (!name || !name.trim()) return;
-    const val = name.trim();
-    if (!list.includes(val)) list.push(val);
-    if (catNum === 1) state.category1 = val;
-    else if (catNum === 2) state.category2 = val;
-    else state.account = val;
-    // Re-render that specific pill group
-    render();
-  }
+  }  // end showCategoryBottomSheet
 
   async function saveTxn() {
     if (!state.description.trim()) { showToast('Please enter a description', 'warning'); return; }

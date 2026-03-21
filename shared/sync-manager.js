@@ -1,4 +1,4 @@
-// v3.2.1 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.2.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/sync-manager.js ──────────────────────────────────────────────────
 // Core of Phase 3 — Local-first architecture
 // Handles: sequential Drive writes, pending queue, write-ahead safety,
@@ -11,7 +11,6 @@ import { getCachedTravelData, setCachedTravelData,
          getAppState, setAppState } from './db.js';
 import { writeData, fetchJsonFile, initDriveFolders,
          initDataFile, downloadLocalBackup, timestampSuffix } from './drive.js';
-import { authedFetch } from './auth.js';
 import { isOnline, uuidv4, showToast } from './utils.js';
 
 // ── Sync status broadcast ─────────────────────────────────────────────────────
