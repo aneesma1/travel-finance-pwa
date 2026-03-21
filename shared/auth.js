@@ -1,4 +1,4 @@
-// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.2.1 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/auth.js ──────────────────────────────────────────────────────────
 // Google OAuth 2.0 — Implicit flow (token response)
 // No client secret needed. Token returned directly in URL hash.

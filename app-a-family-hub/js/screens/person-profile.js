@@ -1,4 +1,4 @@
-// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.2.1 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-a-family-hub/js/screens/person-profile.js ──────────────────────────
 // Full person profile with 4 tabs:
 // Profile | Locations | Emergency | Documents
@@ -208,8 +208,9 @@ export async function renderPersonProfile(container, params = {}) {
                 {code:'+94', flag:'🇱🇰',label:'LKA +94'},
                 {code:'+63', flag:'🇵🇭',label:'PHL +63'},
               ].map(c => {
-                const currentCC = (draft.phone||'').match(/^(\+\d+)/)?.[1] || '+974';
-                return \`<option value="\${c.code}" \${currentCC === c.code ? 'selected' : ''}>\${c.flag} \${c.code}</option>\`;
+                const currentCC = (draft.phone||'').match(/^([+][0-9]+)/)?.[1] || '+974';
+                const sel = currentCC === c.code ? 'selected' : '';
+                return '<option value="' + c.code + '" ' + sel + '>' + c.flag + ' ' + c.code + '</option>';
               }).join('')}
             </select>
             <input type="tel" class="form-input" id="phone" style="flex:1;"
@@ -263,8 +264,9 @@ export async function renderPersonProfile(container, params = {}) {
                 {code:'+974',flag:'🇶🇦'},{code:'+91',flag:'🇮🇳'},{code:'+1',flag:'🇺🇸'},
                 {code:'+44',flag:'🇬🇧'},{code:'+971',flag:'🇦🇪'},{code:'+966',flag:'🇸🇦'},
               ].map(c => {
-                const currentCC = (draft.employerPhone||'').match(/^(\+\d+)/)?.[1] || '+974';
-                return \`<option value="\${c.code}" \${currentCC === c.code ? 'selected' : ''}>\${c.flag} \${c.code}</option>\`;
+                const currentCC = (draft.employerPhone||'').match(/^([+][0-9]+)/)?.[1] || '+974';
+                const sel = currentCC === c.code ? 'selected' : '';
+                return '<option value="' + c.code + '" ' + sel + '>' + c.flag + ' ' + c.code + '</option>';
               }).join('')}
             </select>
             <input type="tel" class="form-input" id="employer-phone" style="flex:1;"

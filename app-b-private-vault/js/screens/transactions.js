@@ -1,4 +1,4 @@
-// v3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.2.1 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
 
@@ -55,7 +55,7 @@ export async function renderTransactions(container) {
       activeAccount || null,
     ].filter(Boolean).join(' · ');
 
-    sheet.innerHTML = \`
+    sheet.innerHTML = `
       <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>
       <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Export</div>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Active filters: \${filterSummary}</div>
@@ -78,7 +78,7 @@ export async function renderTransactions(container) {
         <button id="export-download" class="btn btn-primary" style="flex:1;">📥 Download</button>
         <button id="export-share" class="btn btn-secondary" style="flex:1;">📤 Share</button>
       </div>
-    \`;
+    `;
 
     const style = document.createElement('style');
     style.textContent = '.sheet-pill{padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer;} .sheet-pill.active{border-color:var(--primary);background:var(--primary-bg);color:var(--primary);font-weight:600;}';
@@ -127,9 +127,9 @@ export async function renderTransactions(container) {
         : allTxns;
 
       const scopeLabel = selectedScope === 'filtered' ? filterSummary.replace(/ · /g,'_') : 'All';
-      const filename = \`Finance_\${scopeLabel}_\${ts}.\${selectedFmt}\`;
+      const filename = 'Finance_' + scopeLabel + '_' + ts + '.' + selectedFmt;
 
-      status.textContent = \`Exporting \${scopedTxns.length} records…\`;
+      status.textContent = 'Exporting ' + scopedTxns.length + ' records…';
 
       if (selectedFmt === 'csv') {
         const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Currency'];
@@ -138,7 +138,7 @@ export async function renderTransactions(container) {
           t.amountSpend??'', t.income??'', t.category1||'',
           t.category2||'', t.notes1||'', t.account||'', t.currency||''
         ]);
-        const csv = [headers, ...rows].map(r => r.map(v => \`"\${String(v).replace(/"/g,'""')}"\`).join(',')).join('\n');
+        const csv = [headers, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         if (deliver === 'download') {
           const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -146,7 +146,7 @@ export async function renderTransactions(container) {
         } else if (navigator.share) {
           await navigator.share({ files: [new File([blob], filename, { type: 'text/csv' })] }).catch(()=>{});
         }
-        status.textContent = \`✅ \${filename}\`;
+        status.textContent = '✅ ' + filename;
         return;
       }
 
@@ -176,7 +176,7 @@ export async function renderTransactions(container) {
         const blob = new Blob([wbout], { type:'application/octet-stream' });
         await navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(()=>{});
       }
-      status.textContent = \`✅ \${filename}\`;
+      status.textContent = '✅ ' + filename;
       setTimeout(close, 1500);
     }
 
