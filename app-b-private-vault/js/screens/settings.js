@@ -1,4 +1,4 @@
-// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
 
@@ -188,7 +188,7 @@ export async function renderSettings(container, params = {}) {
             }))
           }));
           await setCachedFinanceData(newData);
-          showToast(`Renamed to "${nn}" -- all transactions updated`, 'success');
+          showToast('Renamed to "' + nn + '" — all transactions updated', 'success');
           renderSettings(container, { tab: 'data' });
         });
       });
@@ -208,7 +208,7 @@ export async function renderSettings(container, params = {}) {
             }))
           }));
           await setCachedFinanceData(newData);
-          showToast(`All "${fromCat}" reassigned to "${tt}"`, 'success');
+          showToast('All "' + fromCat + '" reassigned to "' + tt + '"', 'success');
           renderSettings(container, { tab: 'data' });
         });
       });
@@ -233,7 +233,7 @@ export async function renderSettings(container, params = {}) {
             }))
           }));
           await setCachedFinanceData(newData);
-          showToast(`"${cat}" deleted`, 'success');
+          showToast('"' + cat + '" deleted', 'success');
           renderCatList();
         });
       });
@@ -241,18 +241,17 @@ export async function renderSettings(container, params = {}) {
 
     renderCatList();
 
-    document.getElementById('add-cat-btn').addEventListener('click', async () => {
-      const name = prompt('New category name:');
-      if (!name?.trim()) return;
-      const nn = name.trim();
-      if (allCats.includes(nn)) { showToast('Category already exists', 'warning'); return; }
-      allCats.push(nn);
-      const newData = await writeData('finance', r => ({
-        ...r, categories: [...new Set([...(r.categories||[]), nn])]
-      }));
-      await setCachedFinanceData(newData);
-      showToast(`"${nn}" added`, 'success');
-      renderCatList();
+    document.getElementById('add-cat-btn').addEventListener('click', () => {
+      openAddCatSheet(async (nn) => {
+        if (allCats.includes(nn)) { showToast('Category already exists', 'warning'); return; }
+        allCats.push(nn);
+        const newData = await writeData('finance', r => ({
+          ...r, categories: [...new Set([...(r.categories||[]), nn])]
+        }));
+        await setCachedFinanceData(newData);
+        showToast('"' + nn + '" added', 'success');
+        renderSettings(container, { tab: 'data' });
+      });
     });
 
     document.getElementById('backup-now').addEventListener('click', async () => {
@@ -571,7 +570,7 @@ export async function renderSettings(container, params = {}) {
           b.style.background = active ? 'var(--primary-bg)' : 'transparent';
           b.style.color = active ? 'var(--primary)' : 'var(--text)';
         });
-        showToast(`Auto-lock set to ${btn.textContent}`, 'success');
+        showToast('Auto-lock set to ' + btn.textContent, 'success');
       });
     });
 
@@ -595,6 +594,40 @@ export async function renderSettings(container, params = {}) {
         err.textContent = e.message.startsWith('WRONG') ? 'Current PIN is incorrect' : e.message;
       }
     });
+  }
+
+  // ── Add category sheet ───────────────────────────────────────────────────
+  function openAddCatSheet(onConfirm) {
+    document.getElementById('add-cat-sheet')?.remove();
+    document.getElementById('add-cat-backdrop')?.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'add-cat-sheet';
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 40px;box-shadow:0 -4px 24px rgba(0,0,0,0.18);';
+    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>' +
+      '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">New Category</div>' +
+      '<input id="add-cat-input" type="text" class="form-input" placeholder="e.g. Groceries, Rent, Salary…" style="margin-bottom:12px;" />' +
+      '<button id="add-cat-confirm" class="btn btn-primary btn-full">Add Category</button>';
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'add-cat-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+
+    const input = document.getElementById('add-cat-input');
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener('click', close);
+    setTimeout(() => input?.focus(), 100);
+
+    const confirm = () => {
+      const val = input.value.trim();
+      if (!val) { showToast('Enter a category name', 'warning'); return; }
+      close();
+      onConfirm(val);
+    };
+    document.getElementById('add-cat-confirm').addEventListener('click', confirm);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') confirm(); });
   }
 
   // ── Reassign category modal sheet ─────────────────────────────────────────
@@ -669,8 +702,8 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1B</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1B</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
       </div>
     `;

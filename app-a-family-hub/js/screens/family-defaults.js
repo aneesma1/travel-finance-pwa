@@ -1,4 +1,4 @@
-// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
 // Family Defaults -- shared Qatar/India addresses, shared emergency contacts,
 // visual SVG family tree, relation management with auto-reverse + auto-emergency wiring

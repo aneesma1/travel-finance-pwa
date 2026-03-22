@@ -1,4 +1,4 @@
-// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/person-profile.js ──────────────────────────
 // Full person profile with 4 tabs:
 // Profile | Locations | Emergency | Documents
@@ -1273,11 +1273,39 @@ export async function renderPersonProfile(container, params = {}) {
 
     const text = lines.join('\n');
     const { copyToClipboard } = await import('../../../shared/utils.js');
-    if (navigator.share) {
-      try { await navigator.share({ title: draft.name + ' Profile', text }); return; } catch {}
-    }
-    const ok = await copyToClipboard(text);
-    showToast(ok ? '✅ Profile copied! Paste in WhatsApp' : 'Copy failed', ok ? 'success' : 'error', 3000);
+    showTextShareSheet(text, draft.name + ' Profile');
+  }
+
+  function showTextShareSheet(text, title) {
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 36px;box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
+    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">' + title + '</div>' +
+      '<pre style="font-size:12px;color:var(--text-secondary);background:var(--surface-3);border-radius:8px;padding:12px;max-height:140px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin-bottom:14px;">' + text.replace(/</g,'&lt;') + '</pre>' +
+      '<div style="display:flex;flex-direction:column;gap:10px;">' +
+        '<button id="txt-share-btn" class="btn btn-primary btn-full">📤 Share via apps (WhatsApp…)</button>' +
+        '<button id="txt-copy-btn" class="btn btn-secondary btn-full">📋 Copy to clipboard</button>' +
+      '</div>';
+
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener('click', close);
+
+    document.getElementById('txt-share-btn').addEventListener('click', async () => {
+      if (navigator.share) {
+        try { await navigator.share({ title, text }); close(); return; } catch {}
+      }
+      showToast('Share not available — use Copy instead', 'warning');
+    });
+
+    document.getElementById('txt-copy-btn').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(text); showToast('✅ Copied! Paste in WhatsApp', 'success', 3000); }
+      catch { showToast('Could not copy', 'error'); }
+      close();
+    });
   }
 
   render();

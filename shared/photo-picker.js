@@ -1,4 +1,4 @@
-// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/photo-picker.js ──────────────────────────────────────────────────
 // Shared photo capture component
 //   Mobile: tap slot → camera / gallery (capture="environment")
@@ -38,30 +38,86 @@ export async function compressImage(file) {
 }
 
 // ── Paste from clipboard (Ctrl+V or snipping tool) ───────────────────────────
-async function pasteFromClipboard(slotIndex, slots, onChange, rerender) {
-  try {
-    if (!navigator.clipboard?.read) {
-      // Fallback: show paste hint
-      showToast('Press Ctrl+V anywhere on this page to paste', 'info', 3000);
-      return;
-    }
-    const items = await navigator.clipboard.read();
-    for (const item of items) {
-      const imgType = item.types.find(t => t.startsWith('image/'));
-      if (imgType) {
-        const blob = await item.getType(imgType);
-        const file = new File([blob], 'pasted.png', { type: imgType });
-        const compressed = await compressImage(file);
-        slots[slotIndex] = compressed;
-        onChange([...slots]);
-        rerender();
+function pasteFromClipboard(slotIndex, slots, onChange, rerender) {
+  // Primary: try clipboard API (requires permission, may fail)
+  // Fallback: show a temporary focused paste area for Ctrl+V
+  if (navigator.clipboard?.read) {
+    navigator.clipboard.read().then(items => {
+      for (const item of items) {
+        const imgType = item.types.find(t => t.startsWith('image/'));
+        if (imgType) {
+          item.getType(imgType).then(blob => {
+            const file = new File([blob], 'pasted.png', { type: imgType });
+            compressImage(file).then(compressed => {
+              slots[slotIndex] = compressed;
+              onChange([...slots]);
+              rerender();
+            });
+          });
+          return;
+        }
+      }
+      // No image in clipboard API — try paste area fallback
+      showPasteArea(slotIndex, slots, onChange, rerender);
+    }).catch(() => {
+      showPasteArea(slotIndex, slots, onChange, rerender);
+    });
+  } else {
+    showPasteArea(slotIndex, slots, onChange, rerender);
+  }
+}
+
+function showPasteArea(slotIndex, slots, onChange, rerender) {
+  // Create a temporary contenteditable div that captures paste events
+  const existing = document.getElementById('paste-capture-area');
+  if (existing) { existing.focus(); return; }
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = '<div style="background:var(--surface,#fff);border-radius:16px;padding:24px 28px;max-width:320px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);">' +
+    '<div style="font-size:32px;margin-bottom:12px;">📋</div>' +
+    '<div style="font-size:16px;font-weight:700;margin-bottom:8px;">Paste Image</div>' +
+    '<div style="font-size:13px;color:#666;margin-bottom:16px;">Press <strong>Ctrl+V</strong> (PC) or long-press and Paste (Android) to paste your copied image</div>' +
+    '<div id="paste-capture-area" contenteditable="true" tabindex="0" style="position:absolute;opacity:0;width:1px;height:1px;"></div>' +
+    '<button id="paste-cancel-btn" style="padding:10px 24px;border-radius:20px;border:1px solid #ddd;background:transparent;cursor:pointer;font-size:14px;">Cancel</button>' +
+  '</div>';
+
+  document.body.appendChild(overlay);
+
+  const captureEl = document.getElementById('paste-capture-area');
+  captureEl.focus();
+
+  const handlePaste = async (e) => {
+    e.preventDefault();
+    const items = Array.from(e.clipboardData?.items || []);
+    const imgItem = items.find(i => i.type.startsWith('image/'));
+    if (imgItem) {
+      const file = imgItem.getAsFile();
+      if (file) {
+        try {
+          const compressed = await compressImage(file);
+          slots[slotIndex] = compressed;
+          onChange([...slots]);
+          rerender();
+          overlay.remove();
+        } catch { overlay.remove(); }
         return;
       }
     }
-    showToast('No image found in clipboard. Use Ctrl+V after copying.', 'warning', 3000);
-  } catch {
-    showToast('Paste blocked by browser. Press Ctrl+V anywhere on page.', 'warning', 3500);
-  }
+    showToast('No image found — copy an image first, then paste', 'warning', 3000);
+  };
+
+  document.addEventListener('paste', handlePaste, { once: true });
+  document.getElementById('paste-cancel-btn').addEventListener('click', () => {
+    document.removeEventListener('paste', handlePaste);
+    overlay.remove();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      document.removeEventListener('paste', handlePaste);
+      overlay.remove();
+    }
+  });
 }
 
 function showToast(msg, type, dur) {

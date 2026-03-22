@@ -1,4 +1,4 @@
-// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
 
@@ -158,8 +158,8 @@ export async function renderSettings(container) {
       <!-- App info -->
       <div class="section-title">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
       </div>
 
       <!-- Hidden file inputs -->
@@ -547,16 +547,33 @@ function openImportModal(container, data, members) {
       statusBar.style.color = 'var(--text-secondary)';
       statusBar.textContent = 'Resolving members…';
 
-      // Resolve person names to IDs
-      const memberMap = Object.fromEntries(members.map(m => [m.name.toLowerCase(), m.id]));
+      // Resolve person names to IDs (fuzzy: trim, case, partial)
+      const memberMap = Object.fromEntries(members.map(m => [m.name.toLowerCase().trim(), m.id]));
       let imported = 0, skipped = 0;
+      const unmatchedNames = new Set();
 
       const resolved = [];
       records.forEach(rec => {
-        const personId = memberMap[rec.personName?.toLowerCase()];
-        if (!personId) { skipped++; return; }
+        const rawName = rec.personName?.toLowerCase().trim() || '';
+        // Exact match first
+        let personId = memberMap[rawName];
+        // Partial match: member name starts with or contains the value
+        if (!personId) {
+          const match = members.find(m =>
+            m.name.toLowerCase().includes(rawName) ||
+            rawName.includes(m.name.toLowerCase())
+          );
+          personId = match?.id;
+        }
+        if (!personId) { skipped++; unmatchedNames.add(rec.personName); return; }
         resolved.push({ ...rec, id: rec.id || uuidv4(), personId });
       });
+
+      if (unmatchedNames.size > 0) {
+        statusBar.textContent = 'Warning: could not match: ' + [...unmatchedNames].join(', ');
+        statusBar.style.color = 'var(--warning)';
+        await new Promise(r => setTimeout(r, 1500));
+      }
 
       statusBar.textContent = `Saving ${resolved.length} records to Drive…`;
 

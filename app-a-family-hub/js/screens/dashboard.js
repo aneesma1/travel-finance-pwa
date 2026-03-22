@@ -1,4 +1,4 @@
-// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
 // Shows: live status per member, days in location, next doc expiry, filter bar
@@ -460,23 +460,63 @@ export async function renderDashboard(container) {
       });
 
       canvas.toBlob(async (blob) => {
-        const file = new File([blob], `family-hub-${today()}.png`, { type: 'image/png' });
-        if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Family Travel Status' });
-        } else {
-          // Fallback: download
-          const url = URL.createObjectURL(blob);
-          const a   = document.createElement('a');
-          a.href    = url;
-          a.download = `family-hub-${today()}.png`;
-          a.click();
-          URL.revokeObjectURL(url);
-          showToast('Image downloaded', 'success');
-        }
+        const filename = `family-hub-${today()}.png`;
+        const file = new File([blob], filename, { type: 'image/png' });
+        const url = URL.createObjectURL(blob);
+        // Show share options sheet
+        showImageShareSheet(url, filename, file, blob);
       }, 'image/png');
     } catch (err) {
       showToast('Could not capture image', 'error');
     }
+  }
+
+  function showImageShareSheet(url, filename, file, blob) {
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
+    const preview = '<img src="' + url + '" style="width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;" />';
+    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>' +
+      preview +
+      '<div style="display:flex;flex-direction:column;gap:10px;">' +
+        '<button id="img-share-btn" class="btn btn-primary btn-full" style="font-size:15px;">📤 Share via apps</button>' +
+        '<button id="img-save-btn" class="btn btn-secondary btn-full" style="font-size:15px;">💾 Save to device</button>' +
+        '<button id="img-copy-btn" class="btn btn-secondary btn-full" style="font-size:15px;">📋 Copy image</button>' +
+      '</div>';
+
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+
+    const close = () => { sheet.remove(); backdrop.remove(); URL.revokeObjectURL(url); };
+    backdrop.addEventListener('click', close);
+
+    document.getElementById('img-share-btn').addEventListener('click', async () => {
+      if (navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'Family Travel Status' }); close(); }
+        catch { /* cancelled */ }
+      } else {
+        showToast('Sharing not supported — use Save instead', 'warning');
+      }
+    });
+
+    document.getElementById('img-save-btn').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      showToast('Image saved!', 'success');
+      close();
+    });
+
+    document.getElementById('img-copy-btn').addEventListener('click', async () => {
+      try {
+        const data = new ClipboardItem({ 'image/png': blob });
+        await navigator.clipboard.write([data]);
+        showToast('Image copied to clipboard!', 'success');
+      } catch {
+        showToast('Copy not supported — use Save instead', 'warning');
+      }
+      close();
+    });
   }
 
   async function copyDashboardText() {

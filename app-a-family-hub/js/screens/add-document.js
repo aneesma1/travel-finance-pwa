@@ -1,4 +1,4 @@
-// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/add-document.js ────────────────────────────
 // Add / Edit Document: person pill, doc type, expiry, alert toggles, Calendar sync
 
@@ -67,7 +67,13 @@ export async function renderAddDocument(container, params = {}) {
 
         <div class="form-group" style="margin:0;">
           <label class="form-label">Document Type</label>
-          <div id="doctype-pills"></div>
+          <div id="doctype-pills" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="doctype-new-input" class="form-input" placeholder="Type a new document type…"
+              style="flex:1;font-size:13px;" list="doctype-datalist" />
+            <datalist id="doctype-datalist"></datalist>
+            <button id="doctype-add-btn" class="btn btn-secondary" style="padding:10px 14px;font-size:13px;white-space:nowrap;">+ Add</button>
+          </div>
         </div>
 
         <div class="form-group" style="margin:0;">
@@ -163,12 +169,70 @@ export async function renderAddDocument(container, params = {}) {
       onSelect: v => { state.personId = v || ''; }
     });
 
-    // Doc type pills
-    new PillSelect(document.getElementById('doctype-pills'), {
-      options: allDocTypes.map(t => ({ value: t, label: t })),
-      selected: state.docName,
-      color: 'indigo',
-      onSelect: v => { state.docName = v || 'Passport'; }
+    // Doc type chips - custom, deletable
+    function renderDocTypeChips() {
+      const el = document.getElementById('doctype-pills');
+      if (!el) return;
+      el.innerHTML = allDocTypes.map(t => {
+        const active = state.docName === t;
+        const isDefault = DOC_TYPES_DEFAULT.includes(t);
+        return '<div style="display:inline-flex;align-items:center;gap:4px;padding:7px 12px;' +
+          'border-radius:20px;border:1.5px solid ' + (active ? 'var(--primary)' : 'var(--border)') + ';' +
+          'background:' + (active ? 'var(--primary-bg)' : 'transparent') + ';' +
+          'cursor:pointer;font-size:13px;font-weight:' + (active ? '600' : '400') + ';' +
+          'color:' + (active ? 'var(--primary)' : 'var(--text)') + ';" data-type="' + t + '">' +
+          '<span>' + t + '</span>' +
+          (!isDefault ? '<button data-delete-type="' + t + '" style="background:none;border:none;cursor:pointer;' +
+            'color:' + (active ? 'var(--primary)' : 'var(--text-muted)') + ';font-size:14px;padding:0 0 0 4px;' +
+            'line-height:1;">×</button>' : '') +
+          '</div>';
+      }).join('');
+
+      el.querySelectorAll('[data-type]').forEach(chip => {
+        chip.addEventListener('click', (e) => {
+          if (e.target.dataset.deleteType) return; // handled below
+          state.docName = chip.dataset.type;
+          renderDocTypeChips();
+        });
+      });
+      el.querySelectorAll('[data-delete-type]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const t = btn.dataset.deleteType;
+          if (!confirm('Remove "' + t + '" from document types?')) return;
+          const newCustom = (data.customDocTypes || []).filter(x => x !== t);
+          const saved = await localSave('travel', r => ({ ...r, customDocTypes: newCustom }));
+          await setCachedTravelData(saved);
+          allDocTypes.splice(allDocTypes.indexOf(t), 1);
+          if (state.docName === t) state.docName = 'Passport';
+          renderDocTypeChips();
+          showToast('"' + t + '" removed', 'success');
+        });
+      });
+
+      // Datalist
+      const dl = document.getElementById('doctype-datalist');
+      if (dl) dl.innerHTML = allDocTypes.map(t => '<option value="' + t + '">').join('');
+    }
+    renderDocTypeChips();
+
+    // Add new doc type
+    document.getElementById('doctype-add-btn')?.addEventListener('click', async () => {
+      const input = document.getElementById('doctype-new-input');
+      const val = input?.value.trim();
+      if (!val) { showToast('Enter a document type name', 'warning'); return; }
+      if (allDocTypes.includes(val)) { state.docName = val; input.value = ''; renderDocTypeChips(); return; }
+      allDocTypes.push(val);
+      state.docName = val;
+      input.value = '';
+      const newCustom = [...(data.customDocTypes || []).filter(t => !DOC_TYPES_DEFAULT.includes(t)), val];
+      const saved = await localSave('travel', r => ({ ...r, customDocTypes: newCustom }));
+      await setCachedTravelData(saved);
+      renderDocTypeChips();
+      showToast('"' + val + '" added', 'success');
+    });
+    document.getElementById('doctype-new-input')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('doctype-add-btn')?.click();
     });
 
     // Doc number smart input
@@ -333,12 +397,32 @@ export async function renderAddDocument(container, params = {}) {
     lines.push('_Shared from Family Hub_');
 
     const text = lines.join('\n');
-    const { copyToClipboard } = await import('../../../shared/utils.js');
-    if (navigator.share) {
-      try { await navigator.share({ title: existing.docName + ' — ' + member?.name, text }); return; } catch {}
-    }
-    const ok = await copyToClipboard(text);
-    showToast(ok ? '✅ Copied! Paste in WhatsApp' : 'Copy failed', ok ? 'success' : 'error', 3000);
+    showTextShareSheet(text);
+  }
+
+  function showTextShareSheet(text) {
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 36px;box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
+    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>' +
+      '<pre style="font-size:12px;color:var(--text-secondary);background:var(--surface-3);border-radius:8px;padding:12px;max-height:140px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin-bottom:14px;">' + text.replace(/</g,'&lt;') + '</pre>' +
+      '<div style="display:flex;flex-direction:column;gap:10px;">' +
+        '<button id="ts-share-btn" class="btn btn-primary btn-full">📤 Share via apps</button>' +
+        '<button id="ts-copy-btn" class="btn btn-secondary btn-full">📋 Copy to clipboard</button>' +
+      '</div>';
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
+    document.body.appendChild(backdrop); document.body.appendChild(sheet);
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener('click', close);
+    document.getElementById('ts-share-btn').addEventListener('click', async () => {
+      if (navigator.share) { try { await navigator.share({ text }); close(); return; } catch {} }
+      showToast('Use Copy instead', 'warning');
+    });
+    document.getElementById('ts-copy-btn').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(text); showToast('✅ Copied!', 'success', 3000); }
+      catch { showToast('Could not copy', 'error'); }
+      close();
+    });
   }
 
   async function deleteDoc() {
