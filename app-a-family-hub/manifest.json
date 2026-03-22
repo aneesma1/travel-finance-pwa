@@ -1,0 +1,30 @@
+{
+  "name": "Family Hub",
+  "short_name": "FamilyHub",
+  "description": "Shared family travel & document tracker",
+  "start_url": "/travel-finance-pwa/app-a-family-hub/",
+  "scope": "/travel-finance-pwa/app-a-family-hub/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8FAFC",
+  "theme_color": "#3730A3",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "version": "3.5.5",
+  "categories": [
+    "travel",
+    "utilities"
+  ]
+}
