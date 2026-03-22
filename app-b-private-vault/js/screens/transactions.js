@@ -1,4 +1,4 @@
-// v3.4.9 — 2026-03-22
+// v3.5.0 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -438,12 +438,12 @@ export async function renderTransactions(container) {
       const balanceBar = document.getElementById('balance-bar');
       if (balanceBar) balanceBar.classList.add('hidden');
 
-      // Smart fallback: if ONLY the year filter causes empty but data exists for
-      // this currency in other years, auto-switch to all-time view
+      // Smart fallback: ONLY when a year filter is explicitly set AND
+      // it's the sole cause of empty results (no other filters active)
       const hasDataAllTime = transactions.some(t => t.currency === activeCurrency);
-      const onlyYearFiltering = !activeMonth && !activeCategory && !activeAccount;
+      const onlyYearFiltering = !!activeYear && !activeMonth && !activeCategory && !activeAccount;
       if (hasDataAllTime && onlyYearFiltering) {
-        // Clear all filters and re-render - keeps only currency
+        // Year filter produced no results - clear it and show all
         clearHashParams();
         if (activeCurrency !== 'QAR') setHashParams({ currency: activeCurrency });
         renderTransactions(container);

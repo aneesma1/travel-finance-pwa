@@ -1,4 +1,4 @@
-// v3.4.9 — 2026-03-22
+// v3.5.0 — 2026-03-22
 
 // ─── shared/smart-input.js ───────────────────────────────────────────────────
 // SmartInput: text field with real-time pill suggestions from historical data

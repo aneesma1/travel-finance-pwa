@@ -1,4 +1,4 @@
-// v3.4.9 — 2026-03-22
+// v3.5.0 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/add-document.js ────────────────────────────
 // Add / Edit Document: person pill, doc type, expiry, alert toggles, Calendar sync
