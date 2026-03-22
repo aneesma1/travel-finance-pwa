@@ -1,4 +1,4 @@
-// v3.3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
+// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/photo-picker.js ──────────────────────────────────────────────────
 // Shared photo capture component
 //   Mobile: tap slot → camera / gallery (capture="environment")
@@ -166,23 +166,29 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
         slot.appendChild(pasteBtn);
 
       } else {
-        // ── Mobile empty slot: tap to open camera/gallery ────────────────────
-        slot.style.width = '100px';
-        slot.style.height = '80px';
+        // ── Mobile empty slot: camera button + paste button ──────────────────
+        slot.style.padding = '8px 10px';
         slot.style.display = 'flex';
-        slot.style.alignItems = 'center';
-        slot.style.justifyContent = 'center';
-        slot.style.cursor = 'pointer';
+        slot.style.flexDirection = 'column';
+        slot.style.gap = '6px';
+        slot.style.alignItems = 'stretch';
+        slot.style.minWidth = '100px';
 
-        const inner = document.createElement('div');
-        inner.style.cssText = 'text-align:center;pointer-events:none;';
-        inner.innerHTML = '<div style="font-size:22px;">📷</div><div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Add photo</div>';
+        const label = document.createElement('div');
+        label.style.cssText = 'font-size:10px;color:var(--text-muted);font-weight:600;text-align:center;margin-bottom:2px;';
+        label.textContent = 'Photo ' + (i + 1);
+        slot.appendChild(label);
+
+        // Camera/gallery button
+        const cameraBtn = document.createElement('button');
+        cameraBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;';
+        cameraBtn.innerHTML = '📷 Camera';
 
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = 'image/*';
         fileInput.setAttribute('capture', 'environment');
-        fileInput.style.cssText = 'position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;';
+        fileInput.style.display = 'none';
         fileInput.addEventListener('change', async (e) => {
           const file = e.target.files[0];
           if (!file) return;
@@ -193,9 +199,16 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
             render();
           } catch { /* ignore */ }
         });
-
-        slot.appendChild(inner);
+        cameraBtn.addEventListener('click', () => fileInput.click());
         slot.appendChild(fileInput);
+        slot.appendChild(cameraBtn);
+
+        // Paste clipboard button (works on Android Chrome with clipboard permission)
+        const pasteBtn = document.createElement('button');
+        pasteBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 8px;border-radius:var(--radius-md);border:1px solid var(--primary-border);background:var(--primary-bg);color:var(--primary);font-size:12px;cursor:pointer;font-family:inherit;';
+        pasteBtn.innerHTML = '📋 Paste';
+        pasteBtn.addEventListener('click', () => pasteFromClipboard(i, slots, onChange, render));
+        slot.appendChild(pasteBtn);
       }
 
       wrap.appendChild(slot);

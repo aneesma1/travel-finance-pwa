@@ -1,4 +1,4 @@
-// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/pin.js ──────────────────────────────────────────
 // PIN management -- SHA-256 with random per-device salt
 // Random salt generated at first PIN setup, stored in localStorage

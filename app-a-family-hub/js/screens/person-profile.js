@@ -1,4 +1,4 @@
-// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/person-profile.js ──────────────────────────
 // Full person profile with 4 tabs:
 // Profile | Locations | Emergency | Documents
@@ -1271,8 +1271,7 @@ export async function renderPersonProfile(container, params = {}) {
     lines.push('');
     lines.push('_Shared from Family Hub_');
 
-    const text = lines.join('
-');
+    const text = lines.join('\n');
     const { copyToClipboard } = await import('../../../shared/utils.js');
     if (navigator.share) {
       try { await navigator.share({ title: draft.name + ' Profile', text }); return; } catch {}

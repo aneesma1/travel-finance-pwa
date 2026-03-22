@@ -1,4 +1,4 @@
-// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
 // Summary cards: Income / Spend / Net per currency
@@ -64,7 +64,7 @@ export async function renderDashboard(container) {
 
   // ── Filter bar ──────────────────────────────────────────────────────
   function renderFilterBar({ activeCurrency, activeYear, activeMonth, activeCategory, activeAccount, transactions, categories }) {
-    const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(Boolean))].sort((a,b) => b-a);
+    const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b) => b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
     const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
     const allAccounts   = ['Cash','Card','Bank','Other'];

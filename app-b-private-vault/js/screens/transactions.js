@@ -1,4 +1,4 @@
-// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
 
@@ -202,7 +202,7 @@ export async function renderTransactions(container) {
   renderList();
 
   function renderFilterBar() {
-    const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
+    const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b)=>b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
     const activeCount = [activeCategory, activeAccount, activeMonth !== 0].filter(Boolean).length;
 
@@ -428,7 +428,24 @@ export async function renderTransactions(container) {
     }
 
     const wrap = document.getElementById('txn-list-wrap');
-    if (!filtered.length) { renderEmpty(wrap); return; }
+    if (!filtered.length) {
+      const balanceBar = document.getElementById('balance-bar');
+      if (balanceBar) balanceBar.classList.add('hidden');
+      wrap.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:12px;">
+          <div style="font-size:48px;">💳</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text);">No ${activeCurrency} transactions</div>
+          <div style="font-size:13px;color:var(--text-muted);text-align:center;line-height:1.6;">
+            ${activeMonth || activeCategory || activeAccount
+              ? 'No records match the active filters. <button id="clear-filters-empty" style="color:var(--primary);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline;">Clear filters</button>'
+              : 'Tap ＋ to add your first ' + activeCurrency + ' transaction.'}
+          </div>
+        </div>`;
+      wrap.querySelector('#clear-filters-empty')?.addEventListener('click', () => {
+        clearHashParams(); renderTransactions(container);
+      });
+      return;
+    }
 
     // Group by month
     const groups = {};

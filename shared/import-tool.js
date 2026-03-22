@@ -1,4 +1,4 @@
-// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.5 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
 // Steps: (1) Pick file → (2) Map columns → (3) Preview + validate → (4) Import
@@ -280,9 +280,14 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         if (val instanceof Date) {
           val = val.toISOString().split('T')[0];
         } else if (typeof val === 'number' && col.key.toLowerCase().includes('date')) {
-          // Excel serial date
-          const d = new Date(Math.round((val - 25569) * 86400 * 1000));
-          val = d.toISOString().split('T')[0];
+          // Excel serial date — 0 or negative = blank/invalid cell
+          if (val <= 0) {
+            val = '';
+          } else {
+            const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+            const yr = d.getFullYear();
+            val = (yr >= 2000 && yr <= 2100) ? d.toISOString().split('T')[0] : '';
+          }
         } else {
           val = String(val ?? '').trim();
         }
