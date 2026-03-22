@@ -1,4 +1,4 @@
-// v3.5.4 — 2026-03-22
+// v3.5.5 — 2026-03-22
 // ─── app-b-private-vault/js/screens/category-manager.js ─────────────────────
 // Full-screen category manager: rename, merge, delete, add, search
 

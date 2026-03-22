@@ -1,4 +1,4 @@
-// v3.5.4 — 2026-03-22
+// v3.5.5 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -185,13 +185,21 @@ export async function renderTransactions(container) {
     document.getElementById('export-share').addEventListener('click', () => doExport('share'));
   }
 
-  const data = await getCachedFinanceData();
+  // Retry up to 3 times if data not yet loaded from Drive
+  let data = await getCachedFinanceData();
+  if (!data) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise(r => setTimeout(r, 600));
+      data = await getCachedFinanceData();
+      if (data) break;
+    }
+  }
   if (!data) {
     const wrap = document.getElementById('txn-list-wrap');
     wrap.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:12px;">' +
       '<div style="font-size:48px;">💳</div>' +
-      '<div style="font-size:16px;font-weight:600;color:var(--text);">No data loaded yet</div>' +
-      '<div style="font-size:13px;color:var(--text-muted);text-align:center;">Add a transaction to get started, or pull down to refresh.</div>' +
+      '<div style="font-size:16px;font-weight:600;color:var(--text);">Loading transactions…</div>' +
+      '<div style="font-size:13px;color:var(--text-muted);text-align:center;">Syncing from Drive. Tap retry if this persists.</div>' +
       '<button id="retry-load" class="btn btn-primary" style="margin-top:8px;">↻ Retry</button>' +
     '</div>';
     document.getElementById('retry-load')?.addEventListener('click', () => renderTransactions(container));
