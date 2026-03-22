@@ -1,47 +1,46 @@
-// v3.5.3 — 2026-03-22
-
+// v3.5.4 — 2026-03-22
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
-// Settings: family profiles, backup/restore, import, auth, sync status
+// Settings screen — People, Data, Security, Account tabs
 
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
-import {
-  writeData, downloadLocalBackup, restoreFromLocalFile,
-  getMirrorSnapshots, restoreFromMirror, readData, timestampSuffix
-} from '../../../shared/drive.js';
+import { writeData, downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, localSave } from '../../../shared/drive.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
-import { getActiveSessions, getActivityLog, revokeSession, revokeAllSessions } from '../../../shared/security-log.js';
-import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
+import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
 import { uuidv4, formatDisplayDate, showToast, isOnline } from '../../../shared/utils.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openPersonManage } from './person-manage.js';
 
-const MEMBER_EMOJIS  = ['👤','👨','👩','🧑','👦','👧','🧔','👱','🧒'];
-const MEMBER_COLORS  = ['#EEF2FF','#D1FAE5','#FEF3C7','#FCE7F3','#E0F2FE','#F3E8FF'];
+const MEMBER_EMOJIS = ['👤','👨','👩','🧑','👦','👧','🧔','👱','🧒'];
+const MEMBER_COLORS = ['#EEF2FF','#D1FAE5','#FEF3C7','#FCE7F3','#E0F2FE','#F3E8FF'];
 
+// ── Main entry ────────────────────────────────────────────────────────────────
 export async function renderSettings(container, params = {}) {
+  const { tab: activeTab = 'people' } = params;
   const data = await getCachedTravelData();
   const { members = [] } = data || {};
   const user = getUser();
-  const activeTab = params.tab || 'people';
 
-  const TAB = (id, label, active) =>
-    `<button class="settings-tab" data-tab="${id}" style="flex:1;padding:12px 4px;border:none;background:none;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;color:${active?'var(--primary)':'var(--text-muted)'};border-bottom:2px solid ${active?'var(--primary)':'transparent'};transition:all 0.15s;">${label}</button>`;
-
+  const tabs = ['people','data','security','account'];
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">⚙️ Settings</span>
     </div>
-    <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;">
-      ${TAB('people',   '👥 People',   activeTab==='people')}
-      ${TAB('data',     '💾 Data',     activeTab==='data')}
-      ${TAB('security', '🛡️ Security', activeTab==='security')}
-      ${TAB('account',  '👤 Account',  activeTab==='account')}
+    <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 4px;">
+      ${tabs.map(id => `
+        <button class="settings-tab ${activeTab===id?'active':''}" data-tab="${id}"
+          style="flex:1;padding:12px 4px;border:none;background:none;cursor:pointer;
+            font-size:11px;font-weight:600;font-family:inherit;
+            color:${activeTab===id?'var(--primary)':'var(--text-muted)'};
+            border-bottom:2px solid ${activeTab===id?'var(--primary)':'transparent'};
+            transition:all 0.15s;">
+          ${id==='people'?'👥 People':id==='data'?'💾 Data':id==='security'?'🔐 Security':'👤 Account'}
+        </button>`).join('')}
     </div>
-    <div id="tab-content" style="padding-bottom:80px;overflow-y:auto;"></div>
+    <div id="tab-content" style="padding-bottom:32px;"></div>
     <div class="modal-overlay hidden" id="member-modal"></div>
     <input type="file" id="restore-file-input" accept=".json" style="display:none;" />
   `;
@@ -50,233 +49,169 @@ export async function renderSettings(container, params = {}) {
     btn.addEventListener('click', () => renderSettings(container, { tab: btn.dataset.tab }));
   });
 
-  if      (activeTab === 'people')   renderPeopleTab();
-  else if (activeTab === 'data')     renderDataTab();
+  if      (activeTab === 'people')   renderPeopleTab(container, data, members, user);
+  else if (activeTab === 'data')     renderDataTab(data, members, container);
   else if (activeTab === 'security') renderSecurityTab();
-  else if (activeTab === 'account')  renderAccountTab();
+  else if (activeTab === 'account')  renderAccountTab(data, members, user, container);
+}
 
-  // ── PEOPLE TAB ───────────────────────────────────────────────────────────
-  function renderPeopleTab() {
-    const tab = document.getElementById('tab-content');
-    const dupeWarning = members.length >= 2 ? checkDuplicateNames(members) : '';
-    tab.innerHTML = `
-      ${dupeWarning}
-      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>Family Members</span>
-        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;" id="add-member-btn">+ Add</button>
-      </div>
-      <div id="members-list" style="padding:0 16px;display:flex;flex-direction:column;gap:8px;"></div>
-
-      ${isAdmin() ? `
-      <div class="section-title" style="margin-top:16px;">Person Management</div>
-      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
-        <div class="list-row" id="manage-people-btn" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
-          <span style="font-size:20px;">🔀</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Rename &amp; Merge People</div>
-            <div style="font-size:12px;color:var(--text-muted);">Fix misspellings, merge duplicate entries</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
+// ── PEOPLE TAB ────────────────────────────────────────────────────────────────
+function renderPeopleTab(container, data, members, user) {
+  const tab = document.getElementById('tab-content');
+  const dupeWarn = buildDupeWarning(members);
+  tab.innerHTML = `
+    ${dupeWarn}
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+      <span>Family Members</span>
+      <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;" id="add-member-btn">+ Add</button>
+    </div>
+    <div id="members-list" style="padding:0 16px;display:flex;flex-direction:column;gap:8px;"></div>
+    ${isAdmin() ? `
+    <div class="section-title" style="margin-top:16px;">Person Management</div>
+    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
+      <div class="list-row" id="manage-people-btn" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
+        <span style="font-size:20px;">🔀</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Rename &amp; Merge People</div>
+          <div style="font-size:12px;color:var(--text-muted);">Fix misspellings, merge duplicate entries</div>
         </div>
-        <div class="list-row" id="access-control-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
-          <span style="font-size:20px;">👑</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Manage Access</div>
-            <div style="font-size:12px;color:var(--text-muted);">Set Admin or Viewer roles per person</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
+        <span style="color:var(--text-muted);">›</span>
       </div>
-      ` : ''}
-    `;
+      <div class="list-row" id="access-control-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
+        <span style="font-size:20px;">👑</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Manage Access</div>
+          <div style="font-size:12px;color:var(--text-muted);">Set Admin or Viewer roles per person</div>
+        </div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+    </div>` : ''}
+  `;
 
-    renderMembersList(members);
-    bindEvents(members, data, container);
+  renderMembersList(members);
 
-    document.getElementById('manage-people-btn')?.addEventListener('click', () => {
-      openPersonManage(() => renderSettings(container, { tab: 'people' }));
-    });
+  document.getElementById('add-member-btn')?.addEventListener('click', () =>
+    navigate('person-profile', { mode: 'new' }));
 
-    if (isAdmin()) {
-      document.getElementById('access-control-btn')?.addEventListener('click', () => {
-        const modal = document.getElementById('member-modal');
-        modal.classList.remove('hidden');
-        modal.innerHTML = `
-          <div class="modal-sheet" style="max-height:85vh;">
-            <div class="modal-handle"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">
-              <span style="font-size:16px;font-weight:700;">👥 Family Access</span>
-              <button id="close-access" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
-            </div>
-            <div id="access-control-container" style="overflow-y:auto;max-height:60vh;"></div>
-          </div>
-        `;
-        document.getElementById('close-access').addEventListener('click', () => modal.classList.add('hidden'));
-        modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
-        const onSaveAccess = async (newData) => {
-          const saved = await writeData('travel', () => newData);
-          await setCachedTravelData(saved);
-          showToast('Access updated', 'success');
-          renderAccessControl(document.getElementById('access-control-container'), saved, getUser()?.email || '', onSaveAccess);
-        };
-        renderAccessControl(document.getElementById('access-control-container'), data, getUser()?.email || '', onSaveAccess);
-      });
+  document.getElementById('manage-people-btn')?.addEventListener('click', () =>
+    openPersonManage(() => renderSettings(container, { tab: 'people' })));
+
+  document.getElementById('access-control-btn')?.addEventListener('click', () => {
+    const modal = document.getElementById('member-modal');
+    modal.classList.remove('hidden');
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:85vh;">
+        <div class="modal-handle"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">
+          <span style="font-size:16px;font-weight:700;">👥 Family Access</span>
+          <button id="close-access" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+        </div>
+        <div id="access-control-container" style="overflow-y:auto;max-height:60vh;"></div>
+      </div>`;
+    document.getElementById('close-access').addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+    const onSave = async (newData) => {
+      const saved = await writeData('travel', () => newData);
+      await setCachedTravelData(saved);
+      showToast('Access updated', 'success');
+      renderAccessControl(document.getElementById('access-control-container'), saved, getUser()?.email || '', onSave);
+    };
+    renderAccessControl(document.getElementById('access-control-container'), data, user?.email || '', onSave);
+  });
+}
+
+function buildDupeWarning(members) {
+  const dupes = [];
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const a = members[i].name.toLowerCase().trim();
+      const b = members[j].name.toLowerCase().trim();
+      const dp = Array.from({length:a.length+1}, (_,r) =>
+        Array.from({length:b.length+1}, (_,c) => r===0?c:c===0?r:0));
+      for (let r=1;r<=a.length;r++)
+        for (let c=1;c<=b.length;c++)
+          dp[r][c]=a[r-1]===b[c-1]?dp[r-1][c-1]:1+Math.min(dp[r-1][c],dp[r][c-1],dp[r-1][c-1]);
+      if (dp[a.length][b.length] <= 2)
+        dupes.push('"' + members[i].name + '" and "' + members[j].name + '"');
     }
   }
-
-  function checkDuplicateNames(mems) {
-    const dupes = [];
-    for (let i = 0; i < mems.length; i++)
-      for (let j = i+1; j < mems.length; j++) {
-        const a = mems[i].name.toLowerCase().trim(), b = mems[j].name.toLowerCase().trim();
-        const m2 = a.length, n2 = b.length;
-        const dp = Array.from({length:m2+1},(_,i2)=>Array.from({length:n2+1},(_,j2)=>i2===0?j2:j2===0?i2:0));
-        for (let i2=1;i2<=m2;i2++) for (let j2=1;j2<=n2;j2++) dp[i2][j2]=a[i2-1]===b[j2-1]?dp[i2-1][j2-1]:1+Math.min(dp[i2-1][j2],dp[i2][j2-1],dp[i2-1][j2-1]);
-        if (dp[m2][n2] <= 2) dupes.push('"' + mems[i].name + '" and "' + mems[j].name + '"');
-      }
-    if (!dupes.length) return '';
-    return '<div style="margin:12px 16px 0;background:#FEF3C7;border:1px solid #F59E0B;border-radius:10px;padding:10px 14px;">' +
-      '<div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:4px;">⚠️ Possible duplicate names</div>' +
-      dupes.map(d => '<div style="font-size:12px;color:#78350F;">' + d + ' — use Rename &amp; Merge to fix</div>').join('') +
-      '</div>';
-  }
-
-  // ── DATA TAB ─────────────────────────────────────────────────────────────
-  function renderDataTab() {
-    const tab = document.getElementById('tab-content');
-    tab.innerHTML = `
-      <div class="section-title">Data Management</div>
-      <div class="card" style="margin:0 16px;overflow:visible;">
-        <div class="list-row" id="backup-btn" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
-          <span style="font-size:20px;">💾</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Backup Now</div><div style="font-size:12px;color:var(--text-muted);">Download JSON to device</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="restore-local-btn">
-          <span style="font-size:20px;">📂</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Restore from Local Backup</div><div style="font-size:12px;color:var(--text-muted);">Pick a downloaded backup file</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="restore-mirror-btn">
-          <span style="font-size:20px;">☁️</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Restore from Drive Mirror</div><div style="font-size:12px;color:var(--text-muted);">Choose from last 3 snapshots</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="import-btn">
-          <span style="font-size:20px;">📥</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Import from Excel / CSV</div><div style="font-size:12px;color:var(--text-muted);">Migrate existing travel data</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="photo-zip-btn">
-          <span style="font-size:20px;">📦</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Export All Photos as ZIP</div><div style="font-size:12px;color:var(--text-muted);">Document scans, address photos</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="clear-cache-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
-          <span style="font-size:20px;">🗑️</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Clear Local Cache</div><div style="font-size:12px;color:var(--text-muted);">Force fresh re-download from Drive</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-      </div>
-    `;
-    bindDataEvents();
-  }
-
-  // ── SECURITY TAB ─────────────────────────────────────────────────────────
-  function renderSecurityTab() {
-    const tab = document.getElementById('tab-content');
-    tab.innerHTML = `
-      <div class="section-title">Security Dashboard</div>
-      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
-        <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg);">
-          <span style="font-size:20px;">🛡️</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Security &amp; Access</div><div style="font-size:12px;color:var(--text-muted);">Sessions · Activity log · Revoke access</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-      </div>
-      <div class="section-title" style="margin-top:16px;">Session</div>
-      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
-        <div class="list-row" id="safe-exit-btn" style="border-radius:var(--radius-lg);">
-          <span style="font-size:20px;">🚪</span>
-          <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Save &amp; Exit</div><div style="font-size:12px;color:var(--text-muted);">Sync data then close cleanly</div></div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-      </div>
-    `;
-    bindSecurityEvents();
-  }
-
-  // ── ACCOUNT TAB ──────────────────────────────────────────────────────────
-  function renderAccountTab() {
-    const tab = document.getElementById('tab-content');
-    tab.innerHTML = `
-      <div class="section-title">Signed In As</div>
-      <div class="card" style="margin:0 16px;">
-        <div class="card-body" style="display:flex;align-items:center;gap:12px;">
-          ${user?.picture ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />` : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name || 'Signed in'}</div>
-            <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email || ''}</div>
-          </div>
-        </div>
-        <div class="divider"></div>
-        <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <span style="font-size:13px;color:var(--text-secondary);">Drive sync</span>
-            <span style="font-size:13px;font-weight:600;color:${isOnline() ? 'var(--success)' : 'var(--warning)'};">${isOnline() ? '● Online' : '● Offline'}</span>
-          </div>
-          ${data?.lastSync ? `<div style="font-size:11px;color:var(--text-muted);">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>` : ''}
-          <button class="btn btn-secondary btn-full" style="margin-top:12px;" id="signout-btn">Sign out of Google</button>
-        </div>
-      </div>
-      <div class="section-title" style="margin-top:16px;">App Info</div>
-      <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.3 · 2026-03-22</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin() ? '👑 Admin' : '👁 Viewer'} · ${user?.email || 'Not signed in'}</div>
-      </div>
-    `;
-    document.getElementById('signout-btn').addEventListener('click', () => { clearAuth(); window.location.reload(); });
-  }
-
+  if (!dupes.length) return '';
+  return '<div style="margin:12px 16px 0;background:#FEF3C7;border:1px solid #F59E0B;border-radius:10px;padding:10px 14px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:4px;">⚠️ Possible duplicate names</div>' +
+    dupes.map(d => '<div style="font-size:12px;color:#78350F;">' + d + ' — use Rename &amp; Merge to fix</div>').join('') +
+    '</div>';
+}
 
 function renderMembersList(members) {
   const list = document.getElementById('members-list');
+  if (!list) return;
   if (!members.length) {
-    list.innerHTML = `<div style="font-size:13px;color:var(--text-muted);padding:8px 4px;">No family members added yet</div>`;
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 4px;">No family members added yet</div>';
     return;
   }
   list.innerHTML = members.map(m => `
     <div class="card" style="padding:0;">
       <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
-        <div style="width:40px;height:40px;border-radius:50%;background:${m.color || '#EEF2FF'};display:flex;align-items:center;justify-content:center;font-size:20px;">${m.emoji || '👤'}</div>
-        <div style="flex:1;">
-          <div style="font-size:15px;font-weight:600;color:var(--text);">${m.name}</div>
+        <div style="width:40px;height:40px;border-radius:50%;background:${m.color||'#EEF2FF'};display:flex;align-items:center;justify-content:center;font-size:20px;">
+          ${m.photo?.startsWith('data:') ? `<img src="${m.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" />` : (m.emoji||'👤')}
         </div>
-        <button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" data-edit-member="${m.id}">Edit</button>
+        <div style="flex:1;"><div style="font-size:15px;font-weight:600;">${m.name}</div></div>
+        <button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" data-edit="${m.id}">Edit</button>
       </div>
-    </div>
-  `).join('');
-
-  list.querySelectorAll('[data-edit-member]').forEach(btn => {
-    btn.addEventListener('click', () => navigate('person-profile', { memberId: btn.dataset.editMember, mode: 'view' }));
-  });
+    </div>`).join('');
+  list.querySelectorAll('[data-edit]').forEach(btn =>
+    btn.addEventListener('click', () => navigate('person-profile', { memberId: btn.dataset.edit, mode: 'view' })));
 }
 
-function bindDataEvents() {
-  document.getElementById('backup-btn')?.addEventListener('click', async () => {
+// ── DATA TAB ──────────────────────────────────────────────────────────────────
+function renderDataTab(data, members, container) {
+  const tab = document.getElementById('tab-content');
+  tab.innerHTML = `
+    <div class="section-title">Data Management</div>
+    <div class="card" style="margin:0 16px;overflow:visible;">
+      <div class="list-row" id="backup-btn" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
+        <span style="font-size:20px;">💾</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Backup Now</div><div style="font-size:12px;color:var(--text-muted);">Download JSON to device</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+      <div class="list-row" id="restore-local-btn">
+        <span style="font-size:20px;">📂</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Restore from Local Backup</div><div style="font-size:12px;color:var(--text-muted);">Pick a downloaded backup file</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+      <div class="list-row" id="restore-mirror-btn">
+        <span style="font-size:20px;">☁️</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Restore from Drive Mirror</div><div style="font-size:12px;color:var(--text-muted);">Choose from last 3 snapshots</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+      <div class="list-row" id="import-btn">
+        <span style="font-size:20px;">📥</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Import from Excel / CSV</div><div style="font-size:12px;color:var(--text-muted);">Migrate existing travel data</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+      <div class="list-row" id="photo-zip-btn">
+        <span style="font-size:20px;">📦</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Export All Photos as ZIP</div><div style="font-size:12px;color:var(--text-muted);">Document scans, address photos</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+      <div class="list-row" id="clear-cache-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
+        <span style="font-size:20px;">🗑️</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Clear Local Cache</div><div style="font-size:12px;color:var(--text-muted);">Force fresh re-download from Drive</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+    </div>`;
+
+  document.getElementById('backup-btn').addEventListener('click', async () => {
     const cached = await getCachedTravelData();
     if (!cached) { showToast('No data to backup', 'warning'); return; }
     downloadLocalBackup('travel', cached);
     showToast('Backup downloaded!', 'success');
   });
 
-  document.getElementById('restore-local-btn')?.addEventListener('click', () => {
-    document.getElementById('restore-file-input').click();
-  });
+  document.getElementById('restore-local-btn').addEventListener('click', () =>
+    document.getElementById('restore-file-input').click());
 
-  document.getElementById('restore-file-input')?.addEventListener('change', async (e) => {
+  document.getElementById('restore-file-input').addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!confirm('This will overwrite your current trip records. Continue?')) return;
@@ -284,28 +219,27 @@ function bindDataEvents() {
       showToast('Restoring…', 'info', 2000);
       const restored = await restoreFromLocalFile(file, 'travel');
       await setCachedTravelData(restored);
-      showToast('Restored successfully!', 'success');
+      showToast('Restored!', 'success');
       navigate('dashboard');
     } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
   });
 
-  document.getElementById('restore-mirror-btn')?.addEventListener('click', async () => {
-    if (!isOnline()) { showToast('Internet required to access Drive mirror', 'warning'); return; }
-    showToast('Loading snapshots…', 'info', 1500);
+  document.getElementById('restore-mirror-btn').addEventListener('click', async () => {
+    if (!isOnline()) { showToast('Internet required', 'warning'); return; }
     try {
-      const snapshots = await getMirrorSnapshots('travel');
-      if (!snapshots.length) { showToast('No mirror snapshots found', 'warning'); return; }
-      showMirrorModal(snapshots);
-    } catch { showToast('Could not load mirror snapshots', 'error'); }
+      const snaps = await getMirrorSnapshots('travel');
+      if (!snaps.length) { showToast('No snapshots found', 'warning'); return; }
+      showMirrorModal(snaps);
+    } catch { showToast('Could not load snapshots', 'error'); }
   });
 
-  document.getElementById('import-btn')?.addEventListener('click', async () => {
-    const data = await getCachedTravelData();
-    const { members = [] } = data || {};
-    openImportModal(document.getElementById('screen'), data, members);
+  document.getElementById('import-btn').addEventListener('click', async () => {
+    const freshData = await getCachedTravelData();
+    const freshMembers = freshData?.members || [];
+    openImportModal(freshData, freshMembers);
   });
 
-  document.getElementById('photo-zip-btn')?.addEventListener('click', async () => {
+  document.getElementById('photo-zip-btn').addEventListener('click', async () => {
     try {
       showToast('Preparing photos…', 'info', 2000);
       const cached = await getCachedTravelData();
@@ -320,46 +254,70 @@ function bindDataEvents() {
       }
       const zip = new window.JSZip();
       let count = 0;
-      (cached.members || []).forEach(m => {
+      (cached.members||[]).forEach(m => {
         if (m.photo?.startsWith('data:')) {
-          zip.folder('profiles').file((m.name || 'member') + '_profile.jpg', m.photo.split(',')[1], { base64: true });
+          zip.folder('profiles').file((m.name||'member')+'_profile.jpg', m.photo.split(',')[1], {base64:true});
           count++;
         }
       });
-      (cached.documents || []).forEach(doc => {
-        const member = (cached.members || []).find(m => m.id === doc.personId);
-        const name = member?.name || 'unknown';
-        (doc.photos || []).forEach((p, i) => {
+      (cached.documents||[]).forEach(doc => {
+        const mn = (cached.members||[]).find(m=>m.id===doc.personId)?.name||'unknown';
+        (doc.photos||[]).forEach((p,i) => {
           if (p?.startsWith('data:')) {
-            zip.folder('documents').file(name + '_' + (doc.docName || 'doc') + '_' + (i === 0 ? 'front' : 'back') + '.jpg', p.split(',')[1], { base64: true });
+            zip.folder('documents').file(mn+'_'+(doc.docName||'doc')+'_'+(i===0?'front':'back')+'.jpg', p.split(',')[1], {base64:true});
             count++;
           }
         });
       });
-      if (count === 0) { showToast('No photos found to export', 'warning'); return; }
+      if (count===0) { showToast('No photos found', 'warning'); return; }
       const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
-      const blob = await zip.generateAsync({ type:'blob' });
+      const blob = await zip.generateAsync({type:'blob'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'Travel_Photos_' + ts + '.zip';
+      a.download = 'Travel_Photos_'+ts+'.zip';
       a.click();
       URL.revokeObjectURL(a.href);
-      showToast('✅ ' + count + ' photos exported', 'success');
-    } catch (err) { showToast('ZIP export failed: ' + err.message, 'error'); }
+      showToast('✅ '+count+' photos exported', 'success');
+    } catch (err) { showToast('ZIP failed: '+err.message, 'error'); }
   });
 
-  document.getElementById('clear-cache-btn')?.addEventListener('click', async () => {
-    if (!confirm('Clear local cache? Data will be re-downloaded from Drive on next open.')) return;
+  document.getElementById('clear-cache-btn').addEventListener('click', async () => {
+    if (!confirm('Clear local cache? Drive data is safe. App will re-download on next open.')) return;
     await clearAllCachedData();
-    showToast('Cache cleared. Reloading…', 'success');
-    setTimeout(() => window.location.reload(), 1000);
+    showToast('Cache cleared — reloading…', 'success');
+    setTimeout(() => window.location.reload(), 1200);
   });
 }
 
-function bindSecurityEvents() {
-  document.getElementById('security-dashboard-btn')?.addEventListener('click', async () => {
+// ── SECURITY TAB ──────────────────────────────────────────────────────────────
+function renderSecurityTab() {
+  const tab = document.getElementById('tab-content');
+  tab.innerHTML = `
+    <div class="section-title">Security Dashboard</div>
+    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
+      <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg);">
+        <span style="font-size:20px;">🛡️</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Security &amp; Access</div>
+          <div style="font-size:12px;color:var(--text-muted);">Sessions · Activity log · Revoke access</div>
+        </div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+    </div>
+    <div class="section-title" style="margin-top:16px;">Session</div>
+    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
+      <div class="list-row" id="safe-exit-btn" style="border-radius:var(--radius-lg);">
+        <span style="font-size:20px;">🚪</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Save &amp; Exit</div>
+          <div style="font-size:12px;color:var(--text-muted);">Sync data then close cleanly</div>
+        </div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+    </div>`;
+
+  document.getElementById('security-dashboard-btn').addEventListener('click', async () => {
     const modal = document.getElementById('member-modal');
-    if (!modal) return;
     modal.classList.remove('hidden');
     modal.innerHTML = '<div class="modal-sheet" style="max-height:90vh;">' +
       '<div class="modal-handle"></div>' +
@@ -368,7 +326,7 @@ function bindSecurityEvents() {
         '<button id="close-sec" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>' +
       '</div>' +
       '<div id="security-content" style="overflow-y:auto;max-height:70vh;padding:0 20px 24px;">' +
-        '<div style="font-size:13px;color:var(--text-muted);padding:8px 0;">Loading…</div>' +
+        '<div style="font-size:13px;color:var(--text-muted);">Loading…</div>' +
       '</div></div>';
     document.getElementById('close-sec').addEventListener('click', () => modal.classList.add('hidden'));
     modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
@@ -378,227 +336,68 @@ function bindSecurityEvents() {
     ]);
     const sc = document.getElementById('security-content');
     if (!sc) return;
-    const riskEmoji = r => r==='high'?'🔴':r==='medium'?'🟠':r==='low'?'🟡':'🟢';
+    const ri = r => r==='high'?'🔴':r==='medium'?'🟠':r==='low'?'🟡':'🟢';
     sc.innerHTML =
-      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions (' + sessions.length + ')</div>' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions ('+sessions.length+')</div>' +
       (sessions.length ? sessions.map(s =>
         '<div style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;">' +
-        '<div style="font-size:13px;font-weight:600;">' + s.userEmail + '</div>' +
-        '<div style="font-size:12px;color:var(--text-muted);">' + s.device + ' · ' + new Date(s.lastActive).toLocaleString() + '</div>' +
-        '</div>'
-      ).join('') : '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No other active sessions</div>') +
+        '<div style="font-size:13px;font-weight:600;">'+s.userEmail+'</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);">'+s.device+' · '+new Date(s.lastActive).toLocaleString()+'</div></div>'
+      ).join('') : '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No active sessions logged</div>') +
       '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;">Activity Log (last 30)</div>' +
       (log.length ? log.map(e =>
         '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light);">' +
-        '<span>' + riskEmoji(e.risk) + '</span>' +
-        '<div><div style="font-size:13px;font-weight:500;">' + e.action + '</div>' +
-        '<div style="font-size:11px;color:var(--text-muted);">' + e.detail + ' · ' + new Date(e.time).toLocaleString() + '</div></div>' +
-        '</div>'
+        '<span>'+ri(e.risk)+'</span><div><div style="font-size:13px;font-weight:500;">'+e.action+'</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">'+e.detail+' · '+new Date(e.time).toLocaleString()+'</div></div></div>'
       ).join('') : '<div style="font-size:13px;color:var(--text-muted);">No activity logged yet</div>');
   });
 
-  document.getElementById('safe-exit-btn')?.addEventListener('click', async () => {
+  document.getElementById('safe-exit-btn').addEventListener('click', async () => {
     showToast('Syncing before exit…', 'info', 2000);
     await new Promise(r => setTimeout(r, 1500));
     showToast('All synced. You can close the app.', 'success', 3000);
   });
 }
 
-function bindEvents(members, data, container) {
-  document.getElementById('add-member-btn').addEventListener('click', () => navigate('person-profile', { mode: 'new' }));
-  document.getElementById('signout-btn').addEventListener('click', () => {
-    if (confirm('Sign out? You will need to sign in again to sync data.')) {
-      clearAuth();
-      window.location.reload();
-    }
-  });
-
-  document.getElementById('backup-btn').addEventListener('click', async () => {
-    const cached = await getCachedTravelData();
-    if (!cached) { showToast('No data to backup', 'warning'); return; }
-    downloadLocalBackup('travel', cached);
-    showToast('Backup downloaded!', 'success');
-  });
-
-  document.getElementById('restore-local-btn').addEventListener('click', () => {
-    document.getElementById('restore-file-input').click();
-  });
-
-  document.getElementById('restore-file-input').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const count = data?.trips?.length || 0;
-    if (!confirm(`This will overwrite your current ${count} trip records. Continue?`)) return;
-    try {
-      showToast('Restoring…', 'info', 2000);
-      const restored = await restoreFromLocalFile(file, 'travel');
-      await setCachedTravelData(restored);
-      showToast('Restored successfully!', 'success');
-      navigate('dashboard');
-    } catch (err) {
-      showToast('Restore failed: ' + err.message, 'error');
-    }
-  });
-
-  document.getElementById('restore-mirror-btn').addEventListener('click', async () => {
-    if (!isOnline()) { showToast('Internet required to access Drive mirror', 'warning'); return; }
-    showToast('Loading snapshots…', 'info', 1500);
-    try {
-      const snapshots = await getMirrorSnapshots('travel');
-      if (!snapshots.length) { showToast('No mirror snapshots found', 'warning'); return; }
-      showMirrorModal(snapshots);
-    } catch {
-      showToast('Could not load mirror snapshots', 'error');
-    }
-  });
-
-  document.getElementById('import-btn').addEventListener('click', () => {
-    openImportModal(container, data, members);
-  });
-
-  // Security events handled by bindSecurityEvents()
-
-
-  if (isAdmin()) {
-    document.getElementById('access-control-btn')?.addEventListener('click', () => {
-      // Open modal with access control UI
-      const modal = document.getElementById('member-modal');
-      modal.classList.remove('hidden');
-      modal.innerHTML = `
-        <div class="modal-sheet" style="max-height:85vh;">
-          <div class="modal-handle"></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">
-            <span style="font-size:16px;font-weight:700;">👥 Family Access</span>
-            <button id="close-access" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
-          </div>
-          <div id="access-control-container" style="overflow-y:auto;max-height:60vh;"></div>
+// ── ACCOUNT TAB ───────────────────────────────────────────────────────────────
+function renderAccountTab(data, members, user, container) {
+  const tab = document.getElementById('tab-content');
+  tab.innerHTML = `
+    <div class="section-title">Signed In As</div>
+    <div class="card" style="margin:0 16px;">
+      <div class="card-body" style="display:flex;align-items:center;gap:12px;">
+        ${user?.picture
+          ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />`
+          : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name||'Signed in'}</div>
+          <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email||''}</div>
         </div>
-      `;
-      document.getElementById('close-access').addEventListener('click', () => modal.classList.add('hidden'));
-      modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
-      const onSaveAccess = async (newData) => {
-        const saved = await writeData('travel', () => newData);
-        await setCachedTravelData(saved);
-        showToast('Access updated', 'success');
-        renderAccessControl(
-          document.getElementById('access-control-container'),
-          saved,
-          getUser()?.email || '',
-          onSaveAccess
-        );
-      };
-      renderAccessControl(
-        document.getElementById('access-control-container'),
-        data,
-        getUser()?.email || '',
-        onSaveAccess
-      );
-    });
-  }
+      </div>
+      <div class="divider"></div>
+      <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:13px;color:var(--text-secondary);">Drive sync</span>
+          <span style="font-size:13px;font-weight:600;color:${isOnline()?'var(--success)':'var(--warning)'};">${isOnline()?'● Online':'● Offline'}</span>
+        </div>
+        ${data?.lastSync?`<div style="font-size:11px;color:var(--text-muted);">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>`:''}
+        <button class="btn btn-secondary btn-full" style="margin-top:12px;" id="signout-btn">Sign out of Google</button>
+      </div>
+    </div>
+    <div class="section-title" style="margin-top:16px;">App Info</div>
+    <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.4 · 2026-03-22</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
+    </div>`;
 
-  document.getElementById('photo-zip-btn')?.addEventListener('click', async () => {
-    try {
-      showToast('Preparing photos…', 'info', 2000);
-      const cached = await getCachedTravelData();
-      if (!cached) { showToast('No data found', 'warning'); return; }
-
-      // Load JSZip
-      if (!window.JSZip) {
-        await new Promise((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
-        });
-      }
-
-      const zip = new JSZip();
-      let count = 0;
-
-      // Member profile photos
-      (cached.members || []).forEach(m => {
-        if (m.photo?.startsWith('data:')) {
-          const b64 = m.photo.split(',')[1];
-          zip.folder('profiles').file(`${m.name || 'member'}_profile.jpg`, b64, { base64: true });
-          count++;
-        }
-      });
-
-      // Document photos
-      (cached.documents || []).forEach(doc => {
-        const member = (cached.members || []).find(m => m.id === doc.personId);
-        const name = member?.name || 'unknown';
-        const docType = doc.docName || 'doc';
-        (doc.photos || []).forEach((p, i) => {
-          if (p?.startsWith('data:')) {
-            const b64 = p.split(',')[1];
-            const side = i === 0 ? 'front' : 'back';
-            zip.folder('documents').file(`${name}_${docType}_${side}.jpg`, b64, { base64: true });
-            count++;
-          }
-        });
-      });
-
-      // Address photos
-      ['homeQatar','homeIndia'].forEach(key => {
-        const loc = cached.familyDefaults?.[key];
-        (loc?.photos || []).forEach((p, i) => {
-          if (p?.startsWith('data:')) {
-            const b64 = p.split(',')[1];
-            zip.folder('addresses').file(`${key}_photo${i+1}.jpg`, b64, { base64: true });
-            count++;
-          }
-        });
-      });
-
-      if (count === 0) { showToast('No photos found to export', 'warning'); return; }
-
-      const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
-      const blob = await zip.generateAsync({ type:'blob' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `Travel_Photos_${ts}.zip`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      showToast(`✅ ${count} photos exported`, 'success');
-    } catch (err) {
-      showToast('ZIP export failed: ' + err.message, 'error');
-    }
-  });
-
-  document.getElementById('safe-exit-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('safe-exit-btn');
-    btn.querySelector('.list-row div:first-child + div div:first-child') &&
-      (btn.querySelector('div:nth-child(2) div:first-child').textContent = 'Syncing…');
-    showToast('Syncing before exit…', 'info', 2000);
-    try {
-      // Give any pending IndexedDB writes a moment to flush
-      await new Promise(r => setTimeout(r, 500));
-      showToast('All data saved. Goodbye! 👋', 'success', 2000);
-      setTimeout(() => {
-        // Clear navigation history and show login
-        window.history.pushState(null, '', window.location.pathname);
-        window.location.reload();
-      }, 2000);
-    } catch (err) {
-      showToast('Exit failed: ' + err.message, 'error');
-    }
-  });
-
-  document.getElementById('clear-cache-btn').addEventListener('click', async () => {
-    if (!confirm('Clear local cache? Your Drive data is safe. The app will re-download everything from Drive on next open.')) return;
-    try {
-      await clearAllCachedData();
-      showToast('Cache cleared -- reloading…', 'success');
-      setTimeout(() => window.location.reload(), 1200);
-    } catch (err) {
-      showToast('Clear failed: ' + err.message, 'error');
-    }
+  document.getElementById('signout-btn').addEventListener('click', () => {
+    if (confirm('Sign out?')) { clearAuth(); window.location.reload(); }
   });
 }
-} // end renderSettings
 
-
+// ── Mirror restore modal ───────────────────────────────────────────────────────
 function showMirrorModal(snapshots) {
   const modal = document.getElementById('member-modal');
   modal.classList.remove('hidden');
@@ -607,23 +406,21 @@ function showMirrorModal(snapshots) {
       <div class="modal-handle"></div>
       <div style="padding:0 20px 20px;">
         <div style="font-size:17px;font-weight:700;margin-bottom:16px;">Restore from Mirror</div>
-        ${snapshots.map((s, i) => `
+        ${snapshots.map((s,i) => `
           <button class="list-row" data-snapshot="${i}" style="width:100%;text-align:left;border-radius:var(--radius-md);margin-bottom:8px;border:1px solid var(--border);">
             <div style="flex:1;">
               <div style="font-size:14px;font-weight:600;">${new Date(s.timestamp).toLocaleString('en-GB')}</div>
               <div style="font-size:12px;color:var(--text-muted);">${s.recordCount} records</div>
             </div>
             <span style="color:var(--primary);font-weight:600;font-size:13px;">Restore</span>
-          </button>
-        `).join('')}
-        <button class="btn btn-secondary btn-full" id="close-mirror-modal" style="margin-top:8px;">Cancel</button>
+          </button>`).join('')}
+        <button class="btn btn-secondary btn-full" id="close-mirror" style="margin-top:8px;">Cancel</button>
       </div>
-    </div>
-  `;
+    </div>`;
   modal.querySelectorAll('[data-snapshot]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const idx = Number(btn.dataset.snapshot);
-      if (!confirm(`Restore snapshot from ${new Date(snapshots[idx].timestamp).toLocaleString('en-GB')}? This will overwrite current data.`)) return;
+      if (!confirm('Restore this snapshot? Current data will be overwritten.')) return;
       try {
         showToast('Restoring…', 'info', 2000);
         const restored = await restoreFromMirror('travel', idx);
@@ -631,20 +428,15 @@ function showMirrorModal(snapshots) {
         showToast('Restored!', 'success');
         modal.classList.add('hidden');
         navigate('dashboard');
-      } catch {
-        showToast('Restore failed', 'error');
-      }
+      } catch { showToast('Restore failed', 'error'); }
     });
   });
-  document.getElementById('close-mirror-modal').addEventListener('click', () => {
-    modal.classList.add('hidden');
-  });
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.classList.add('hidden');
-  });
+  document.getElementById('close-mirror').addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
 }
 
-function openImportModal(container, data, members) {
+// ── Import modal ──────────────────────────────────────────────────────────────
+function openImportModal(data, members) {
   const modal = document.getElementById('member-modal');
   modal.classList.remove('hidden');
   modal.innerHTML = `
@@ -654,46 +446,36 @@ function openImportModal(container, data, members) {
         <span style="font-size:16px;font-weight:700;">Import Travel Data</span>
         <button id="close-import" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
       </div>
-      <div id="import-status" style="display:none;padding:8px 20px;font-size:13px;color:var(--text-secondary);"></div>
+      <div id="import-status" style="display:none;padding:10px 20px;font-size:14px;font-weight:600;"></div>
       <div id="import-tool-container" style="overflow-y:auto;max-height:70vh;"></div>
-    </div>
-  `;
+    </div>`;
 
   let importInProgress = false;
 
-  const closeBtn = document.getElementById('close-import');
-  closeBtn.addEventListener('click', () => {
-    if (importInProgress) {
-      if (!confirm('Import in progress. Close anyway?')) return;
-    }
+  document.getElementById('close-import').addEventListener('click', () => {
+    if (importInProgress && !confirm('Import in progress. Close anyway?')) return;
     modal.classList.add('hidden');
   });
   modal.addEventListener('click', e => {
-    if (e.target !== modal) return;
-    if (importInProgress) return; // Block backdrop close during import
-    modal.classList.add('hidden');
+    if (e.target === modal && !importInProgress) modal.classList.add('hidden');
   });
 
   const toolContainer = document.getElementById('import-tool-container');
-  const statusBar = document.getElementById('import-status');
+  const statusBar    = document.getElementById('import-status');
+
+  const setStatus = (msg, color) => {
+    statusBar.style.display = 'block';
+    statusBar.textContent = msg;
+    statusBar.style.color = color || 'var(--text-secondary)';
+  };
 
   renderImportTool(toolContainer, {
     appType: 'travel',
     existingData: data,
     onImportComplete: async (records, progressCb) => {
       importInProgress = true;
-      statusBar.style.display = 'block';
-      statusBar.style.fontSize = '14px';
-      statusBar.style.padding = '10px 20px';
-
-      const setStatus = (msg, color) => {
-        statusBar.textContent = msg;
-        statusBar.style.color = color || 'var(--text-secondary)';
-      };
-
       setStatus('Matching people…');
 
-      // Build name→id map. Auto-create members for unknown names.
       const memberMap = {};
       members.forEach(m => { memberMap[m.name.toLowerCase().trim()] = m.id; });
 
@@ -702,42 +484,39 @@ function openImportModal(container, data, members) {
         const rawName = rec.personName?.trim();
         if (!rawName) return;
         const key = rawName.toLowerCase();
-        if (!memberMap[key] && !newMembersToCreate[key]) {
+        if (!memberMap[key] && !newMembersToCreate[key])
           newMembersToCreate[key] = { id: uuidv4(), name: rawName };
-        }
       });
-      Object.values(newMembersToCreate).forEach(m => {
-        memberMap[m.name.toLowerCase()] = m.id;
-      });
+      Object.values(newMembersToCreate).forEach(m => { memberMap[m.name.toLowerCase()] = m.id; });
 
       const newMemberList = Object.values(newMembersToCreate);
-      if (newMemberList.length > 0) {
+      if (newMemberList.length)
         setStatus('Creating members: ' + newMemberList.map(m => m.name).join(', '));
-      }
 
       let imported = 0, skipped = 0;
-      const resolved = [];
-      records.forEach(rec => {
+      const resolved = records.reduce((acc, rec) => {
         const rawName = rec.personName?.trim();
-        if (!rawName) { skipped++; return; }
+        if (!rawName) { skipped++; return acc; }
         const personId = memberMap[rawName.toLowerCase()];
-        if (!personId) { skipped++; return; }
-        resolved.push({ ...rec, id: rec.id || uuidv4(), personId });
-      });
+        if (!personId) { skipped++; return acc; }
+        acc.push({ ...rec, id: rec.id || uuidv4(), personId });
+        return acc;
+      }, []);
 
       setStatus('Saving ' + resolved.length + ' trips…');
 
       try {
-        const newData = await localSave('travel', (remote) => {
-          const existingMembers = [...(remote.members || [])];
+        const newData = await localSave('travel', remote => {
+          const existingMembers = [...(remote.members||[])];
           const existingIds = new Set(existingMembers.map(m => m.id));
           newMemberList.forEach(m => {
-            if (!existingIds.has(m.id)) existingMembers.push({ id: m.id, name: m.name, emoji: '👤', color: '#EEF2FF' });
+            if (!existingIds.has(m.id))
+              existingMembers.push({ id: m.id, name: m.name, emoji: '👤', color: '#EEF2FF' });
           });
-          const trips = [...(remote.trips || [])];
-          const existingKeys = new Set(trips.map(t => t.personId + '|' + t.dateOutIndia));
+          const trips = [...(remote.trips||[])];
+          const existingKeys = new Set(trips.map(t => t.personId+'|'+t.dateOutIndia));
           resolved.forEach(rec => {
-            const key = rec.personId + '|' + rec.dateOutIndia;
+            const key = rec.personId+'|'+rec.dateOutIndia;
             if (existingKeys.has(key)) { skipped++; return; }
             trips.push(rec);
             existingKeys.add(key);
@@ -745,31 +524,28 @@ function openImportModal(container, data, members) {
           });
           return { ...remote, members: existingMembers, trips };
         });
-
         await setCachedTravelData(newData);
         const msg = imported > 0
-          ? '✅ ' + imported + ' trips imported!' + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
-          : '⚠️ 0 imported — all ' + skipped + ' already exist';
+          ? '✅ '+imported+' trips imported!'+(skipped>0?' ('+skipped+' duplicates skipped)':'')
+          : '⚠️ 0 imported — all '+skipped+' already exist';
         setStatus(msg, imported > 0 ? 'var(--success)' : 'var(--warning)');
         progressCb(imported, skipped);
         importInProgress = false;
-        // Scroll tool container to top to show done screen
-        if (toolContainer) toolContainer.scrollTop = 0;
+        toolContainer.scrollTop = 0;
         return { imported, skipped };
       } catch (err) {
         importInProgress = false;
-        setStatus('❌ Failed: ' + (err.message || 'Unknown'), 'var(--danger)');
+        setStatus('❌ Failed: '+(err.message||'Unknown'), 'var(--danger)');
         throw err;
       }
     }
+  });
 
-  // Handle import complete -- close modal and navigate
   toolContainer.addEventListener('import:complete', () => {
     setTimeout(() => {
       modal.classList.add('hidden');
       navigate('travel-log');
       showToast('Import complete! Travel log updated.', 'success');
-    }, 1200); // Brief delay so user sees the success status
+    }, 1200);
   });
 }
-} // end renderSettings

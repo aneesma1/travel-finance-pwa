@@ -1,4 +1,4 @@
-// v3.5.3 — 2026-03-22
+// v3.5.4 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/analytics.js ────────────────────────────
 // Analytics: monthly bar chart, category donut, year-over-year comparison
@@ -122,7 +122,7 @@ function renderCharts(transactions, currency) {
   `;
 
   // Year buttons
-  const years = [...new Set(filtered.map(t => t.date?.slice(0,4)).filter(Boolean))].sort((a,b) => b-a);
+  const years = [...new Set(filtered.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b) => b-a);
   if (!years.includes(String(year))) years.unshift(String(year));
   let selectedYear = year;
 
