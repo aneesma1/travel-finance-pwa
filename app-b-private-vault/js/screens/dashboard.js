@@ -1,4 +1,4 @@
-// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
 // Summary cards: Income / Spend / Net per currency
@@ -54,7 +54,7 @@ export async function renderDashboard(container) {
   // Read filters from URL hash
   const p = getHashParams();
   const activeCurrency = p.currency || 'QAR';
-  const activeYear     = p.year     ? Number(p.year)  : currentYear();
+  const activeYear     = p.year     ? Number(p.year)  : null;  // null = no year filter
   const activeMonth    = p.month    ? Number(p.month) : 0;  // 0 = all months (no filter)
   const activeCategory = p.category || '';
   const activeAccount  = p.account  || '';
@@ -171,7 +171,7 @@ export async function renderDashboard(container) {
     // Apply all filters
     let filtered = transactions.filter(t => {
       if (t.currency !== activeCurrency) return false;
-      if (activeYear && activeYear !== 0 && t.date?.slice(0,4) !== String(activeYear)) return false;
+      if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false; // null = all years
       if (activeMonth && Number(t.date?.slice(5,7)) !== activeMonth)  return false;
       if (activeCategory && t.category1 !== activeCategory)           return false;
       if (activeAccount  && t.account   !== activeAccount)            return false;
@@ -373,7 +373,7 @@ export async function renderDashboard(container) {
     const net  = inc - spnd;
     const recent3 = [...filtered].sort((a,b) => new Date(b.date)-new Date(a.date)).slice(0,3);
     const dateStr = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
-    const period  = mo ? `${MONTHS[mo-1]} ${yr}` : String(yr);
+    const period  = mo ? (MONTHS[mo-1] + (yr ? ' ' + yr : '')) : (yr ? String(yr) : 'All time');
 
     let text = `💰 Finance Summary -- ${dateStr}\n`;
     text += `─────────────────────────────\n`;

@@ -1,4 +1,4 @@
-// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+
 // ─── app-b-private-vault/js/app-config.js ───────────────────────────────────
 // app_config.json on Drive -- stores PIN hash + salt + lock timeout
 // Survives browser cache clear. Restored automatically on sign-in.

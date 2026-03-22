@@ -1,4 +1,4 @@
-// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
 
@@ -120,12 +120,16 @@ export async function renderSettings(container, params = {}) {
         </div>
       </div>
 
-      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>Categories</span>
-        <button class="btn btn-primary" style="padding:5px 12px;font-size:12px;" id="add-cat-btn">+ Add</button>
-      </div>
-      <div id="cat-list" style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
-        <div id="cat-chips"></div>
+      <div class="section-title">Categories</div>
+      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
+        <div class="list-row" id="manage-cats-btn" style="border-radius:var(--radius-lg);">
+          <span style="font-size:20px;">🏷</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Manage Categories</div>
+            <div style="font-size:12px;color:var(--text-muted);">Rename · Merge · Reassign · Delete</div>
+          </div>
+          <span style="color:var(--text-muted);">›</span>
+        </div>
       </div>
 
       <div class="section-title" style="margin-top:16px;">Sync Status</div>
@@ -140,121 +144,15 @@ export async function renderSettings(container, params = {}) {
       </div>
     `;
 
-    // Category Manager -- full list with count, rename, reassign, delete
-    const DEFAULT_CATS = ['Food','Groceries','Rent','Salary','Transport','Medical','Education','Shopping','Utilities','Travel','Entertainment','Transfer','Investment','Insurance','Freelance','Other'];
-    const allCats = [...new Set([...DEFAULT_CATS, ...savedCats])];
-    const chips = document.getElementById('cat-chips');
-
-    function getCatCount(cat) {
-      return transactions.filter(t => t.category1 === cat || t.category2 === cat).length;
-    }
-
-    function renderCatList() {
-      if (!allCats.length) {
-        chips.innerHTML = `<div style="padding:16px;font-size:13px;color:var(--text-muted);">No categories yet</div>`;
-        return;
-      }
-      chips.innerHTML = allCats.map((c, idx) => {
-        const count = getCatCount(c);
-        const isDefault = DEFAULT_CATS.includes(c);
-        return `
-          <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;${idx < allCats.length-1 ? 'border-bottom:1px solid var(--border-light);' : ''}">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:600;color:var(--text);">${c}</div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">${count} transaction${count !== 1 ? 's' : ''}${isDefault ? ' · built-in' : ''}</div>
-            </div>
-            <div style="display:flex;gap:6px;">
-              ${!isDefault ? `<button data-rename="${c}" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--text-secondary);cursor:pointer;">Rename</button>` : ''}
-              ${count > 0 ? `<button data-reassign="${c}" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--text-secondary);cursor:pointer;">Reassign</button>` : ''}
-              ${!isDefault ? `<button data-delete="${c}" style="background:none;border:1px solid var(--danger-bg);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--danger);cursor:pointer;">Delete</button>` : ''}
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      chips.querySelectorAll('[data-rename]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const oldName = btn.dataset.rename;
-          // Use sheet instead of prompt()
-          openRenameCatSheet(oldName, async (nn) => {
-          if (!nn || nn === oldName) return;
-          const newData = await writeData('finance', r => ({
-            ...r,
-            categories: (r.categories||[]).map(c => c === oldName ? nn : c),
-            transactions: (r.transactions||[]).map(t => ({
-              ...t,
-              category1: t.category1 === oldName ? nn : t.category1,
-              category2: t.category2 === oldName ? nn : t.category2,
-            }))
-          }));
-          await setCachedFinanceData(newData);
-          showToast('Renamed to "' + nn + '" — all transactions updated', 'success');
-          renderSettings(container, { tab: 'data' });
-          }); // end openRenameCatSheet callback
-        }); // end addEventListener
-      }); // end querySelectorAll
-
-      chips.querySelectorAll('[data-reassign]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const fromCat = btn.dataset.reassign;
-          const others = allCats.filter(c => c !== fromCat);
-          if (!others.length) { showToast('No other categories to reassign to', 'warning'); return; }
-          openReassignSheet(fromCat, others, async (tt) => {
-            const newData = await writeData('finance', r => ({
-              ...r,
-              transactions: (r.transactions||[]).map(t => ({
-                ...t,
-                category1: t.category1 === fromCat ? tt : t.category1,
-                category2: t.category2 === fromCat ? tt : t.category2,
-              }))
-            }));
-            await setCachedFinanceData(newData);
-            showToast('All "' + fromCat + '" reassigned to "' + tt + '"', 'success');
-            renderSettings(container, { tab: 'data' });
-          }); // end callback
-        }); // end addEventListener
-      }); // end querySelectorAll
-
-      chips.querySelectorAll('[data-delete]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const cat = btn.dataset.delete;
-          const count = getCatCount(cat);
-          const msg = count > 0
-            ? `Delete "${cat}"? ${count} transactions will lose this category.`
-            : `Delete category "${cat}"?`;
-          if (!confirm(msg)) return;
-          const idx = allCats.indexOf(cat);
-          if (idx > -1) allCats.splice(idx, 1);
-          const newData = await writeData('finance', r => ({
-            ...r,
-            categories: (r.categories||[]).filter(c => c !== cat),
-            transactions: (r.transactions||[]).map(t => ({
-              ...t,
-              category1: t.category1 === cat ? '' : t.category1,
-              category2: t.category2 === cat ? '' : t.category2,
-            }))
-          }));
-          await setCachedFinanceData(newData);
-          showToast('"' + cat + '" deleted', 'success');
-          renderCatList();
+    // Navigate to dedicated Category Manager screen
+    document.getElementById('manage-cats-btn')?.addEventListener('click', () => {
+      navigate('category-manager');
+    });
         });
       });
     }
 
-    renderCatList();
-
-    document.getElementById('add-cat-btn').addEventListener('click', () => {
-      openAddCatSheet(async (nn) => {
-        if (allCats.includes(nn)) { showToast('Category already exists', 'warning'); return; }
-        allCats.push(nn);
-        const newData = await writeData('finance', r => ({
-          ...r, categories: [...new Set([...(r.categories||[]), nn])]
-        }));
-        await setCachedFinanceData(newData);
-        showToast('"' + nn + '" added', 'success');
-        renderSettings(container, { tab: 'data' });
-      });
-    });
+    // Category management moved to dedicated screen (category-manager.js)
 
     document.getElementById('backup-now').addEventListener('click', async () => {
       const cached = await getCachedFinanceData();
@@ -735,8 +633,8 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1B</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.4.6 · 2026-03-22</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
       </div>
     `;

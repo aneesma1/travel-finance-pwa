@@ -1,4 +1,4 @@
-// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
 
@@ -193,7 +193,7 @@ export async function renderTransactions(container) {
 
   const p = getHashParams();
   const activeCurrency = p.currency || 'QAR';
-  const activeYear     = p.year   ? Number(p.year)  : currentYear();
+  const activeYear     = p.year   ? Number(p.year)  : null;  // null = all years
   const activeMonth    = p.month  ? Number(p.month) : 0;
   const activeCategory = p.category || '';
   const activeAccount  = p.account  || '';
@@ -204,7 +204,7 @@ export async function renderTransactions(container) {
   function renderFilterBar() {
     const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b)=>b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
-    const activeCount = [activeCategory, activeAccount, activeMonth !== 0, activeYear !== currentYear()].filter(Boolean).length;
+    const activeCount = [activeCategory, activeAccount, activeMonth !== 0, !!activeYear].filter(Boolean).length;
 
     // Collapsed summary chips + filter icon
     const summaryParts = [];
@@ -226,7 +226,7 @@ export async function renderTransactions(container) {
         <!-- Collapsed filter summary row -->
         <div style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;" id="filter-summary-row">
           <div style="flex:1;font-size:13px;color:${activeCount > 0 ? 'var(--primary)' : 'var(--text-muted)'};">
-            ${activeYear !== currentYear() ? activeYear + ' · ' : ''}${summaryText}
+            ${activeYear ? activeYear + ' · ' : ''}${summaryText}
           </div>
           ${activeCount > 0
             ? `<button id="clear-filters-quick" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">✕ Clear all</button>`
@@ -388,7 +388,7 @@ export async function renderTransactions(container) {
     // Filter
     let filtered = transactions.filter(t => {
       if (t.currency !== activeCurrency) return false;
-      if (activeYear   && t.date?.slice(0,4)    !== String(activeYear))  return false;
+      if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
       if (activeMonth  && Number(t.date?.slice(5,7)) !== activeMonth)    return false;
       if (activeCategory && t.category1 !== activeCategory)              return false;
       if (activeAccount  && t.account   !== activeAccount)               return false;

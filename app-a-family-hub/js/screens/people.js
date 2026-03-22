@@ -1,8 +1,9 @@
-// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+
 // ─── app-a-family-hub/js/screens/people.js ──────────────────────────────────
 // People tab -- grouped family view, Family Defaults button, member cards
 
 'use strict';
+
 
 import { getCachedTravelData } from '../../../shared/db.js';
 import { navigate } from '../router.js';
@@ -26,6 +27,7 @@ export async function renderPeople(container) {
 
   document.getElementById('add-person-fab').addEventListener('click', () => navigate('person-profile', { mode: 'new' }));
   document.getElementById('refresh-btn').addEventListener('click', () => renderPeople(container));
+
   document.getElementById('export-pdf-btn').addEventListener('click', () => openPdfExportModal(container));
 
   const data = await getCachedTravelData();

@@ -1,4 +1,4 @@
-// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+
 // ─── app-b-private-vault/js/router.js ───────────────────────────────────────
 'use strict';
 
@@ -8,6 +8,7 @@ import { renderAddTransaction } from './screens/add-transaction.js';
 import { renderTransactionView } from './screens/transaction-view.js';
 import { renderAnalytics }      from './screens/analytics.js';
 import { renderSettings }       from './screens/settings.js';
+import { renderCategoryManager } from './screens/category-manager.js';
 
 const SCREENS = {
   dashboard:       renderDashboard,
@@ -16,6 +17,7 @@ const SCREENS = {
   'transaction-view': renderTransactionView,
   analytics:       renderAnalytics,
   settings:        renderSettings,
+  'category-manager': renderCategoryManager,
 };
 
 let currentScreen = null;
@@ -39,6 +41,7 @@ function updateNav(screenName) {
     'transactions':    'transactions',
     'analytics':       'analytics',
     'settings':        'settings',
+    'category-manager': 'settings',
   };
   const activeTab = navMap[screenName] || screenName;
   document.querySelectorAll('.nav-item').forEach(item => {
