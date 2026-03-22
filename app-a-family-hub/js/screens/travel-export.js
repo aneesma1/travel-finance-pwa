@@ -1,4 +1,4 @@
-// v3.4.8 — 2026-03-22
+// v3.4.9 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range

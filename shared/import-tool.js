@@ -1,4 +1,4 @@
-// v3.4.8 — 2026-03-22
+// v3.4.9 — 2026-03-22
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)

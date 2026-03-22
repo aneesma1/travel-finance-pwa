@@ -1,4 +1,4 @@
-// v3.4.8 — 2026-03-22
+// v3.4.9 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
@@ -196,6 +196,9 @@ export async function renderSettings(container, params = {}) {
 
   // ── EXPORT TAB ────────────────────────────────────────────────────────────
   function renderExportTab(transactions, data) {
+    const DEFAULT_CATS = ['Food','Groceries','Rent','Salary','Transport','Medical',
+      'Education','Shopping','Utilities','Travel','Entertainment',
+      'Transfer','Investment','Insurance','Freelance','Other'];
     const tab = document.getElementById('tab-content');
     const yr  = currentYear();
     const mo  = currentMonth();
@@ -227,6 +230,22 @@ export async function renderSettings(container, params = {}) {
             <option value="">All currencies</option>
             ${['QAR','INR','USD'].map(c => `<option value="${c}" ${c === 'QAR' ? 'selected' : ''}>${c}</option>`).join('')}
           </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label class="form-label">Category 1</label>
+            <select class="form-input" id="exp-cat1" style="padding:10px 12px;">
+              <option value="">All</option>
+              ${[...new Set([...DEFAULT_CATS,...savedCats])].sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Category 2</label>
+            <select class="form-input" id="exp-cat2" style="padding:10px 12px;">
+              <option value="">All</option>
+              ${[...new Set([...DEFAULT_CATS,...savedCats])].sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div id="export-count" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;"></div>
       </div>
@@ -264,20 +283,25 @@ export async function renderSettings(container, params = {}) {
 
     // Live count update
     function updateCount() {
-      const yr  = document.getElementById('exp-year').value;
-      const mo  = document.getElementById('exp-month').value;
-      const cur = document.getElementById('exp-currency').value;
+      const yr   = document.getElementById('exp-year').value;
+      const mo   = document.getElementById('exp-month').value;
+      const cur  = document.getElementById('exp-currency').value;
+      const cat1 = document.getElementById('exp-cat1').value;
+      const cat2 = document.getElementById('exp-cat2').value;
       const filtered = transactions.filter(t => {
-        if (yr  && t.date?.slice(0,4)    !== yr)  return false;
-        if (mo  && Number(t.date?.slice(5,7)) !== Number(mo)) return false;
-        if (cur && t.currency !== cur)             return false;
+        if (yr   && t.date?.slice(0,4)             !== yr)          return false;
+        if (mo   && Number(t.date?.slice(5,7))     !== Number(mo))  return false;
+        if (cur  && t.currency                     !== cur)          return false;
+        if (cat1 && t.category1                    !== cat1)         return false;
+        if (cat2 && t.category2                    !== cat2)         return false;
         return true;
       });
-      document.getElementById('export-count').textContent = `${filtered.length} transaction${filtered.length !== 1 ? 's' : ''} will be exported`;
+      document.getElementById('export-count').textContent =
+        filtered.length + ' transaction' + (filtered.length !== 1 ? 's' : '') + ' will be exported';
       return filtered;
     }
     updateCount();
-    ['exp-year','exp-month','exp-currency'].forEach(id => {
+    ['exp-year','exp-month','exp-currency','exp-cat1','exp-cat2'].forEach(id => {
       document.getElementById(id).addEventListener('change', updateCount);
     });
 
@@ -631,7 +655,7 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.4.8 · 2026-03-22</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.4.9 · 2026-03-22</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
       </div>

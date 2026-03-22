@@ -1,4 +1,4 @@
-// v3.4.8 — 2026-03-22
+// v3.4.9 — 2026-03-22
 
 // ─── shared/pill-select.js ───────────────────────────────────────────────────
 // PillSelect: tappable pill button selector -- single or multi select

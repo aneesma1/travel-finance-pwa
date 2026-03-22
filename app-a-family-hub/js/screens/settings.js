@@ -1,4 +1,4 @@
-// v3.4.8 — 2026-03-22
+// v3.4.9 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
@@ -231,7 +231,7 @@ export async function renderSettings(container, params = {}) {
       </div>
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.8 · 2026-03-22</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.9 · 2026-03-22</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
       </div>
