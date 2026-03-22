@@ -1,4 +1,4 @@
-// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
 // Formats: PDF report, Excel/CSV, WhatsApp text copy

@@ -1,4 +1,4 @@
-// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/add-document.js ────────────────────────────
 // Add / Edit Document: person pill, doc type, expiry, alert toggles, Calendar sync
 
@@ -332,8 +332,7 @@ export async function renderAddDocument(container, params = {}) {
     lines.push('');
     lines.push('_Shared from Family Hub_');
 
-    const text = lines.join('
-');
+    const text = lines.join('\n');
     const { copyToClipboard } = await import('../../../shared/utils.js');
     if (navigator.share) {
       try { await navigator.share({ title: existing.docName + ' — ' + member?.name, text }); return; } catch {}

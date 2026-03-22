@@ -1,4 +1,4 @@
-// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/roles.js ───────────────────────────────────────────
 // Admin / Viewer role system for App A -- Family Hub
 // Roles stored in travel_data.json under data.roles: { email: 'admin'|'viewer' }

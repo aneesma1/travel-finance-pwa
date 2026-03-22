@@ -1,4 +1,4 @@
-// v3.3.1 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.2 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/sync-manager.js ──────────────────────────────────────────────────
 // Core of Phase 3 -- Local-first architecture
 // Handles: sequential Drive writes, pending queue, write-ahead safety,

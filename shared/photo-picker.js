@@ -1,4 +1,4 @@
-// v3.3.1 — 2026-03-21 — 2026-03-21
+// v3.3.2 — 2026-03-21 — 2026-03-21 — 2026-03-21
 // ─── shared/photo-picker.js ──────────────────────────────────────────────────
 // Shared photo capture component
 //   Mobile: tap slot → camera / gallery (capture="environment")
