@@ -1,4 +1,4 @@
-// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
 // Steps: (1) Pick file → (2) Map columns → (3) Preview + validate → (4) Import
@@ -430,7 +430,10 @@ export function renderImportTool(container, { appType, existingData, onImportCom
     const btn = document.getElementById('import-btn');
     const progress = document.getElementById('import-progress');
     btn.disabled = true;
-    btn.textContent = 'Importing…';
+    btn.textContent = '⏳ Importing…';
+    btn.style.opacity = '0.7';
+    progress.style.color = 'var(--primary)';
+    progress.style.fontWeight = '600';
     progress.textContent = 'Preparing records…';
 
     try {
@@ -451,6 +454,11 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       container.dataset.importedCount = importedCount;
       container.dataset.skippedCount  = skippedCount;
       render();
+      // Scroll container to top so done screen is visible
+      container.scrollTop = 0;
+      // Also scroll the parent modal if it exists
+      const parentModal = container.closest('[style*="overflow-y"]') || container.parentElement;
+      if (parentModal) parentModal.scrollTop = 0;
     } catch (err) {
       progress.textContent = '';
       btn.disabled = false;

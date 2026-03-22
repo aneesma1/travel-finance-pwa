@@ -1,4 +1,4 @@
-// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
 
@@ -158,8 +158,8 @@ export async function renderSettings(container) {
       <!-- App info -->
       <div class="section-title">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
       </div>
 
       <!-- Hidden file inputs -->
@@ -339,22 +339,22 @@ function bindEvents(members, data, container) {
       `;
       document.getElementById('close-access').addEventListener('click', () => modal.classList.add('hidden'));
       modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+      const onSaveAccess = async (newData) => {
+        const saved = await writeData('travel', () => newData);
+        await setCachedTravelData(saved);
+        showToast('Access updated', 'success');
+        renderAccessControl(
+          document.getElementById('access-control-container'),
+          saved,
+          getUser()?.email || '',
+          onSaveAccess
+        );
+      };
       renderAccessControl(
         document.getElementById('access-control-container'),
         data,
         getUser()?.email || '',
-        async (newData) => {
-          const saved = await writeData('travel', () => newData);
-          await setCachedTravelData(saved);
-          showToast('Access updated', 'success');
-          // Re-render access control
-          renderAccessControl(
-            document.getElementById('access-control-container'),
-            saved,
-            getUser()?.email || '',
-            arguments.callee
-          );
-        }
+        onSaveAccess
       );
     });
   }
@@ -595,9 +595,12 @@ function openImportModal(container, data, members) {
 
         await setCachedTravelData(newData);
         statusBar.style.color = 'var(--success)';
-        statusBar.textContent = `✅ Saved ${imported} records to Drive`;
+        statusBar.textContent = '✅ Saved ' + imported + ' records to Drive';
         progressCb(imported, skipped);
         importInProgress = false;
+        // Scroll modal to show done screen
+        const tc = document.getElementById('import-tool-container');
+        if (tc) { tc.scrollTop = 0; tc.parentElement.scrollTop = 0; }
         return { imported, skipped };
       } catch (err) {
         importInProgress = false;

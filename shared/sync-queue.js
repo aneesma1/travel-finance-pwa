@@ -1,4 +1,4 @@
-// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/sync-queue.js ────────────────────────────────────────────────────
 // Offline sync queue processor
 // When writes fail offline, they're stored in IndexedDB.
@@ -6,9 +6,9 @@
 
 'use strict';
 
-import { getSyncQueue, removeSyncItem, clearSyncQueue } from './db.js';
+import { getSyncQueue, removeSyncItem, clearSyncQueue,
+         setCachedTravelData, setCachedFinanceData } from './db.js';
 import { writeData } from './drive.js';
-import { setCachedTravelData, setCachedFinanceData } from './db.js';
 import { isOnline } from './utils.js';
 
 let _processing = false;

@@ -1,4 +1,4 @@
-// v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
 
@@ -175,9 +175,9 @@ export async function renderSettings(container, params = {}) {
       chips.querySelectorAll('[data-rename]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const oldName = btn.dataset.rename;
-          const newName = prompt(`Rename "${oldName}" to:`, oldName);
-          if (!newName?.trim() || newName.trim() === oldName) return;
-          const nn = newName.trim();
+          // Use sheet instead of prompt()
+          openRenameCatSheet(oldName, async (nn) => {
+          if (!nn || nn === oldName) return;
           const newData = await writeData('finance', r => ({
             ...r,
             categories: (r.categories||[]).map(c => c === oldName ? nn : c),
@@ -190,8 +190,9 @@ export async function renderSettings(container, params = {}) {
           await setCachedFinanceData(newData);
           showToast('Renamed to "' + nn + '" — all transactions updated', 'success');
           renderSettings(container, { tab: 'data' });
-        });
-      });
+          }); // end openRenameCatSheet callback
+        }); // end addEventListener
+      }); // end querySelectorAll
 
       chips.querySelectorAll('[data-reassign]').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -199,19 +200,20 @@ export async function renderSettings(container, params = {}) {
           const others = allCats.filter(c => c !== fromCat);
           if (!others.length) { showToast('No other categories to reassign to', 'warning'); return; }
           openReassignSheet(fromCat, others, async (tt) => {
-          const newData = await writeData('finance', r => ({
-            ...r,
-            transactions: (r.transactions||[]).map(t => ({
-              ...t,
-              category1: t.category1 === fromCat ? tt : t.category1,
-              category2: t.category2 === fromCat ? tt : t.category2,
-            }))
-          }));
-          await setCachedFinanceData(newData);
-          showToast('All "' + fromCat + '" reassigned to "' + tt + '"', 'success');
-          renderSettings(container, { tab: 'data' });
-        });
-      });
+            const newData = await writeData('finance', r => ({
+              ...r,
+              transactions: (r.transactions||[]).map(t => ({
+                ...t,
+                category1: t.category1 === fromCat ? tt : t.category1,
+                category2: t.category2 === fromCat ? tt : t.category2,
+              }))
+            }));
+            await setCachedFinanceData(newData);
+            showToast('All "' + fromCat + '" reassigned to "' + tt + '"', 'success');
+            renderSettings(container, { tab: 'data' });
+          }); // end callback
+        }); // end addEventListener
+      }); // end querySelectorAll
 
       chips.querySelectorAll('[data-delete]').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -596,6 +598,37 @@ export async function renderSettings(container, params = {}) {
     });
   }
 
+  // ── Rename category sheet ─────────────────────────────────────────────────
+  function openRenameCatSheet(oldName, onConfirm) {
+    document.getElementById('rename-cat-sheet')?.remove();
+    document.getElementById('rename-cat-backdrop')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'rename-cat-sheet';
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 40px;box-shadow:0 -4px 24px rgba(0,0,0,0.18);';
+    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>' +
+      '<div style="font-size:16px;font-weight:700;margin-bottom:4px;">Rename Category</div>' +
+      '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Renaming <strong>' + oldName + '</strong> will update all transactions</div>' +
+      '<input id="rename-cat-input" type="text" class="form-input" value="' + oldName + '" style="margin-bottom:12px;" />' +
+      '<button id="rename-cat-confirm" class="btn btn-primary btn-full">Rename</button>';
+    const backdrop = document.createElement('div');
+    backdrop.id = 'rename-cat-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+    const input = document.getElementById('rename-cat-input');
+    input.select();
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener('click', close);
+    const confirm = () => {
+      const val = input.value.trim();
+      if (!val || val === oldName) { close(); return; }
+      close(); onConfirm(val);
+    };
+    document.getElementById('rename-cat-confirm').addEventListener('click', confirm);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') confirm(); });
+    setTimeout(() => input?.focus(), 100);
+  }
+
   // ── Add category sheet ───────────────────────────────────────────────────
   function openAddCatSheet(onConfirm) {
     document.getElementById('add-cat-sheet')?.remove();
@@ -702,8 +735,8 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1B</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.6 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1B</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
       </div>
     `;
