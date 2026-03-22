@@ -1,4 +1,4 @@
-// v3.5.2 — 2026-03-22
+// v3.5.3 — 2026-03-22
 
 // ─── shared/security-log.js ─────────────────────────────────────────────────
 // Session registry and activity log stored on Google Drive

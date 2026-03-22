@@ -1,4 +1,4 @@
-// v3.5.2 — 2026-03-22
+// v3.5.3 — 2026-03-22
 
 // ─── app-b-private-vault/js/app-config.js ───────────────────────────────────
 // app_config.json on Drive -- stores PIN hash + salt + lock timeout

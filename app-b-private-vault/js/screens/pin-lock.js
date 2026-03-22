@@ -1,4 +1,4 @@
-// v3.5.2 — 2026-03-22
+// v3.5.3 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/pin-lock.js ─────────────────────────────
 // PIN lock and PIN setup screens

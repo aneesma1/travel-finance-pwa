@@ -1,4 +1,4 @@
-// v3.5.2 — 2026-03-22
+// v3.5.3 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -265,7 +265,9 @@ export async function renderTransactions(container) {
       fbWrap.addEventListener('click', (e) => {
         if (e.target.id === 'clear-filters-quick' || e.target.closest?.('#clear-filters-quick')) {
           _txnPage = 1;
+          // Keep currency, clear everything else
           clearHashParams();
+          if (activeCurrency !== 'QAR') setHashParams({ currency: activeCurrency });
           renderTransactions(container);
         }
       });
@@ -376,10 +378,10 @@ export async function renderTransactions(container) {
     });
 
     document.getElementById('sheet-clear-all').addEventListener('click', () => {
-      wYear = currentYear(); wMonth = 0; wCats = []; wAccount = '';
       close();
       _txnPage = 1;
       clearHashParams();
+      if (activeCurrency !== 'QAR') setHashParams({ currency: activeCurrency });
       renderTransactions(container);
     });
 
