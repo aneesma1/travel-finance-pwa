@@ -1,4 +1,4 @@
-// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
 // Summary cards: Income / Spend / Net per currency
@@ -55,7 +55,7 @@ export async function renderDashboard(container) {
   const p = getHashParams();
   const activeCurrency = p.currency || 'QAR';
   const activeYear     = p.year     ? Number(p.year)  : currentYear();
-  const activeMonth    = p.month    ? Number(p.month) : currentMonth();
+  const activeMonth    = p.month    ? Number(p.month) : 0;  // 0 = all months (no filter)
   const activeCategory = p.category || '';
   const activeAccount  = p.account  || '';
 
@@ -68,7 +68,7 @@ export async function renderDashboard(container) {
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
     const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
     const allAccounts   = ['Cash','Card','Bank','Other'];
-    const isDefaultState = activeCurrency === 'QAR' && activeYear === currentYear() && activeMonth === currentMonth() && !activeCategory && !activeAccount;
+    const isDefaultState = activeCurrency === 'QAR' && !activeYear && activeMonth === 0 && !activeCategory && !activeAccount;
     const activeCount   = isDefaultState ? 0 : 1; // any non-default = show clear
 
     document.getElementById('filter-bar-wrap').innerHTML = `
@@ -85,10 +85,10 @@ export async function renderDashboard(container) {
         <div class="filter-bar" style="border-bottom:none;padding-top:8px;">
           <div class="filter-chips">
             ${years.map(y => `
-              <button class="filter-chip ${activeYear === Number(y) ? 'active' : ''}" data-year="${y}">${y}</button>
+              <button class="filter-chip ${activeYear && activeYear === Number(y) ? 'active' : ''}" data-year="${y}">${y}</button>
             `).join('')}
             <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 2px;"></div>
-            <button class="filter-chip ${!activeMonth ? 'active' : ''}" data-month="0">All year</button>
+            <button class="filter-chip ${!activeMonth && !p.year ? 'active' : ''}" data-month="0">All time</button>
             ${MONTHS.map((m, i) => `
               <button class="filter-chip ${activeMonth === i+1 ? 'active' : ''}" data-month="${i+1}">${m}</button>
             `).join('')}
@@ -119,7 +119,13 @@ export async function renderDashboard(container) {
     // Bind year chips
     document.querySelectorAll('[data-year]').forEach(btn => {
       btn.addEventListener('click', () => {
-        setHashParams({ year: Number(btn.dataset.year) !== currentYear() ? btn.dataset.year : null, month: '0' }); // reset to all-year when switching year
+        const clickedYear = Number(btn.dataset.year);
+        if (clickedYear === activeYear) {
+          // Deselect year - show all years
+          setHashParams({ year: null, month: null });
+        } else {
+          setHashParams({ year: String(clickedYear), month: null });
+        }
         renderDashboard(container);
       });
     });
@@ -128,7 +134,12 @@ export async function renderDashboard(container) {
     document.querySelectorAll('[data-month]').forEach(btn => {
       btn.addEventListener('click', () => {
         const m = Number(btn.dataset.month);
-        setHashParams({ month: m !== 0 ? String(m) : '0' }); // '0' = All year (explicit)
+        if (m === 0) {
+          // 'All time' = clear both year and month
+          setHashParams({ year: null, month: null });
+        } else {
+          setHashParams({ month: String(m) });
+        }
         renderDashboard(container);
       });
     });
@@ -160,7 +171,7 @@ export async function renderDashboard(container) {
     // Apply all filters
     let filtered = transactions.filter(t => {
       if (t.currency !== activeCurrency) return false;
-      if (activeYear  && t.date?.slice(0,4) !== String(activeYear))  return false;
+      if (activeYear && activeYear !== 0 && t.date?.slice(0,4) !== String(activeYear)) return false;
       if (activeMonth && Number(t.date?.slice(5,7)) !== activeMonth)  return false;
       if (activeCategory && t.category1 !== activeCategory)           return false;
       if (activeAccount  && t.account   !== activeAccount)            return false;
@@ -348,8 +359,8 @@ export async function renderDashboard(container) {
     const { transactions = [] } = data;
     const p = getHashParams();
     const cur = p.currency || 'QAR';
-    const yr  = p.year  ? Number(p.year)  : currentYear();
-    const mo  = p.month ? Number(p.month) : currentMonth();
+    const yr  = p.year  ? Number(p.year)  : 0;
+    const mo  = p.month ? Number(p.month) : 0;
 
     const filtered = transactions.filter(t =>
       t.currency === cur &&

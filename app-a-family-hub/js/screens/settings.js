@@ -1,4 +1,4 @@
-// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
 
@@ -158,8 +158,8 @@ export async function renderSettings(container) {
       <!-- App info -->
       <div class="section-title">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
       </div>
 
       <!-- Hidden file inputs -->
@@ -543,11 +543,20 @@ function openImportModal(container, data, members) {
     existingData: data,
     onImportComplete: async (records, progressCb) => {
       importInProgress = true;
-      statusBar.style.display = 'block';
-      statusBar.style.color = 'var(--text-secondary)';
-      statusBar.textContent = 'Resolving members…';
 
-      // Resolve person names to IDs (fuzzy: trim, case, partial)
+      // Show a fullscreen overlay so progress is always visible
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+      overlay.innerHTML = '<div class="spinner" style="border-color:#fff;border-top-color:transparent;"></div>' +
+        '<div id="import-overlay-msg" style="color:#fff;font-size:16px;font-weight:600;text-align:center;padding:0 32px;">Resolving members…</div>';
+      document.body.appendChild(overlay);
+
+      const setMsg = (msg, color) => {
+        const el = document.getElementById('import-overlay-msg');
+        if (el) { el.textContent = msg; if (color) el.style.color = color; }
+      };
+
+      // Resolve person names to IDs
       const memberMap = Object.fromEntries(members.map(m => [m.name.toLowerCase().trim(), m.id]));
       let imported = 0, skipped = 0;
       const unmatchedNames = new Set();
@@ -555,9 +564,7 @@ function openImportModal(container, data, members) {
       const resolved = [];
       records.forEach(rec => {
         const rawName = rec.personName?.toLowerCase().trim() || '';
-        // Exact match first
         let personId = memberMap[rawName];
-        // Partial match: member name starts with or contains the value
         if (!personId) {
           const match = members.find(m =>
             m.name.toLowerCase().includes(rawName) ||
@@ -570,22 +577,27 @@ function openImportModal(container, data, members) {
       });
 
       if (unmatchedNames.size > 0) {
-        const unmatchedList = [...unmatchedNames].join(', ');
-        statusBar.textContent = '⚠️ Could not match names: ' + unmatchedList;
-        statusBar.style.color = 'var(--warning)';
-        statusBar.style.display = 'block';
-        statusBar.style.fontWeight = '600';
-        showToast('Name mismatch: ' + unmatchedList + '. Check member names in Settings → People.', 'warning', 6000);
-        await new Promise(r => setTimeout(r, 2500));
+        const names = [...unmatchedNames].join(', ');
+        setMsg('⚠️ Names not matched: ' + names + '\nCheck People names match your Excel exactly.', '#FCD34D');
+        const memberList = members.map(m => m.name).join(', ');
+        // Show member names so user can compare
+        overlay.innerHTML += '<div style="color:#94A3B8;font-size:13px;text-align:center;padding:0 24px;">Your members: ' + memberList + '</div>';
+        if (resolved.length === 0) {
+          await new Promise(r => setTimeout(r, 4000));
+          overlay.remove();
+          importInProgress = false;
+          progressCb(0, skipped);
+          return { imported: 0, skipped };
+        }
+        await new Promise(r => setTimeout(r, 2000));
       }
 
-      statusBar.textContent = `Saving ${resolved.length} records to Drive…`;
+      setMsg('Saving ' + resolved.length + ' trips…');
 
       try {
         const newData = await localSave('travel', (remote) => {
           const trips = [...(remote.trips || [])];
           const existingKeys = new Set(trips.map(t => t.personId + '|' + t.dateOutIndia));
-
           resolved.forEach(rec => {
             const key = rec.personId + '|' + rec.dateOutIndia;
             if (existingKeys.has(key)) { skipped++; return; }
@@ -593,36 +605,30 @@ function openImportModal(container, data, members) {
             existingKeys.add(key);
             imported++;
           });
-
           return { ...remote, trips };
         });
-
         await setCachedTravelData(newData);
+
         const msg = imported > 0
-          ? '✅ Imported ' + imported + ' trip' + (imported !== 1 ? 's' : '')
+          ? '✅ ' + imported + ' trip' + (imported !== 1 ? 's' : '') + ' imported!'
             + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
-          : '⚠️ All ' + skipped + ' records already exist (duplicates skipped)';
-        statusBar.style.color = imported > 0 ? 'var(--success)' : 'var(--warning)';
-        statusBar.textContent = msg;
-        statusBar.style.display = 'block';
-        statusBar.style.fontSize = '14px';
-        statusBar.style.fontWeight = '600';
-        statusBar.style.padding = '12px 20px';
-        showToast(msg, imported > 0 ? 'success' : 'warning', 4000);
+          : '⚠️ All ' + skipped + ' records already exist';
+        setMsg(msg, imported > 0 ? '#6EE7B7' : '#FCD34D');
         progressCb(imported, skipped);
         importInProgress = false;
-        // Scroll all parent containers to top
-        const tc = document.getElementById('import-tool-container');
-        if (tc) { let el = tc; while (el) { el.scrollTop = 0; el = el.parentElement; } }
+
+        await new Promise(r => setTimeout(r, 1500));
+        overlay.remove();
+        modal.classList.add('hidden');
+        navigate('travel-log');
+        showToast(msg, imported > 0 ? 'success' : 'warning', 4000);
         return { imported, skipped };
+
       } catch (err) {
+        setMsg('❌ Failed: ' + (err.message || 'Unknown error'), '#FCA5A5');
+        await new Promise(r => setTimeout(r, 3000));
+        overlay.remove();
         importInProgress = false;
-        statusBar.style.color = 'var(--danger)';
-        statusBar.style.display = 'block';
-        statusBar.style.fontWeight = '600';
-        statusBar.style.padding = '12px 20px';
-        statusBar.textContent = '❌ Import failed: ' + (err.message || 'Unknown error');
-        showToast('Import failed: ' + (err.message || 'Unknown error'), 'error', 8000);
         throw err;
       }
     }
