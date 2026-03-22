@@ -1,4 +1,4 @@
-// v3.5.0 — 2026-03-22
+// v3.5.1 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -248,13 +248,18 @@ export async function renderTransactions(container) {
       }));
 
     // Use event delegation so clear button works even when conditionally rendered
-    document.getElementById('filter-bar-wrap')?.addEventListener('click', (e) => {
-      if (e.target.id === 'clear-filters-quick' || e.target.closest('#clear-filters-quick')) {
-        _txnPage = 1;
-        clearHashParams();
-        renderTransactions(container);
-      }
-    }, { once: true });
+    // Event delegation on stable parent - no { once: true } so it persists
+    const fbWrap = document.getElementById('filter-bar-wrap');
+    if (fbWrap && !fbWrap._clearBound) {
+      fbWrap._clearBound = true;
+      fbWrap.addEventListener('click', (e) => {
+        if (e.target.id === 'clear-filters-quick' || e.target.closest?.('#clear-filters-quick')) {
+          _txnPage = 1;
+          clearHashParams();
+          renderTransactions(container);
+        }
+      });
+    }
 
     // Open filter bottom sheet
     document.getElementById('open-filter-sheet').addEventListener('click', () => {

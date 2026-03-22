@@ -1,4 +1,4 @@
-// v3.5.0 — 2026-03-22
+// v3.5.1 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/person-profile.js ──────────────────────────
 // Full person profile with 4 tabs:

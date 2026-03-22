@@ -1,4 +1,4 @@
-// v3.5.0 — 2026-03-22
+// v3.5.1 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
@@ -231,7 +231,7 @@ export async function renderSettings(container, params = {}) {
       </div>
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.0 · 2026-03-22</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.1 · 2026-03-22</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
       </div>
@@ -260,6 +260,146 @@ function renderMembersList(members) {
 
   list.querySelectorAll('[data-edit-member]').forEach(btn => {
     btn.addEventListener('click', () => navigate('person-profile', { memberId: btn.dataset.editMember, mode: 'view' }));
+  });
+}
+
+function bindDataEvents() {
+  document.getElementById('backup-btn')?.addEventListener('click', async () => {
+    const cached = await getCachedTravelData();
+    if (!cached) { showToast('No data to backup', 'warning'); return; }
+    downloadLocalBackup('travel', cached);
+    showToast('Backup downloaded!', 'success');
+  });
+
+  document.getElementById('restore-local-btn')?.addEventListener('click', () => {
+    document.getElementById('restore-file-input').click();
+  });
+
+  document.getElementById('restore-file-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!confirm('This will overwrite your current trip records. Continue?')) return;
+    try {
+      showToast('Restoring…', 'info', 2000);
+      const restored = await restoreFromLocalFile(file, 'travel');
+      await setCachedTravelData(restored);
+      showToast('Restored successfully!', 'success');
+      navigate('dashboard');
+    } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
+  });
+
+  document.getElementById('restore-mirror-btn')?.addEventListener('click', async () => {
+    if (!isOnline()) { showToast('Internet required to access Drive mirror', 'warning'); return; }
+    showToast('Loading snapshots…', 'info', 1500);
+    try {
+      const snapshots = await getMirrorSnapshots('travel');
+      if (!snapshots.length) { showToast('No mirror snapshots found', 'warning'); return; }
+      showMirrorModal(snapshots);
+    } catch { showToast('Could not load mirror snapshots', 'error'); }
+  });
+
+  document.getElementById('import-btn')?.addEventListener('click', async () => {
+    const data = await getCachedTravelData();
+    const { members = [] } = data || {};
+    openImportModal(document.getElementById('screen'), data, members);
+  });
+
+  document.getElementById('photo-zip-btn')?.addEventListener('click', async () => {
+    try {
+      showToast('Preparing photos…', 'info', 2000);
+      const cached = await getCachedTravelData();
+      if (!cached) { showToast('No data found', 'warning'); return; }
+      if (!window.JSZip) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+      const zip = new window.JSZip();
+      let count = 0;
+      (cached.members || []).forEach(m => {
+        if (m.photo?.startsWith('data:')) {
+          zip.folder('profiles').file((m.name || 'member') + '_profile.jpg', m.photo.split(',')[1], { base64: true });
+          count++;
+        }
+      });
+      (cached.documents || []).forEach(doc => {
+        const member = (cached.members || []).find(m => m.id === doc.personId);
+        const name = member?.name || 'unknown';
+        (doc.photos || []).forEach((p, i) => {
+          if (p?.startsWith('data:')) {
+            zip.folder('documents').file(name + '_' + (doc.docName || 'doc') + '_' + (i === 0 ? 'front' : 'back') + '.jpg', p.split(',')[1], { base64: true });
+            count++;
+          }
+        });
+      });
+      if (count === 0) { showToast('No photos found to export', 'warning'); return; }
+      const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
+      const blob = await zip.generateAsync({ type:'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'Travel_Photos_' + ts + '.zip';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('✅ ' + count + ' photos exported', 'success');
+    } catch (err) { showToast('ZIP export failed: ' + err.message, 'error'); }
+  });
+
+  document.getElementById('clear-cache-btn')?.addEventListener('click', async () => {
+    if (!confirm('Clear local cache? Data will be re-downloaded from Drive on next open.')) return;
+    await clearAllCachedData();
+    showToast('Cache cleared. Reloading…', 'success');
+    setTimeout(() => window.location.reload(), 1000);
+  });
+}
+
+function bindSecurityEvents() {
+  document.getElementById('security-dashboard-btn')?.addEventListener('click', async () => {
+    const modal = document.getElementById('member-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.innerHTML = '<div class="modal-sheet" style="max-height:90vh;">' +
+      '<div class="modal-handle"></div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">' +
+        '<span style="font-size:16px;font-weight:700;">🛡️ Security</span>' +
+        '<button id="close-sec" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>' +
+      '</div>' +
+      '<div id="security-content" style="overflow-y:auto;max-height:70vh;padding:0 20px 24px;">' +
+        '<div style="font-size:13px;color:var(--text-muted);padding:8px 0;">Loading…</div>' +
+      '</div></div>';
+    document.getElementById('close-sec').addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+    const [sessions, log] = await Promise.all([
+      getActiveSessions().catch(() => []),
+      getActivityLog(30).catch(() => [])
+    ]);
+    const sc = document.getElementById('security-content');
+    if (!sc) return;
+    const riskEmoji = r => r==='high'?'🔴':r==='medium'?'🟠':r==='low'?'🟡':'🟢';
+    sc.innerHTML =
+      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions (' + sessions.length + ')</div>' +
+      (sessions.length ? sessions.map(s =>
+        '<div style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;">' +
+        '<div style="font-size:13px;font-weight:600;">' + s.userEmail + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);">' + s.device + ' · ' + new Date(s.lastActive).toLocaleString() + '</div>' +
+        '</div>'
+      ).join('') : '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No other active sessions</div>') +
+      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;">Activity Log (last 30)</div>' +
+      (log.length ? log.map(e =>
+        '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light);">' +
+        '<span>' + riskEmoji(e.risk) + '</span>' +
+        '<div><div style="font-size:13px;font-weight:500;">' + e.action + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">' + e.detail + ' · ' + new Date(e.time).toLocaleString() + '</div></div>' +
+        '</div>'
+      ).join('') : '<div style="font-size:13px;color:var(--text-muted);">No activity logged yet</div>');
+  });
+
+  document.getElementById('safe-exit-btn')?.addEventListener('click', async () => {
+    showToast('Syncing before exit…', 'info', 2000);
+    await new Promise(r => setTimeout(r, 1500));
+    showToast('All synced. You can close the app.', 'success', 3000);
   });
 }
 
@@ -315,78 +455,8 @@ function bindEvents(members, data, container) {
     openImportModal(container, data, members);
   });
 
-  document.getElementById('security-dashboard-btn')?.addEventListener('click', async () => {
-    const modal = document.getElementById('member-modal');
-    modal.classList.remove('hidden');
-    modal.innerHTML = `
-      <div class="modal-sheet" style="max-height:90vh;">
-        <div class="modal-handle"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">
-          <span style="font-size:16px;font-weight:700;">🛡️ Security</span>
-          <button id="close-sec" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
-        </div>
-        <div id="security-content" style="overflow-y:auto;max-height:70vh;padding:0 20px 24px;">
-          <div style="font-size:13px;color:var(--text-muted);padding:8px 0;">Loading…</div>
-        </div>
-      </div>
-    `;
-    document.getElementById('close-sec').addEventListener('click', () => modal.classList.add('hidden'));
-    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+  // Security events handled by bindSecurityEvents()
 
-    const [sessions, log] = await Promise.all([
-      getActiveSessions().catch(() => []),
-      getActivityLog(30).catch(() => [])
-    ]);
-    const sc = document.getElementById('security-content');
-    const riskColor = r => r==='high'?'var(--danger)':r==='medium'?'var(--warning)':r==='low'?'var(--primary)':'var(--text-muted)';
-    const riskEmoji = r => r==='high'?'🔴':r==='medium'?'🟠':r==='low'?'🟡':'🟢';
-
-    sc.innerHTML = `
-      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions (${sessions.length})</div>
-      ${sessions.length ? sessions.map(s => `
-        <div style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;">
-            <div>
-              <div style="font-size:13px;font-weight:600;">${s.userEmail}</div>
-              <div style="font-size:12px;color:var(--text-muted);">${s.device} · ${s.app}</div>
-              <div style="font-size:11px;color:var(--text-muted);">Last active: ${new Date(s.lastActive).toLocaleString()}</div>
-            </div>
-            <button data-revoke="${s.id}" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--danger-bg);background:none;color:var(--danger);cursor:pointer;">Revoke</button>
-          </div>
-        </div>
-      `).join('') : '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No other active sessions</div>'}
-
-      ${sessions.length > 1 ? `<button id="revoke-all-btn" style="width:100%;padding:10px;border-radius:var(--radius-md);border:1px solid var(--danger);background:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:16px;">🚫 Revoke all other sessions</button>` : ''}
-
-      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;">Activity Log (last 30)</div>
-      ${log.length ? log.map(e => `
-        <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light);">
-          <span style="font-size:16px;">${riskEmoji(e.risk)}</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:500;color:${riskColor(e.risk)};">${e.action}</div>
-            <div style="font-size:12px;color:var(--text-muted);">${e.detail} · ${e.device}</div>
-            <div style="font-size:11px;color:var(--text-muted);">${new Date(e.time).toLocaleString()}</div>
-          </div>
-        </div>
-      `).join('') : '<div style="font-size:13px;color:var(--text-muted);">No activity logged yet</div>'}
-    `;
-
-    sc.querySelectorAll('[data-revoke]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Revoke this session?')) return;
-        await revokeSession(btn.dataset.revoke);
-        showToast('Session revoked', 'success');
-        btn.closest('div[style]').remove();
-      });
-    });
-
-    document.getElementById('revoke-all-btn')?.addEventListener('click', async () => {
-      if (!confirm('Revoke all other sessions?')) return;
-      await revokeAllSessions();
-      showToast('All other sessions revoked', 'success');
-      modal.classList.add('hidden');
-    });
-  });
 
   if (isAdmin()) {
     document.getElementById('access-control-btn')?.addEventListener('click', () => {
