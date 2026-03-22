@@ -1,4 +1,4 @@
-// v3.5.1 — 2026-03-22
+// v3.5.2 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/documents.js ───────────────────────────────
 // Document Tracker: cards grouped by person, life bars, expiry badges

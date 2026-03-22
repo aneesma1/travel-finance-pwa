@@ -1,4 +1,4 @@
-// v3.5.1 — 2026-03-22
+// v3.5.2 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
@@ -231,9 +231,10 @@ export async function renderSettings(container, params = {}) {
       </div>
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.1 · 2026-03-22</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.2 · 2026-03-22</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin() ? '👑 Admin' : '👁 Viewer'} · ${user?.email || 'Not signed in'}</div>
       </div>
     `;
     document.getElementById('signout-btn').addEventListener('click', () => { clearAuth(); window.location.reload(); });
@@ -681,24 +682,21 @@ function openImportModal(container, data, members) {
     existingData: data,
     onImportComplete: async (records, progressCb) => {
       importInProgress = true;
+      statusBar.style.display = 'block';
+      statusBar.style.fontSize = '14px';
+      statusBar.style.padding = '10px 20px';
 
-      // Fullscreen overlay - always visible
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;';
-      overlay.innerHTML = '<div class="spinner" style="border-color:#fff;border-top-color:transparent;width:40px;height:40px;"></div>' +
-        '<div id="import-overlay-msg" style="color:#fff;font-size:16px;font-weight:600;text-align:center;line-height:1.6;">Importing…</div>';
-      document.body.appendChild(overlay);
-
-      const setMsg = (msg, color) => {
-        const el = document.getElementById('import-overlay-msg');
-        if (el) { el.textContent = msg; if (color) el.style.color = color; }
+      const setStatus = (msg, color) => {
+        statusBar.textContent = msg;
+        statusBar.style.color = color || 'var(--text-secondary)';
       };
 
-      // Build name→id map from existing members
+      setStatus('Matching people…');
+
+      // Build name→id map. Auto-create members for unknown names.
       const memberMap = {};
       members.forEach(m => { memberMap[m.name.toLowerCase().trim()] = m.id; });
 
-      // Collect all unique names from the import file
       const newMembersToCreate = {};
       records.forEach(rec => {
         const rawName = rec.personName?.trim();
@@ -708,19 +706,15 @@ function openImportModal(container, data, members) {
           newMembersToCreate[key] = { id: uuidv4(), name: rawName };
         }
       });
-
-      // Add new members to map
       Object.values(newMembersToCreate).forEach(m => {
         memberMap[m.name.toLowerCase()] = m.id;
       });
 
       const newMemberList = Object.values(newMembersToCreate);
       if (newMemberList.length > 0) {
-        setMsg('Creating ' + newMemberList.length + ' new member' + (newMemberList.length > 1 ? 's' : '') + ': ' + newMemberList.map(m => m.name).join(', '));
-        await new Promise(r => setTimeout(r, 800));
+        setStatus('Creating members: ' + newMemberList.map(m => m.name).join(', '));
       }
 
-      // Resolve all records — every record now gets a personId
       let imported = 0, skipped = 0;
       const resolved = [];
       records.forEach(rec => {
@@ -731,22 +725,15 @@ function openImportModal(container, data, members) {
         resolved.push({ ...rec, id: rec.id || uuidv4(), personId });
       });
 
-      setMsg('Saving ' + resolved.length + ' trips…');
+      setStatus('Saving ' + resolved.length + ' trips…');
 
       try {
         const newData = await localSave('travel', (remote) => {
-          // Add any new members
           const existingMembers = [...(remote.members || [])];
-          const existingMemberIds = new Set(existingMembers.map(m => m.id));
+          const existingIds = new Set(existingMembers.map(m => m.id));
           newMemberList.forEach(m => {
-            if (!existingMemberIds.has(m.id)) {
-              existingMembers.push({
-                id: m.id, name: m.name,
-                emoji: '👤', color: '#EEF2FF'
-              });
-            }
+            if (!existingIds.has(m.id)) existingMembers.push({ id: m.id, name: m.name, emoji: '👤', color: '#EEF2FF' });
           });
-
           const trips = [...(remote.trips || [])];
           const existingKeys = new Set(trips.map(t => t.personId + '|' + t.dateOutIndia));
           resolved.forEach(rec => {
@@ -758,32 +745,23 @@ function openImportModal(container, data, members) {
           });
           return { ...remote, members: existingMembers, trips };
         });
-        await setCachedTravelData(newData);
 
+        await setCachedTravelData(newData);
         const msg = imported > 0
-          ? '✅ ' + imported + ' trip' + (imported !== 1 ? 's' : '') + ' imported!'
-            + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
-          : '⚠️ All ' + skipped + ' records already exist';
-        setMsg(msg, imported > 0 ? '#6EE7B7' : '#FCD34D');
+          ? '✅ ' + imported + ' trips imported!' + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
+          : '⚠️ 0 imported — all ' + skipped + ' already exist';
+        setStatus(msg, imported > 0 ? 'var(--success)' : 'var(--warning)');
         progressCb(imported, skipped);
         importInProgress = false;
-
-        await new Promise(r => setTimeout(r, 1500));
-        overlay.remove();
-        modal.classList.add('hidden');
-        navigate('travel-log');
-        showToast(msg, imported > 0 ? 'success' : 'warning', 4000);
+        // Scroll tool container to top to show done screen
+        if (toolContainer) toolContainer.scrollTop = 0;
         return { imported, skipped };
-
       } catch (err) {
-        setMsg('❌ Failed: ' + (err.message || 'Unknown error'), '#FCA5A5');
-        await new Promise(r => setTimeout(r, 3000));
-        overlay.remove();
         importInProgress = false;
+        setStatus('❌ Failed: ' + (err.message || 'Unknown'), 'var(--danger)');
         throw err;
       }
     }
-  });
 
   // Handle import complete -- close modal and navigate
   toolContainer.addEventListener('import:complete', () => {

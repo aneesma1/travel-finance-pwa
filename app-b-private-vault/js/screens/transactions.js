@@ -1,4 +1,4 @@
-// v3.5.1 — 2026-03-22
+// v3.5.2 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -186,7 +186,17 @@ export async function renderTransactions(container) {
   }
 
   const data = await getCachedFinanceData();
-  if (!data) { renderEmpty(document.getElementById('txn-list-wrap')); return; }
+  if (!data) {
+    const wrap = document.getElementById('txn-list-wrap');
+    wrap.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:12px;">' +
+      '<div style="font-size:48px;">💳</div>' +
+      '<div style="font-size:16px;font-weight:600;color:var(--text);">No data loaded yet</div>' +
+      '<div style="font-size:13px;color:var(--text-muted);text-align:center;">Add a transaction to get started, or pull down to refresh.</div>' +
+      '<button id="retry-load" class="btn btn-primary" style="margin-top:8px;">↻ Retry</button>' +
+    '</div>';
+    document.getElementById('retry-load')?.addEventListener('click', () => renderTransactions(container));
+    return;
+  }
 
   const { transactions = [], categories: savedCats = [], accounts: savedAccounts = [] } = data;
   const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))];

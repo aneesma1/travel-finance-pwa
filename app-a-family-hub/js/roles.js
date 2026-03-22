@@ -1,4 +1,4 @@
-// v3.5.1 — 2026-03-22
+// v3.5.2 — 2026-03-22
 
 // ─── app-a-family-hub/js/roles.js ───────────────────────────────────────────
 // Admin / Viewer role system for App A -- Family Hub
@@ -54,15 +54,18 @@ export function applyRoleRestrictions() {
 
 // ── Resolve role from data ────────────────────────────────────────────────────
 export function resolveRole(data, userEmail) {
-  if (!data || !userEmail) return 'viewer';
+  if (!data || !userEmail) return 'admin'; // No data = first run = admin
   const roles = data.roles || {};
 
-  // If no roles defined yet -- first run -- treat signed-in user as admin
-  if (Object.keys(roles).length === 0) {
-    return 'admin';
-  }
+  // No roles configured yet = everyone is admin
+  if (Object.keys(roles).length === 0) return 'admin';
 
-  return roles[userEmail.toLowerCase()] || 'viewer';
+  const role = roles[userEmail.toLowerCase().trim()];
+  // If this user isn't in the roles list at all, treat as admin
+  // (they are the owner using their own Google account)
+  if (!role) return 'admin';
+
+  return role; // 'admin' or 'viewer'
 }
 
 // ── Render Access Control in settings ────────────────────────────────────────

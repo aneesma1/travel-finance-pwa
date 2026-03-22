@@ -1,4 +1,4 @@
-// v3.5.1 — 2026-03-22
+// v3.5.2 — 2026-03-22
 
 // ─── shared/photo-picker.js ──────────────────────────────────────────────────
 // Shared photo capture component
@@ -69,56 +69,59 @@ function pasteFromClipboard(slotIndex, slots, onChange, rerender) {
 }
 
 function showPasteArea(slotIndex, slots, onChange, rerender) {
-  // Create a temporary contenteditable div that captures paste events
-  const existing = document.getElementById('paste-capture-area');
-  if (existing) { existing.focus(); return; }
+  // Remove any existing paste overlay
+  document.getElementById('paste-overlay')?.remove();
 
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = '<div style="background:var(--surface,#fff);border-radius:16px;padding:24px 28px;max-width:320px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);">' +
-    '<div style="font-size:32px;margin-bottom:12px;">📋</div>' +
-    '<div style="font-size:16px;font-weight:700;margin-bottom:8px;">Paste Image</div>' +
-    '<div style="font-size:13px;color:#666;margin-bottom:16px;">Press <strong>Ctrl+V</strong> (PC) or long-press and Paste (Android) to paste your copied image</div>' +
-    '<div id="paste-capture-area" contenteditable="true" tabindex="0" style="position:absolute;opacity:0;width:1px;height:1px;"></div>' +
-    '<button id="paste-cancel-btn" style="padding:10px 24px;border-radius:20px;border:1px solid #ddd;background:transparent;cursor:pointer;font-size:14px;">Cancel</button>' +
-  '</div>';
+  overlay.id = 'paste-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:2000;display:flex;align-items:center;justify-content:center;';
 
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:16px;padding:28px 32px;max-width:320px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);';
+  box.innerHTML =
+    '<div style="font-size:40px;margin-bottom:12px;">📋</div>' +
+    '<div style="font-size:17px;font-weight:700;margin-bottom:10px;color:#111;">Paste Image</div>' +
+    '<div style="font-size:14px;color:#555;margin-bottom:20px;line-height:1.6;">' +
+      'Copy an image first (Snipping Tool, screenshot, etc.)<br>' +
+      'Then press <strong>Ctrl+V</strong>' +
+    '</div>' +
+    '<button id="paste-cancel-btn" style="padding:10px 28px;border-radius:20px;border:1.5px solid #ddd;background:transparent;cursor:pointer;font-size:14px;">Cancel</button>';
+
+  overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  const captureEl = document.getElementById('paste-capture-area');
-  captureEl.focus();
-
+  // Listen on document - works without focus tricks
   const handlePaste = async (e) => {
     e.preventDefault();
     const items = Array.from(e.clipboardData?.items || []);
-    const imgItem = items.find(i => i.type.startsWith('image/'));
+    const imgItem = items.find(it => it.type.startsWith('image/'));
     if (imgItem) {
       const file = imgItem.getAsFile();
       if (file) {
+        overlay.remove();
         try {
           const compressed = await compressImage(file);
           slots[slotIndex] = compressed;
           onChange([...slots]);
           rerender();
-          overlay.remove();
-        } catch { overlay.remove(); }
+        } catch (err) {
+          showToast('Could not process image', 'error');
+        }
         return;
       }
     }
-    showToast('No image found — copy an image first, then paste', 'warning', 3000);
+    showToast('No image in clipboard — copy an image first', 'warning', 3000);
   };
 
   document.addEventListener('paste', handlePaste, { once: true });
-  document.getElementById('paste-cancel-btn').addEventListener('click', () => {
+
+  const cancel = () => {
     document.removeEventListener('paste', handlePaste);
     overlay.remove();
-  });
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      document.removeEventListener('paste', handlePaste);
-      overlay.remove();
-    }
-  });
+  };
+
+  document.getElementById('paste-cancel-btn').addEventListener('click', cancel);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) cancel(); });
 }
 
 function showToast(msg, type, dur) {
