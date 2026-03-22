@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields

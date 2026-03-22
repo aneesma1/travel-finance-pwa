@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── shared/auth.js ──────────────────────────────────────────────────────────
 // Google OAuth 2.0 -- Implicit flow (token response)

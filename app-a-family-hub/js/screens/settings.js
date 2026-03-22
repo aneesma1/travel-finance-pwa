@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
@@ -230,7 +231,7 @@ export async function renderSettings(container, params = {}) {
       </div>
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.6 · 2026-03-22</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.8 · 2026-03-22</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
       </div>
@@ -238,157 +239,6 @@ export async function renderSettings(container, params = {}) {
     document.getElementById('signout-btn').addEventListener('click', () => { clearAuth(); window.location.reload(); });
   }
 
-  // ── DATA EVENTS ──────────────────────────────────────────────────────────
-  function bindDataEvents() {
-    // placeholder - wired below in bindEvents
-    bindEvents(members, data, container);
-  }
-
-  // ── SECURITY EVENTS ──────────────────────────────────────────────────────
-  function bindSecurityEvents() {
-    document.getElementById('security-dashboard-btn')?.addEventListener('click', () => {
-      const modal = document.getElementById('member-modal');
-      modal.classList.remove('hidden');
-      <div class="card" style="margin:0 16px;">
-        <div class="card-body" style="display:flex;align-items:center;gap:12px;">
-          ${user?.picture ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />` : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name || 'Signed in'}</div>
-            <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email || ''}</div>
-          </div>
-          <button class="btn btn-secondary" style="padding:8px 14px;font-size:13px;" id="signout-btn">Sign out</button>
-        </div>
-        <div class="divider"></div>
-        <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:13px;color:var(--text-secondary);">Drive sync</span>
-            <span style="font-size:13px;font-weight:600;color:${isOnline() ? 'var(--success)' : 'var(--warning)'};">
-              ${isOnline() ? '● Online' : '● Offline'}
-            </span>
-          </div>
-          ${data?.lastSync ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>` : ''}
-        </div>
-      </div>
-
-      <!-- Family Members -->
-      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>Family Members</span>
-        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;" id="add-member-btn">+ Add</button>
-      </div>
-      <div id="members-list" style="padding:0 16px;display:flex;flex-direction:column;gap:8px;"></div>
-
-      <!-- Data Management -->
-      <div class="section-title">Data Management</div>
-      <div class="card" style="margin:0 16px;overflow:visible;">
-        <div class="list-row" id="backup-btn" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
-          <span style="font-size:20px;">💾</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Backup Now</div>
-            <div style="font-size:12px;color:var(--text-muted);">Download JSON to device</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="restore-local-btn">
-          <span style="font-size:20px;">📂</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Restore from Local Backup</div>
-            <div style="font-size:12px;color:var(--text-muted);">Pick a downloaded backup file</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="restore-mirror-btn">
-          <span style="font-size:20px;">☁️</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Restore from Drive Mirror</div>
-            <div style="font-size:12px;color:var(--text-muted);">Choose from last 3 snapshots</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="import-btn">
-          <span style="font-size:20px;">📥</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Import from Excel / CSV</div>
-            <div style="font-size:12px;color:var(--text-muted);">Migrate existing travel data</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="photo-zip-btn">
-          <span style="font-size:20px;">📦</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Export All Photos as ZIP</div>
-            <div style="font-size:12px;color:var(--text-muted);">Document scans, address photos</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-        <div class="list-row" id="clear-cache-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
-          <span style="font-size:20px;">🗑️</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Clear Local Cache</div>
-            <div style="font-size:12px;color:var(--text-muted);">Force fresh re-download from Drive</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-      </div>
-
-      <!-- Access Control -- admin only -->
-      ${isAdmin() ? `
-      <div class="section-title">Family Access</div>
-      <div class="card" style="margin:0 16px;">
-        <div class="list-row" id="access-control-btn" style="border-radius:var(--radius-lg);">
-          <span style="font-size:20px;">👥</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Manage Access</div>
-            <div style="font-size:12px;color:var(--text-muted);">Set Admin or Viewer roles</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Security -->
-      <div class="section-title">Security</div>
-      <div class="card" style="margin:0 16px;">
-        <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg);">
-          <span style="font-size:20px;">🛡️</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Security & Access</div>
-            <div style="font-size:12px;color:var(--text-muted);">Sessions, activity log, revoke access</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-      </div>
-
-      <!-- Safe Exit -->
-      <div class="section-title">Session</div>
-      <div class="card" style="margin:0 16px;">
-        <div class="list-row" id="safe-exit-btn" style="border-radius:var(--radius-lg);">
-          <span style="font-size:20px;">🚪</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Save &amp; Exit</div>
-            <div style="font-size:12px;color:var(--text-muted);">Sync data then close cleanly</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-      </div>
-
-      <!-- App info -->
-      <div class="section-title">App Info</div>
-      <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.6 · 2026-03-22</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
-      </div>
-
-      <!-- Hidden file inputs -->
-      <input type="file" id="restore-file-input" accept=".json" style="display:none;" />
-    </div>
-
-    <!-- Member modal -->
-    <div class="modal-overlay hidden" id="member-modal"></div>
-  `;
-
-  renderMembersList(members);
-  bindEvents(members, data, container);
-}
 
 function renderMembersList(members) {
   const list = document.getElementById('members-list');

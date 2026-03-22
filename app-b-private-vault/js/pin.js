@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── app-b-private-vault/js/pin.js ──────────────────────────────────────────
 // PIN management -- SHA-256 with random per-device salt

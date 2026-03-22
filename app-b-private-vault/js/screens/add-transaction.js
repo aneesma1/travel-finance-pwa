@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form

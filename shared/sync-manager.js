@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── shared/sync-manager.js ──────────────────────────────────────────────────
 // Core of Phase 3 -- Local-first architecture

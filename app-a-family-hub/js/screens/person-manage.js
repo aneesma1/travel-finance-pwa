@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 // ─── app-a-family-hub/js/screens/person-manage.js ───────────────────────────
 // Comprehensive Person Management: rename, merge, duplicate detection
 // Opens as a bottom sheet from the People screen

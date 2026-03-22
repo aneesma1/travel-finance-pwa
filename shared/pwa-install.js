@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── shared/pwa-install.js ───────────────────────────────────────────────────
 // PWA install prompt management

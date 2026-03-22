@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── app-a-family-hub/sw.js ──────────────────────────────────────────────────
 // Service Worker for Family Hub PWA
@@ -5,7 +6,7 @@
 
 'use strict';
 
-const CACHE_NAME    = 'family-hub-v2';
+const CACHE_NAME    = 'family-hub-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',

@@ -1,3 +1,4 @@
+// v3.4.8 — 2026-03-22
 
 // ─── app-b-private-vault/js/auth-config.js ──────────────────────────────────
 // Google OAuth client configuration for App B
