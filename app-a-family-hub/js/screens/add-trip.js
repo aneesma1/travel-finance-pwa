@@ -1,4 +1,4 @@
-// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
 
@@ -18,14 +18,15 @@ const STEPS = ['Person', 'Dates', 'Flights', 'Reason', 'Review'];
 
 export async function renderAddTrip(container, params = {}) {
   const { tripId, mode } = params;
-  const isEdit = mode === 'edit' && tripId;
-  let isViewMode = isEdit;  // existing trips open in view mode by default
+  const isExisting = !!tripId;
+  const isEdit = isExisting;  // any existing trip can be edited
+  let isViewMode = isExisting && mode !== 'edit';  // view by default, edit when explicit
 
   const data = await getCachedTravelData();
   const { members = [], trips = [] } = data || {};
 
   // Load existing trip if editing
-  let existingTrip = isEdit ? trips.find(t => t.id === tripId) : null;
+  let existingTrip = isExisting ? trips.find(t => t.id === tripId) : null;
 
   // Form state
   const state = {

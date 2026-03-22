@@ -1,4 +1,4 @@
-// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
 
@@ -204,7 +204,7 @@ export async function renderTransactions(container) {
   function renderFilterBar() {
     const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b)=>b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
-    const activeCount = [activeCategory, activeAccount, activeMonth !== 0].filter(Boolean).length;
+    const activeCount = [activeCategory, activeAccount, activeMonth !== 0, activeYear !== currentYear()].filter(Boolean).length;
 
     // Collapsed summary chips + filter icon
     const summaryParts = [];
@@ -226,11 +226,13 @@ export async function renderTransactions(container) {
         <!-- Collapsed filter summary row -->
         <div style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;" id="filter-summary-row">
           <div style="flex:1;font-size:13px;color:${activeCount > 0 ? 'var(--primary)' : 'var(--text-muted)'};">
-            ${activeYear} · ${summaryText}
+            ${activeYear !== currentYear() ? activeYear + ' · ' : ''}${summaryText}
           </div>
-          ${activeCount > 0 ? `<button id="clear-filters-quick" style="font-size:12px;color:var(--danger);background:none;border:none;cursor:pointer;padding:0;">✕ Clear</button>` : ''}
+          ${activeCount > 0
+            ? `<button id="clear-filters-quick" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">✕ Clear all</button>`
+            : ''}
           <button id="open-filter-sheet" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1px solid ${activeCount > 0 ? 'var(--primary)' : 'var(--border)'};background:${activeCount > 0 ? 'var(--primary-bg)' : 'transparent'};color:${activeCount > 0 ? 'var(--primary)' : 'var(--text-secondary)'};font-size:13px;font-weight:500;cursor:pointer;">
-            ⚙️ Filters${activeCount > 0 ? ` (${activeCount})` : ''}
+            ⚙️ Filters${activeCount > 0 ? ' (' + activeCount + ')' : ''}
           </button>
         </div>
       </div>
@@ -431,22 +433,32 @@ export async function renderTransactions(container) {
     if (!filtered.length) {
       const balanceBar = document.getElementById('balance-bar');
       if (balanceBar) balanceBar.classList.add('hidden');
-      wrap.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:12px;">
-          <div style="font-size:48px;">💳</div>
-          <div style="font-size:16px;font-weight:600;color:var(--text);">No ${activeCurrency} transactions</div>
-          <div style="font-size:13px;color:var(--text-muted);text-align:center;line-height:1.6;">
-            ${activeMonth || activeCategory || activeAccount
-              ? 'No records match the active filters. <button id="clear-filters-empty" style="color:var(--primary);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline;">Clear filters</button>'
-              : 'Tap ＋ to add your first ' + activeCurrency + ' transaction.'}
-          </div>
-        </div>`;
+
+      // Smart fallback: if ONLY the year filter causes empty but data exists for
+      // this currency in other years, auto-switch to all-time view
+      const hasDataAllTime = transactions.some(t => t.currency === activeCurrency);
+      const onlyYearFiltering = !activeMonth && !activeCategory && !activeAccount;
+      if (hasDataAllTime && onlyYearFiltering) {
+        // Clear all filters and re-render - keeps only currency
+        clearHashParams();
+        if (activeCurrency !== 'QAR') setHashParams({ currency: activeCurrency });
+        renderTransactions(container);
+        return;
+      }
+
+      wrap.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:12px;">' +
+        '<div style="font-size:48px;">💳</div>' +
+        '<div style="font-size:16px;font-weight:600;color:var(--text);">No ' + activeCurrency + ' transactions</div>' +
+        '<div style="font-size:13px;color:var(--text-muted);text-align:center;line-height:1.6;">' +
+          (activeMonth || activeCategory || activeAccount
+            ? 'No records match the active filters. <button id="clear-filters-empty" style="color:var(--primary);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline;">Clear filters</button>'
+            : 'Tap ＋ to add your first ' + activeCurrency + ' transaction.') +
+        '</div></div>';
       wrap.querySelector('#clear-filters-empty')?.addEventListener('click', () => {
         clearHashParams(); renderTransactions(container);
       });
       return;
     }
-
     // Group by month
     const groups = {};
     filtered.forEach(t => {

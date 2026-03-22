@@ -1,4 +1,4 @@
-// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
 // Summary cards: Income / Spend / Net per currency
@@ -68,7 +68,8 @@ export async function renderDashboard(container) {
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
     const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
     const allAccounts   = ['Cash','Card','Bank','Other'];
-    const activeCount   = [activeCategory, activeAccount, activeMonth !== currentMonth(), activeYear !== currentYear()].filter(Boolean).length;
+    const isDefaultState = activeCurrency === 'QAR' && activeYear === currentYear() && activeMonth === currentMonth() && !activeCategory && !activeAccount;
+    const activeCount   = isDefaultState ? 0 : 1; // any non-default = show clear
 
     document.getElementById('filter-bar-wrap').innerHTML = `
       <div style="background:var(--surface);border-bottom:1px solid var(--border);">
@@ -118,7 +119,7 @@ export async function renderDashboard(container) {
     // Bind year chips
     document.querySelectorAll('[data-year]').forEach(btn => {
       btn.addEventListener('click', () => {
-        setHashParams({ year: Number(btn.dataset.year) !== currentYear() ? btn.dataset.year : null });
+        setHashParams({ year: Number(btn.dataset.year) !== currentYear() ? btn.dataset.year : null, month: '0' }); // reset to all-year when switching year
         renderDashboard(container);
       });
     });
@@ -127,7 +128,7 @@ export async function renderDashboard(container) {
     document.querySelectorAll('[data-month]').forEach(btn => {
       btn.addEventListener('click', () => {
         const m = Number(btn.dataset.month);
-        setHashParams({ month: m !== 0 ? m : null });
+        setHashParams({ month: m !== 0 ? String(m) : '0' }); // '0' = All year (explicit)
         renderDashboard(container);
       });
     });
@@ -287,18 +288,58 @@ export async function renderDashboard(container) {
       showToast('Capturing…', 'info', 1500);
       const target = document.getElementById('dash-content');
       const canvas = await window.html2canvas(target, { backgroundColor: '#F8FAFC', scale: 2, logging: false });
-      canvas.toBlob(async (blob) => {
-        const file = new File([blob], `vault-${today()}.png`, { type: 'image/png' });
-        if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Finance Summary' });
-        } else {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url; a.download = `vault-${today()}.png`; a.click();
-          URL.revokeObjectURL(url);
-          showToast('Image downloaded', 'success');
-        }
+      canvas.toBlob((blob) => {
+        const filename = 'vault-' + today() + '.png';
+        const url = URL.createObjectURL(blob);
+        const file = new File([blob], filename, { type: 'image/png' });
+        showImageShareSheet(url, filename, file, blob);
       }, 'image/png');
     } catch { showToast('Could not capture image', 'error'); }
+  }
+
+  function showImageShareSheet(url, filename, file, blob) {
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
+    sheet.innerHTML =
+      '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>' +
+      '<img src="' + url + '" style="width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;" />' +
+      '<div style="display:flex;flex-direction:column;gap:10px;">' +
+        '<button id="img-share-btn" class="btn btn-primary btn-full" style="font-size:15px;">📤 Share via apps</button>' +
+        '<button id="img-save-btn" class="btn btn-secondary btn-full" style="font-size:15px;">💾 Save to device</button>' +
+        '<button id="img-copy-btn" class="btn btn-secondary btn-full" style="font-size:15px;">📋 Copy image</button>' +
+      '</div>';
+
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+
+    const close = () => { sheet.remove(); backdrop.remove(); URL.revokeObjectURL(url); };
+    backdrop.addEventListener('click', close);
+
+    document.getElementById('img-share-btn').addEventListener('click', async () => {
+      if (navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'Finance Summary' }); close(); return; } catch {}
+      }
+      showToast('Sharing not supported — use Save instead', 'warning');
+    });
+
+    document.getElementById('img-save-btn').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      showToast('Image saved!', 'success');
+      close();
+    });
+
+    document.getElementById('img-copy-btn').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        showToast('Image copied to clipboard!', 'success');
+      } catch {
+        showToast('Copy not supported — use Save instead', 'warning');
+      }
+      close();
+    });
   }
 
   async function copyText() {

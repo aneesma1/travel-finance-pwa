@@ -1,4 +1,4 @@
-// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings: family profiles, backup/restore, import, auth, sync status
 
@@ -158,8 +158,8 @@ export async function renderSettings(container) {
       <!-- App info -->
       <div class="section-title">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- Phase 1A</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 · Travel & Finance PWA Suite</div>
       </div>
 
       <!-- Hidden file inputs -->
@@ -570,9 +570,13 @@ function openImportModal(container, data, members) {
       });
 
       if (unmatchedNames.size > 0) {
-        statusBar.textContent = 'Warning: could not match: ' + [...unmatchedNames].join(', ');
+        const unmatchedList = [...unmatchedNames].join(', ');
+        statusBar.textContent = '⚠️ Could not match names: ' + unmatchedList;
         statusBar.style.color = 'var(--warning)';
-        await new Promise(r => setTimeout(r, 1500));
+        statusBar.style.display = 'block';
+        statusBar.style.fontWeight = '600';
+        showToast('Name mismatch: ' + unmatchedList + '. Check member names in Settings → People.', 'warning', 6000);
+        await new Promise(r => setTimeout(r, 2500));
       }
 
       statusBar.textContent = `Saving ${resolved.length} records to Drive…`;
@@ -594,18 +598,31 @@ function openImportModal(container, data, members) {
         });
 
         await setCachedTravelData(newData);
-        statusBar.style.color = 'var(--success)';
-        statusBar.textContent = '✅ Saved ' + imported + ' records to Drive';
+        const msg = imported > 0
+          ? '✅ Imported ' + imported + ' trip' + (imported !== 1 ? 's' : '')
+            + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
+          : '⚠️ All ' + skipped + ' records already exist (duplicates skipped)';
+        statusBar.style.color = imported > 0 ? 'var(--success)' : 'var(--warning)';
+        statusBar.textContent = msg;
+        statusBar.style.display = 'block';
+        statusBar.style.fontSize = '14px';
+        statusBar.style.fontWeight = '600';
+        statusBar.style.padding = '12px 20px';
+        showToast(msg, imported > 0 ? 'success' : 'warning', 4000);
         progressCb(imported, skipped);
         importInProgress = false;
-        // Scroll modal to show done screen
+        // Scroll all parent containers to top
         const tc = document.getElementById('import-tool-container');
-        if (tc) { tc.scrollTop = 0; tc.parentElement.scrollTop = 0; }
+        if (tc) { let el = tc; while (el) { el.scrollTop = 0; el = el.parentElement; } }
         return { imported, skipped };
       } catch (err) {
         importInProgress = false;
         statusBar.style.color = 'var(--danger)';
-        statusBar.textContent = `❌ Save failed: ${err.message}`;
+        statusBar.style.display = 'block';
+        statusBar.style.fontWeight = '600';
+        statusBar.style.padding = '12px 20px';
+        statusBar.textContent = '❌ Import failed: ' + (err.message || 'Unknown error');
+        showToast('Import failed: ' + (err.message || 'Unknown error'), 'error', 8000);
         throw err;
       }
     }

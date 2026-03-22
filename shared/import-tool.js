@@ -1,4 +1,4 @@
-// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
 // Steps: (1) Pick file → (2) Map columns → (3) Preview + validate → (4) Import
@@ -454,11 +454,14 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       container.dataset.importedCount = importedCount;
       container.dataset.skippedCount  = skippedCount;
       render();
-      // Scroll container to top so done screen is visible
-      container.scrollTop = 0;
-      // Also scroll the parent modal if it exists
-      const parentModal = container.closest('[style*="overflow-y"]') || container.parentElement;
-      if (parentModal) parentModal.scrollTop = 0;
+      // Force all scrollable parents to top so done screen is visible
+      let el = container;
+      while (el) { el.scrollTop = 0; el = el.parentElement; }
+      // Auto-dispatch complete event after short delay so parent can navigate
+      setTimeout(() => {
+        const event = new CustomEvent('import:complete', { detail: { appType } });
+        container.dispatchEvent(event);
+      }, 2000);
     } catch (err) {
       progress.textContent = '';
       btn.disabled = false;

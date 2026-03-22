@@ -1,4 +1,4 @@
-// v3.3.8 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
+// v3.4.1 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21 -- 2026-03-21
 // ─── app-a-family-hub/js/screens/add-document.js ────────────────────────────
 // Add / Edit Document: person pill, doc type, expiry, alert toggles, Calendar sync
 
@@ -19,8 +19,9 @@ const ALERT_DAYS = [90, 60, 30];
 
 export async function renderAddDocument(container, params = {}) {
   const { docId, mode, personId: defaultPersonId } = params;
-  const isEdit = mode === 'edit' && docId;
-  let isViewMode = isEdit && mode !== 'edit';  // view by default, except when explicitly editing
+  const isExisting = !!docId;
+  const isEdit = isExisting;  // any existing doc can be edited
+  let isViewMode = isExisting && mode !== 'edit';  // view by default, edit only when explicitly requested
 
   const data = await getCachedTravelData();
   const { members = [], documents = [], customDocTypes = [] } = data || {};
