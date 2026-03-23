@@ -89,6 +89,33 @@ export async function renderAddTrip(container, params = {}) {
     renderStep();
   }
 
+  async function shareTripText() {
+    const member = members.find(m => m.id === state.personId);
+    const text = [
+      `✈️ *Travel Details: ${member?.name || 'Unknown'}*`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `🇮🇳 Departed India: ${formatDisplayDate(state.dateOutIndia)}`,
+      `🇶🇦 Arrived Qatar: ${formatDisplayDate(state.dateInQatar)}`,
+      state.dateOutQatar ? `🇶🇦 Left Qatar: ${formatDisplayDate(state.dateOutQatar)}` : `🇶🇦 Status: Still in Qatar`,
+      state.dateInIndia  ? `🇮🇳 Back in India: ${formatDisplayDate(state.dateInIndia)}` : '',
+      `⏱️ Duration: ${state.dateInQatar && state.dateOutQatar ? daysBetween(state.dateInQatar, state.dateOutQatar) + ' days' : daysBetween(state.dateInQatar, today()) + ' days so far'}`,
+      state.flightInward ? `✈️ Inward: ${state.flightInward}` : '',
+      state.flightOutward? `✈️ Outward: ${state.flightOutward}` : '',
+      state.reason       ? `📝 Reason: ${state.reason}` : '',
+      state.travelWith.length ? `👥 With: ${state.travelWith.map(id => members.find(m => m.id === id)?.name).join(', ')}` : '',
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `_Shared from Family Hub PWA_`
+    ].filter(Boolean).join('\n');
+
+    if (navigator.share) {
+      await navigator.share({ title: `Travel Details - ${member?.name}`, text }).catch(() => {});
+    } else {
+      const { copyToClipboard } = await import('../../../shared/utils.js');
+      const ok = await copyToClipboard(text);
+      showToast(ok ? 'Details copied to clipboard!' : 'Failed to copy', ok ? 'success' : 'error');
+    }
+  }
+
   function renderStep() {
     const stepContent = document.getElementById('step-content');
 
@@ -273,6 +300,12 @@ export async function renderAddTrip(container, params = {}) {
           ${row('Travelling with', travelWithNames.join(', '))}
         </div>
       </div>
+
+      <div style="margin-top:20px;display:flex;gap:10px;">
+        <button id="share-trip-btn" class="btn btn-secondary" style="flex:1;">📤 Share Details</button>
+        ${isViewMode ? `<button id="edit-trip-btn" class="btn btn-primary" style="flex:1;">📝 Edit Details</button>` : ''}
+      </div>
+
       <div id="save-error" style="color:var(--danger);font-size:13px;margin-top:12px;text-align:center;"></div>
     `;
   }

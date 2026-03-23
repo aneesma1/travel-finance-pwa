@@ -20,6 +20,7 @@ export async function renderTravelLog(container, params = {}) {
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">✈️ Travel Log</span>
+      <button class="app-header-action" id="header-export-btn" title="Export History">📤</button>
     </div>
     <div id="filter-bar-container"></div>
     <div id="log-content"></div>
@@ -37,7 +38,13 @@ export async function renderTravelLog(container, params = {}) {
   if (params.personId) setHashParams({ person: params.personId });
   const hashParams = getHashParams();
   const filterPerson = hashParams.person || '';
-  const filterYear   = hashParams.year   || String(currentYear());
+  // Default year logic: if current year has no data, default to 'all'
+  const hasCurrentYearData = trips.some(t => t.dateOutIndia?.startsWith(String(currentYear())));
+  const filterYear = hashParams.year || (hasCurrentYearData ? String(currentYear()) : 'all');
+
+  document.getElementById('header-export-btn')?.addEventListener('click', () => {
+    openTravelExportSheet(members, trips, data.documents || []);
+  });
 
   renderFilters(members, filterPerson, filterYear);
   renderTrips(members, trips, filterPerson, filterYear);
