@@ -9,8 +9,6 @@ import { renderAddTransaction } from './screens/add-transaction.js';
 import { renderTransactionView } from './screens/transaction-view.js';
 import { renderAnalytics }      from './screens/analytics.js';
 import { renderSettings }       from './screens/settings.js';
-import { renderAnalytics }      from './screens/analytics.js';
-import { renderSettings }       from './screens/settings.js';
 
 const SCREENS = {
   dashboard:       renderDashboard,

@@ -183,4 +183,4 @@ git checkout master
   - Added granular console logging (`[import-tool]`) to trace button clicks, progress, and errors during the import sequence.
   - Bumped SW to `v3.5.12` to ensure the logic update is pulled.
 
-- **Commit**: `[TBD]` — `v3.5.12: Fix Vault 404 (paths) & Travel Import (scoping/logging)`
+- **Commit**: `6e48e55` (master), `b2aa46a` (main) — `v3.5.12: Fix Vault 404 (paths) & Travel Import (scoping/logging)`
