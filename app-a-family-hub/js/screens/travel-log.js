@@ -22,18 +22,32 @@ export async function renderTravelLog(container, params = {}) {
       <span class="app-header-title">✈️ Travel Log</span>
       <button class="app-header-action" id="header-export-btn" title="Export History">📤</button>
     </div>
+    ${hasOrphaned ? `
+      <div id="migration-banner" style="background:#FEF3C7; border-bottom:1px solid #F59E0B; padding:10px 16px; display:flex; align-items:center; gap:12px;">
+        <span style="font-size:20px;">⚠️</span>
+        <div style="flex:1; font-size:12px; line-height:1.4; color:#92400E;">
+          <b>Missing trips?</b> Some records are still linked to your Contact list.
+        </div>
+        <button id="fix-silo-btn" class="btn" style="background:#F59E0B; color:#fff; padding:6px 12px; font-size:11px; font-weight:700;">FIX NOW</button>
+      </div>
+    ` : ''}
     <div id="filter-bar-container"></div>
     <div id="log-content"></div>
     <button class="fab" id="add-trip-fab">＋</button>
   `;
 
   document.getElementById('add-trip-fab').addEventListener('click', () => navigate('add-trip'));
+  document.getElementById('fix-silo-btn')?.addEventListener('click', () => navigate('settings', { tab: 'data' }));
 
   const data = await getCachedTravelData();
   if (!data) { showEmpty(document.getElementById('log-content'), 'No data available'); return; }
 
-  const { travelPersons = [], trips = [] } = data;
+  const { travelPersons = [], trips = [], members = [] } = data;
   const persons = travelPersons;
+
+  // Detect orphaned trips (linked to members but not travelPersons)
+  const tpIds = new Set(travelPersons.map(p => p.id));
+  const hasOrphaned = trips.some(t => t.personId && !tpIds.has(t.personId) && members.some(m => m.id === t.personId));
 
   // Merge any incoming params with URL hash
   if (params.personId) setHashParams({ person: params.personId });

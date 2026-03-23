@@ -206,3 +206,68 @@ export function onNetworkChange(callback) {
   window.addEventListener('online',  () => callback(true));
   window.addEventListener('offline', () => callback(false));
 }
+// ── Custom Modals (Attractive alternatives to prompt/confirm) ────────────────
+export function showConfirmModal(title, message, options = {}) {
+  const { onConfirm, onCancel, confirmText = 'Confirm', cancelText = 'Cancel', danger = false } = options;
+  
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10001';
+    overlay.innerHTML = `
+      <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
+        <div style="padding:20px 24px;">
+          <div style="font-size:17px; font-weight:700; margin-bottom:8px;">${title}</div>
+          <div style="font-size:14px; color:var(--text-secondary); line-height:1.5;">${message}</div>
+          <div style="margin-top:24px; display:flex; gap:12px;">
+            <button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>
+            <button id="modal-confirm" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" style="flex:1;">${confirmText}</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = (val) => {
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.remove(); resolve(val); }, 150);
+    };
+
+    overlay.querySelector('#modal-cancel').onclick = () => { if (onCancel) onCancel(); close(false); };
+    overlay.querySelector('#modal-confirm').onclick = () => { if (onConfirm) onConfirm(); close(true); };
+  });
+}
+
+export function showInputModal(title, label, defaultValue = '', options = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10001';
+    overlay.innerHTML = `
+      <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
+        <div style="padding:20px 24px;">
+          <div style="font-size:17px; font-weight:700; margin-bottom:16px;">${title}</div>
+          <label class="form-label">${label}</label>
+          <input type="text" id="modal-input" class="form-input" value="${defaultValue}" autocomplete="off" style="margin-top:4px;" />
+          <div style="margin-top:24px; display:flex; gap:12px;">
+            <button id="modal-cancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
+            <button id="modal-confirm" class="btn btn-primary" style="flex:1;">Save</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('#modal-input');
+    input.focus();
+    input.setSelectionRange(0, input.value.length);
+
+    const close = (val) => {
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.remove(); resolve(val); }, 150);
+    };
+
+    overlay.querySelector('#modal-cancel').onclick = () => close(null);
+    overlay.querySelector('#modal-confirm').onclick = () => close(input.value.trim());
+    input.onkeydown = (e) => { if (e.key === 'Enter') overlay.querySelector('#modal-confirm').click(); };
+  });
+}

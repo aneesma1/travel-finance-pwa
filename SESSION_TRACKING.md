@@ -222,8 +222,20 @@ git checkout master
 
 -   **Vault App: Category Formatting**:
     -   **Reverted Cleaning**: Removed the strict character-cleaning logic. Categories now support free-text input including spaces and numbers (e.g., "Home Rent 1") as requested by the user.
--   **Service Worker**: Bumped to `v3.5.18` across the suite.
--   **Commit**: `[TBD]` — `v3.5.18: Strict Travel Siloing and Vault UX Fixes`
+### UI Polish & Data Recovery (v3.5.19 · 2026-03-23)
+
+-   **Shared: Custom Modals**:
+    -   Implemented `showConfirmModal` and `showInputModal` in `shared/utils.js`.
+    -   Replaced unattractive browser `prompt()` and `confirm()` popups across the suite with these attractive, app-themed modal sheets.
+-   **Vault App: UX Improvements**:
+    -   **Edit Button**: Redesigned the "EDIT" button in `transaction-view.js` to be much more prominent (styled button with pencil icon).
+    -   **Category Manager**: Integrated new custom modals for Rename and Merge actions.
+-   **Travel App: Data Maintenance & Visibility**:
+    -   **Sync Tool**: Added "Sync Travelers from Contacts" in settings to repair trip links broken by v3.5.17 siloing.
+    -   **Name Cleanup**: Added "Split Combined Names" to automatically separate names like "A, B, C" and assign companions.
+    -   **Orphan Detection**: Added a warning banner in `travel-log.js` that detects if trips are missing due to siloing and guides the user to the fix.
+-   **Service Worker**: Bumped all apps to **v3.5.19**.
+-   **Commit**: `[TBD]` — `v3.5.19: UI Polish and Travel Hub Data Maintenance`
 
 ---
 
