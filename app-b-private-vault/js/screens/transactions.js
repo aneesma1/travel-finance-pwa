@@ -185,14 +185,11 @@ export async function renderTransactions(container) {
     document.getElementById('export-share').addEventListener('click', () => doExport('share'));
   }
 
-  // Retry up to 3 times if data not yet loaded from Drive
+  // Wait for data to be structurally ready (via global event)
   let data = await getCachedFinanceData();
   if (!data) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await new Promise(r => setTimeout(r, 600));
-      data = await getCachedFinanceData();
-      if (data) break;
-    }
+    await new Promise(r => window.addEventListener('finance-data-ready', r, { once: true }));
+    data = await getCachedFinanceData();
   }
   if (!data) {
     const wrap = document.getElementById('txn-list-wrap');
@@ -311,6 +308,7 @@ export async function renderTransactions(container) {
 
         <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Year</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" id="sheet-years">
+          <button class="sheet-pill ${!wYear?'active':''}" data-year="0">All</button>
           ${years.map(y => `<button class="sheet-pill ${Number(y)===wYear?'active':''}" data-year="${y}">${y}</button>`).join('')}
         </div>
 
