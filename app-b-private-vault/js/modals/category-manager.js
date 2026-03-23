@@ -2,10 +2,10 @@
 // ─── app-b-private-vault/js/modals/category-manager.js ───────────────────────
 // Category Manager Modal: Multi-select, Rename, Merge, Delete
 
-import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
-import { localSave } from '../../shared/sync-manager.js';
-import { showToast, uuidv4 } from '../../shared/utils.js';
-import { SmartInput } from '../../shared/smart-input.js';
+import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
+import { localSave } from '../../../shared/sync-manager.js';
+import { showToast, uuidv4 } from '../../../shared/utils.js';
+import { SmartInput } from '../../../shared/smart-input.js';
 
 export async function openCategoryManager(containerEl) {
   const data = await getCachedFinanceData();
