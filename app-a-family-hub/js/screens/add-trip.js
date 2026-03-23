@@ -23,7 +23,9 @@ export async function renderAddTrip(container, params = {}) {
   let isViewMode = isExisting && mode !== 'edit';  // view by default, edit when explicit
 
   const data = await getCachedTravelData();
-  const { members = [], trips = [] } = data || {};
+  const { travelPersons = [], trips = [] } = data || {};
+  // Fallback to shared members if no travelPersons exist yet (migration)
+  const persons = travelPersons.length ? travelPersons : (data?.members || []);
 
   // Load existing trip if editing
   let existingTrip = isExisting ? trips.find(t => t.id === tripId) : null;
@@ -39,6 +41,7 @@ export async function renderAddTrip(container, params = {}) {
     flightOutward:existingTrip?.flightOutward|| '',
     reason:       existingTrip?.reason       || '',
     travelWith:   existingTrip?.travelWith   || [],
+    destination:  existingTrip?.destination  || 'Qatar',
   };
 
   let currentStep = isViewMode ? (STEPS.length - 1) : 0;  // view starts on Review
@@ -120,52 +123,88 @@ export async function renderAddTrip(container, params = {}) {
     const stepContent = document.getElementById('step-content');
 
     switch (currentStep) {
-      case 0: renderPersonStep(stepContent, members); break;
+      case 0: renderPersonStep(stepContent, persons); break;
       case 1: renderDatesStep(stepContent); break;
       case 2: renderFlightsStep(stepContent); break;
-      case 3: renderReasonStep(stepContent, members); break;
-      case 4: renderReviewStep(stepContent, members); break;
+      case 3: renderReasonStep(stepContent, persons); break;
+      case 4: renderReviewStep(stepContent, persons); break;
     }
   }
 
   // ── Step 0: Person ──────────────────────────────────────────────────
-  function renderPersonStep(el, members) {
+  function renderPersonStep(el, persons) {
     el.innerHTML = `
       <div class="form-group">
         <label class="form-label">Who is travelling?</label>
         <div id="person-pills"></div>
       </div>
+      <div style="margin-top:12px;text-align:center;">
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px;" id="add-new-person-btn">+ Add New Travel Person</button>
+      </div>
     `;
     new PillSelect(document.getElementById('person-pills'), {
-      options: members.map(m => ({ value: m.id, label: m.name, emoji: m.emoji || '👤' })),
+      options: persons.map(m => ({ value: m.id, label: m.name, emoji: m.emoji || '👤' })),
       selected: state.personId,
       multi: false,
       color: 'indigo',
       onSelect: (val) => { state.personId = val || ''; }
     });
+
+    document.getElementById('add-new-person-btn').addEventListener('click', () => {
+      const name = prompt('Enter name of travel person:');
+      if (!name) return;
+      const newPerson = { id: uuidv4(), name: name.trim(), emoji: '👤', color: '#EEF2FF' };
+      saveNewPerson(newPerson);
+    });
+  }
+
+  async function saveNewPerson(person) {
+    try {
+      const newData = await localSave('travel', (remote) => {
+        const travelPersons = remote.travelPersons || remote.members || [];
+        travelPersons.push(person);
+        return { ...remote, travelPersons };
+      });
+      await setCachedTravelData(newData);
+      persons.push(person);
+      state.personId = person.id;
+      navigate('add-trip', params); // refresh with new person list
+    } catch { showToast('Failed to add person', 'error'); }
   }
 
   // ── Step 1: Dates ───────────────────────────────────────────────────
   function renderDatesStep(el) {
     el.innerHTML = `
       <div class="form-group">
+        <label class="form-label">Destination Country</label>
+        <div id="dest-input"></div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Date Out of India</label>
         <input type="date" class="form-input" id="dateOutIndia" value="${state.dateOutIndia}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Date Arrived in Qatar</label>
+        <label class="form-label">Date Arrived in ${state.destination}</label>
         <input type="date" class="form-input" id="dateInQatar" value="${state.dateInQatar}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Date Out of Qatar <span style="color:var(--text-muted);font-weight:400;">(leave blank if still in Qatar)</span></label>
+        <label class="form-label">Date Out of ${state.destination} <span style="color:var(--text-muted);font-weight:400;">(leave blank if still there)</span></label>
         <input type="date" class="form-input" id="dateOutQatar" value="${state.dateOutQatar}" />
       </div>
       <div class="form-group">
         <label class="form-label">Date Back in India <span style="color:var(--text-muted);font-weight:400;">(leave blank if not returned)</span></label>
-        <input type="date" class="form-input" id="dateInIndia" value="${state.dateInIndia}" />
+        <input type="date" class="date-input" id="dateInIndia" value="${state.dateInIndia}" />
       </div>
       <div id="days-computed" style="background:var(--primary-bg);border-radius:var(--radius-md);padding:12px 16px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;"></div>
     `;
+
+    new SmartInput(document.getElementById('dest-input'), {
+      suggestions: ['Qatar', 'UAE', 'Saudi Arabia', 'Oman', 'Bahrain', 'Kuwait', 'USA', 'UK', 'Canada'],
+      value: state.destination,
+      placeholder: 'e.g. Qatar',
+      onInput: (v) => { state.destination = v; renderDatesStep(el); },
+      onSelect: (v) => { state.destination = v; renderDatesStep(el); }
+    });
 
     ['dateOutIndia','dateInQatar','dateOutQatar','dateInIndia'].forEach(field => {
       const input = document.getElementById(field);
@@ -184,7 +223,7 @@ export async function renderAddTrip(container, params = {}) {
 
     if (state.dateInQatar && state.dateOutQatar) {
       const days = daysBetween(state.dateInQatar, state.dateOutQatar);
-      parts.push(`<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--primary);">${days}</div><div style="font-size:11px;color:var(--text-muted);font-weight:500;">Days in Qatar</div></div>`);
+      parts.push(`<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--primary);">${days}</div><div style="font-size:11px;color:var(--text-muted);font-weight:500;">Days in ${state.destination}</div></div>`);
     } else if (state.dateInQatar) {
       const days = daysBetween(state.dateInQatar, today());
       parts.push(`<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--success);">${days}</div><div style="font-size:11px;color:var(--text-muted);font-weight:500;">Days so far</div></div>`);
@@ -230,15 +269,15 @@ export async function renderAddTrip(container, params = {}) {
   }
 
   // ── Step 3: Reason + Travel With ────────────────────────────────────
-  function renderReasonStep(el, members) {
-    const otherMembers = members.filter(m => m.id !== state.personId);
+  function renderReasonStep(el, persons) {
+    const otherPersons = persons.filter(m => m.id !== state.personId);
 
     el.innerHTML = `
       <div class="form-group">
         <label class="form-label">Reason for Travel</label>
         <div id="reason-input"></div>
       </div>
-      ${otherMembers.length > 0 ? `
+      ${otherPersons.length > 0 ? `
         <div class="form-group">
           <label class="form-label">Travelling with</label>
           <div id="travel-with-pills"></div>
@@ -254,9 +293,9 @@ export async function renderAddTrip(container, params = {}) {
       onSelect: (v) => { state.reason = v; }
     });
 
-    if (otherMembers.length) {
+    if (otherPersons.length) {
       new PillSelect(document.getElementById('travel-with-pills'), {
-        options: otherMembers.map(m => ({ value: m.id, label: m.name, emoji: m.emoji || '👤' })),
+        options: otherPersons.map(m => ({ value: m.id, label: m.name, emoji: m.emoji || '👤' })),
         selected: state.travelWith,
         multi: true,
         color: 'indigo',
@@ -266,12 +305,12 @@ export async function renderAddTrip(container, params = {}) {
   }
 
   // ── Step 4: Review ──────────────────────────────────────────────────
-  function renderReviewStep(el, members) {
-    const member = members.find(m => m.id === state.personId);
-    const daysInQatar = state.dateInQatar && state.dateOutQatar
+  function renderReviewStep(el, persons) {
+    const person = persons.find(m => m.id === state.personId) || { name: 'Unknown', emoji: '👤' };
+    const daysInDest = state.dateInQatar && state.dateOutQatar
       ? daysBetween(state.dateInQatar, state.dateOutQatar) : null;
     const travelWithNames = (state.travelWith || [])
-      .map(id => members.find(m => m.id === id)?.name).filter(Boolean);
+      .map(id => persons.find(m => m.id === id)?.name).filter(Boolean);
 
     const row = (label, value) => value
       ? `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-light);">
@@ -283,16 +322,17 @@ export async function renderAddTrip(container, params = {}) {
     el.innerHTML = `
       <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
         <div style="background:var(--primary);padding:14px 20px;display:flex;align-items:center;gap:12px;">
-          <div style="font-size:28px;">${member?.emoji || '👤'}</div>
+          <div style="font-size:28px;">${person?.emoji || '👤'}</div>
           <div>
-            <div style="font-size:16px;font-weight:700;color:#fff;">${member?.name || 'Unknown'}</div>
-            ${daysInQatar !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysInQatar} days in Qatar</div>` : ''}
+            <div style="font-size:16px;font-weight:700;color:#fff;">${person?.name || 'Unknown'}</div>
+            ${daysInDest !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysInDest} days in ${state.destination}</div>` : ''}
           </div>
         </div>
         <div style="padding:0 16px 8px;">
+          ${row('Destination', state.destination)}
           ${row('Out of India', formatDisplayDate(state.dateOutIndia))}
-          ${row('Arrived Qatar', formatDisplayDate(state.dateInQatar))}
-          ${row('Left Qatar', state.dateOutQatar ? formatDisplayDate(state.dateOutQatar) : 'Still in Qatar')}
+          ${row('Arrived ' + state.destination, formatDisplayDate(state.dateInQatar))}
+          ${row('Left ' + state.destination, state.dateOutQatar ? formatDisplayDate(state.dateOutQatar) : 'Still there')}
           ${row('Back in India', state.dateInIndia ? formatDisplayDate(state.dateInIndia) : 'Not yet')}
           ${row('Inward Flight', state.flightInward)}
           ${row('Outward Flight', state.flightOutward)}
@@ -344,11 +384,12 @@ export async function renderAddTrip(container, params = {}) {
       id:           isEdit ? existingTrip.id : uuidv4(),
       timestamp:    isEdit ? existingTrip.timestamp : new Date().toISOString(),
       personId:     state.personId,
+      destination:  state.destination,
       dateOutIndia: state.dateOutIndia,
       dateInQatar:  state.dateInQatar,
       dateOutQatar: state.dateOutQatar || null,
       dateInIndia:  state.dateInIndia  || null,
-      daysInQatar:  daysInQatar,
+      daysInQatar:  daysInDest,
       flightInward: state.flightInward,
       flightOutward:state.flightOutward,
       reason:       state.reason,

@@ -242,8 +242,8 @@ function renderDataTab(data, members, container) {
 
   document.getElementById('import-btn').addEventListener('click', async () => {
     const freshData = await getCachedTravelData();
-    const freshMembers = freshData?.members || [];
-    openImportModal(freshData, freshMembers);
+    const freshPersons = freshData?.travelPersons || freshData?.members || [];
+    openImportModal(freshData, freshPersons);
   });
 
   document.getElementById('photo-zip-btn').addEventListener('click', async () => {
@@ -443,7 +443,7 @@ function showMirrorModal(snapshots) {
 }
 
 // ── Import modal ──────────────────────────────────────────────────────────────
-function openImportModal(data, members) {
+function openImportModal(data, persons) {
   const modal = document.getElementById('member-modal');
   modal.classList.remove('hidden');
   modal.innerHTML = `
@@ -481,30 +481,30 @@ function openImportModal(data, members) {
     existingData: data,
     onImportComplete: async (records, progressCb) => {
       importInProgress = true;
-      setStatus('Matching people…');
+      setStatus('Matching travel persons…');
 
-      const memberMap = {};
-      members.forEach(m => { memberMap[m.name.toLowerCase().trim()] = m.id; });
+      const personMap = {};
+      persons.forEach(m => { personMap[m.name.toLowerCase().trim()] = m.id; });
 
       const newMembersToCreate = {};
       records.forEach(rec => {
         const rawName = rec.personName?.trim();
         if (!rawName) return;
         const key = rawName.toLowerCase();
-        if (!memberMap[key] && !newMembersToCreate[key])
-          newMembersToCreate[key] = { id: uuidv4(), name: rawName };
+        if (!personMap[key] && !newPersonsToCreate[key])
+          newPersonsToCreate[key] = { id: uuidv4(), name: rawName };
       });
-      Object.values(newMembersToCreate).forEach(m => { memberMap[m.name.toLowerCase()] = m.id; });
+      Object.values(newPersonsToCreate).forEach(m => { personMap[m.name.toLowerCase()] = m.id; });
 
-      const newMemberList = Object.values(newMembersToCreate);
-      if (newMemberList.length)
-        setStatus('Creating members: ' + newMemberList.map(m => m.name).join(', '));
+      const newPersonList = Object.values(newPersonsToCreate);
+      if (newPersonList.length)
+        setStatus('Creating travel persons: ' + newPersonList.map(m => m.name).join(', '));
 
       let imported = 0, skipped = 0;
       const resolved = records.reduce((acc, rec) => {
         const rawName = rec.personName?.trim();
         if (!rawName) { skipped++; return acc; }
-        const personId = memberMap[rawName.toLowerCase()];
+        const personId = personMap[rawName.toLowerCase()];
         if (!personId) { skipped++; return acc; }
         acc.push({ ...rec, id: rec.id || uuidv4(), personId });
         return acc;
@@ -514,11 +514,11 @@ function openImportModal(data, members) {
 
       try {
         const newData = await localSave('travel', remote => {
-          const existingMembers = [...(remote.members||[])];
-          const existingIds = new Set(existingMembers.map(m => m.id));
-          newMemberList.forEach(m => {
+          const travelPersons = [...(remote.travelPersons || remote.members || [])];
+          const existingIds = new Set(travelPersons.map(m => m.id));
+          newPersonList.forEach(m => {
             if (!existingIds.has(m.id))
-              existingMembers.push({ id: m.id, name: m.name.trim(), emoji: '👤', color: '#EEF2FF' });
+              travelPersons.push({ id: m.id, name: m.name.trim(), emoji: '👤', color: '#EEF2FF' });
           });
           const trips = [...(remote.trips||[])];
           // Deduplication key: personId | YYYY-MM-DD
@@ -536,7 +536,7 @@ function openImportModal(data, members) {
             existingKeys.add(key);
             imported++;
           });
-          return { ...remote, members: existingMembers, trips };
+          return { ...remote, travelPersons, trips };
         });
         await setCachedTravelData(newData);
         const msg = imported > 0

@@ -32,7 +32,9 @@ export async function renderTravelLog(container, params = {}) {
   const data = await getCachedTravelData();
   if (!data) { showEmpty(document.getElementById('log-content'), 'No data available'); return; }
 
-  const { members = [], trips = [] } = data;
+  const { travelPersons = [], trips = [] } = data;
+  // Migration fallback: if no travelPersons, use members
+  const persons = travelPersons.length ? travelPersons : (data.members || []);
 
   // Merge any incoming params with URL hash
   if (params.personId) setHashParams({ person: params.personId });
@@ -43,11 +45,11 @@ export async function renderTravelLog(container, params = {}) {
   const filterYear = hashParams.year || (hasCurrentYearData ? String(currentYear()) : 'all');
 
   document.getElementById('header-export-btn')?.addEventListener('click', () => {
-    openTravelExportSheet(members, trips, data.documents || []);
+    openTravelExportSheet(persons, trips, data.documents || []);
   });
 
-  renderFilters(members, filterPerson, filterYear);
-  renderTrips(members, trips, filterPerson, filterYear);
+  renderFilters(persons, filterPerson, filterYear);
+  renderTrips(persons, trips, filterPerson, filterYear);
 
   function renderFilters(members, filterPerson, filterYear) {
     const bar = document.getElementById('filter-bar-container');
@@ -59,7 +61,7 @@ export async function renderTravelLog(container, params = {}) {
         <div class="filter-chips">
           <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Person</span>
           <button class="filter-chip ${!filterPerson ? 'active' : ''}" data-filter="person" data-value="">All</button>
-          ${members.map(m => `
+          ${persons.map(m => `
             <button class="filter-chip ${filterPerson === m.id ? 'active' : ''}" data-filter="person" data-value="${m.id}">
               ${m.emoji || '👤'} ${m.name}
             </button>
@@ -91,10 +93,10 @@ export async function renderTravelLog(container, params = {}) {
   let _tripPage = 1;
   const PAGE_SIZE = 25;
 
-  function renderTrips(members, trips, filterPerson, filterYear, resetPage = true) {
+  function renderTrips(persons, trips, filterPerson, filterYear, resetPage = true) {
     if (resetPage) _tripPage = 1;
     const logContent = document.getElementById('log-content');
-    const memberMap  = Object.fromEntries(members.map(m => [m.id, m]));
+    const personMap  = Object.fromEntries(persons.map(m => [m.id, m]));
 
     let filtered = [...trips].sort((a, b) => new Date(b.dateOutIndia) - new Date(a.dateOutIndia));
     if (filterPerson) filtered = filtered.filter(t => t.personId === filterPerson);
@@ -132,12 +134,13 @@ export async function renderTravelLog(container, params = {}) {
     const list = document.getElementById('trips-list');
 
     filtered.forEach((trip, idx) => {
-      const member = memberMap[trip.personId] || { name: 'Unknown', emoji: '👤', color: '#EEF2FF' };
+      const person = personMap[trip.personId] || { name: 'Unknown', emoji: '👤', color: '#EEF2FF' };
       const travelWith = (trip.travelWith || [])
-        .map(id => memberMap[id]?.name).filter(Boolean);
+        .map(id => personMap[id]?.name).filter(Boolean);
 
+      const dest = trip.destination || 'Qatar';
       const daysLabel = trip.daysInQatar != null
-        ? `${trip.daysInQatar}d in Qatar`
+        ? `${trip.daysInQatar}d in ${dest}`
         : trip.dateInQatar && !trip.dateOutQatar
           ? `${daysBetween(trip.dateInQatar, new Date().toISOString().split('T')[0])}d so far`
           : '--';
@@ -150,12 +153,12 @@ export async function renderTravelLog(container, params = {}) {
       row.className = 'swipe-row-container';
       row.innerHTML = `
         <div class="list-row trip-row" data-trip-id="${trip.id}">
-          <div class="person-avatar" style="background:${member.color || '#EEF2FF'};width:40px;height:40px;font-size:18px;flex-shrink:0;">
-            ${member.emoji || '👤'}
+          <div class="person-avatar" style="background:${person.color || '#EEF2FF'};width:40px;height:40px;font-size:18px;flex-shrink:0;">
+            ${person.emoji || '👤'}
           </div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:15px;font-weight:600;color:var(--text);">${member.name}</span>
+              <span style="font-size:15px;font-weight:600;color:var(--text);">${person.name}</span>
               ${statusDot}
               <span style="font-size:12px;color:var(--text-muted);">${trip.reason || ''}</span>
             </div>
