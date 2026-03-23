@@ -562,12 +562,12 @@ async function exportCSV(trips, deliver) {
 }
 
 // ── WhatsApp Text Copy ────────────────────────────────────────────────────────
-async function exportWhatsApp(trips, members) {
+async function exportWhatsApp(trips, persons) {
   // Group by person
   const byPerson = {};
   trips.forEach(t => {
     const pid = t.personId;
-    if (!byPerson[pid]) byPerson[pid] = { member: t._member, trips: [] };
+    if (!byPerson[pid]) byPerson[pid] = { person: t._person, trips: [] };
     byPerson[pid].trips.push(t);
   });
 
