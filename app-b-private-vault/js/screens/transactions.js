@@ -308,6 +308,7 @@ export async function renderTransactions(container) {
 
         <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Year</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" id="sheet-years">
+          <button class="sheet-pill ${!wYear?'active':''}" data-year="0">All</button>
           ${years.map(y => `<button class="sheet-pill ${Number(y)===wYear?'active':''}" data-year="${y}">${y}</button>`).join('')}
         </div>
 

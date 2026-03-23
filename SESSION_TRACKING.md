@@ -86,6 +86,14 @@ This document logs modifications made during the current development session. It
 ### Conclusion of Initial Audit
 The 10 outstanding issues listed in the `SESSION_HANDOVER.md` under the *Bug Fixes & Refactoring Needed* segment were checked off. The inspection revealed that all the logical incongruities and missing imports from the previous developer's session have actually already been rectified within the source files but just hadn't been marked as completed in their handover notes. 
 
+### User Testing Bug Fixes (v3.5.6)
+During the first user testing phase, several critical edge cases were discovered in the application. The following fixes were rapidly developed and integrated:
+- **Bug 1 (Vault Transactions Missing):** Solved an issue in `app-b-private-vault/js/screens/dashboard.js` (`txnRow`) where a single corrupted, empty, or incorrectly formatted date object passed into `t.date` threw a fatal `RangeError: Invalid time value` when trying to call `.toLocaleDateString('en-GB')`, silently crashing the rendering loop. Added `isNaN()` validation.
+- **Bug 2 (Vault Filter Sheet Missing "All" Year):** Fixed a logical omission in `app-b-private-vault/js/screens/transactions.js` where the `openFilterSheet` generator map did not inject an `--All--` pill for the top `sheet-years` list.
+- **Bug 3 (Vault Security Section Inactive):** Found that `openSecurityDashboard` inside `shared/security-dashboard.js` strictly required a parent modal named `member-modal` or `settings-modal`. Since App B uses an ID named `modal`, the function silently aborted. Updated the code to dynamically query `modal` properly.
+- **Bug 4 (Import Form Hanging on WebViews):** Solved an issue where the file picker `display:none` styling prevented Android WebView click-jacks from functioning. Updated `import-tool.js` CSS to `opacity:0;position:absolute;z-index:-1;` which triggers native OS file dialogues properly.
+- **Bug 5 (App Meta Info Bump):** Bumped the entire stack via the Python toolset from `v3.5.5` to `v3.5.6` matching the release timeframe.
+
 ---
 
 *Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*

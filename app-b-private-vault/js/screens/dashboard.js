@@ -402,7 +402,11 @@ export function txnRow(t, isLast = false) {
   const hasSpend  = t.amountSpend != null && t.amountSpend !== '';
   const hasIncome = t.income      != null && t.income !== '';
   const catEmoji  = categoryEmoji(t.category1);
-  const dateStr   = t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '--';
+  let dateStr = '--';
+  if (t.date) {
+    const d = new Date(t.date + 'T00:00:00');
+    if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  }
 
   return `
     <div class="txn-tap" data-id="${t.id}" style="

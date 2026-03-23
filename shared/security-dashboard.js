@@ -8,7 +8,7 @@
 import { getActiveSessions, getActivityLog, revokeSession, revokeAllSessions } from './security-log.js';
 
 export async function openSecurityDashboard(container) {
-  const modal = document.getElementById('member-modal') || document.getElementById('settings-modal');
+  const modal = document.getElementById('member-modal') || document.getElementById('settings-modal') || document.getElementById('modal');
   if (!modal) return;
 
   modal.classList.remove('hidden');

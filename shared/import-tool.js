@@ -80,7 +80,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
           <div style="font-size:13px;color:var(--text-muted);">.xlsx · .xls · .csv</div>
         </div>
 
-        <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="display:none;" />
+        <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="opacity:0;position:absolute;width:1px;height:1px;z-index:-1;overflow:hidden;" />
 
         <div id="file-error" style="color:var(--danger);font-size:13px;margin-top:12px;text-align:center;min-height:18px;"></div>
 
