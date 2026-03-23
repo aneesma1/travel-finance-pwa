@@ -104,4 +104,26 @@ During the first user testing phase, several critical edge cases were discovered
 
 ---
 
+### Bug Fixes — writeData Migration & Import Fix (v3.5.10 · 2026-03-23)
+
+- **`writeData is not defined` — Root Cause Fixed**: The core architectural issue was that several screen files were still importing and calling `writeData` from `shared/drive.js` directly, which is not intended to be called from UI screens. Migrated every remaining direct `writeData` call to `localSave` from `shared/sync-manager.js` across all affected files:
+  - `app-b-private-vault/js/screens/settings.js`
+  - `app-b-private-vault/js/screens/add-transaction.js`
+  - `app-a-family-hub/js/screens/settings.js`
+  - `app-a-family-hub/js/screens/person-profile.js`
+  - `app-a-family-hub/js/screens/add-document.js`
+  - `app-a-family-hub/js/screens/family-defaults.js`
+  - `app-a-family-hub/js/screens/add-trip.js`
+  - `app-a-family-hub/js/expiry-checker.js`
+  
+  Removed all now-unused `import { writeData }` lines from these files.
+
+- **Travel App Import — Column Mapping Bug Fixed**: The `autoMapColumns` function in `shared/import-tool.js` had a critical fuzzy-matching bug where all four date columns (`Date Out India`, `Date In Qatar`, `Date Out Qatar`, `Date In India`) would collapse onto the same first-matched source column because the old logic matched on any single keyword (e.g. the word "date"). Rewrote the function to:
+  1. Track already-used source column indices with a `Set` to prevent duplicate mappings.
+  2. Score each candidate by counting how many significant words match (requiring at least half the words to match), so each target column maps to the uniquely best-scoring source column.
+
+- **Commit**: `a824823` — `fix: migrate writeData to localSave across all screens; fix import column mapping`
+
+---
+
 *Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*
