@@ -68,8 +68,8 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         </div>
 
         <!-- Drop zone -->
-        <div id="drop-zone" style="
-          border:2px dashed var(--border); border-radius:var(--radius-lg);
+        <label for="import-file-input" id="drop-zone" style="
+          display:block; border:2px dashed var(--border); border-radius:var(--radius-lg);
           padding:40px 24px; text-align:center; cursor:pointer;
           transition:all 0.15s; background:var(--surface);
         ">
@@ -78,7 +78,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
             Tap to pick a file
           </div>
           <div style="font-size:13px;color:var(--text-muted);">.xlsx · .xls · .csv</div>
-        </div>
+        </label>
 
         <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="opacity:0;position:absolute;width:1px;height:1px;z-index:-1;overflow:hidden;" />
 
@@ -106,7 +106,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('import-file-input');
 
-    dropZone.addEventListener('click', () => fileInput.click());
+    // Native <label for> handles the click automatically
 
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();

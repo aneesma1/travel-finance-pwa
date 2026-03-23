@@ -1,11 +1,11 @@
-// v3.5.6 — 2026-03-23
+// v3.5.7 — 2026-03-23
 
 // ─── app-b-private-vault/sw.js ───────────────────────────────────────────────
 // Service Worker for Private Vault PWA
 
 'use strict';
 
-const CACHE_NAME    = 'private-vault-v3.5.6';
+const CACHE_NAME    = 'private-vault-v3.5.7';
 const STATIC_ASSETS = [
   './',
   './index.html',

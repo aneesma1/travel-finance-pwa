@@ -1,4 +1,4 @@
-<!-- v3.5.6 — 2026-03-23 -->
+<!-- v3.5.7 — 2026-03-23 -->
 <!-- version: v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -72,7 +72,7 @@
 <!-- ── App bootstrap ──────────────────────────────────────────────── -->
 <script type="module">
   import { handleOAuthCallback, isAuthenticated, startOAuthFlow } from '../shared/auth.js';
-  import { initDriveFolders, initDataFile, initMirrorFile, readData } from '../shared/drive.js';
+  import { initDriveFolders, initDataFile, initMirrorFile, readData, writeData } from '../shared/drive.js';
   import { initSyncManager, runBootIntegrityCheck, processDriveQueue, watchConnectivity as watchSync } from '../shared/sync-manager.js';
   import { restorePinFromDrive, syncPinToDrive } from './js/app-config.js';
   import { registerSession, logActivity, startHeartbeat, getUnseenHighRiskEvents } from '../shared/security-log.js';
