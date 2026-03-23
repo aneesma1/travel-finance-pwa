@@ -6,7 +6,6 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { PillSelect }  from '../../../shared/pill-select.js';

@@ -182,21 +182,46 @@ export function renderImportTool(container, { appType, existingData, onImportCom
 
   function autoMapColumns(sourceHeaders, targetCols) {
     const map = {};
-    targetCols.forEach(col => {
-      // Try exact match first, then fuzzy
-      const exact = sourceHeaders.findIndex(h =>
-        h.toLowerCase() === col.label.toLowerCase()
-      );
-      if (exact !== -1) { map[col.key] = exact; return; }
+    const usedIndices = new Set();
 
-      // Fuzzy: check if source header contains key words
-      const keywords = col.label.toLowerCase().split(/[\s\/]+/);
-      const fuzzy = sourceHeaders.findIndex(h => {
-        const hl = h.toLowerCase();
-        return keywords.some(kw => kw.length > 3 && hl.includes(kw));
+    targetCols.forEach(col => {
+      // Try exact match first (case insensitive)
+      let matchIdx = sourceHeaders.findIndex((h, idx) =>
+        !usedIndices.has(idx) && h.trim().toLowerCase() === col.label.toLowerCase()
+      );
+
+      if (matchIdx !== -1) {
+        map[col.key] = matchIdx;
+        usedIndices.add(matchIdx);
+        return;
+      }
+
+      // Fuzzy matching: find the source header with the most matching significant words
+      const targetWords = col.label.toLowerCase().split(/[\s\/]+/).filter(w => w.length > 2);
+      
+      let bestMatchIdx = -1;
+      let maxScore = 0;
+
+      sourceHeaders.forEach((h, idx) => {
+        if (usedIndices.has(idx)) return;
+        const hw = h.toLowerCase();
+        let score = 0;
+        targetWords.forEach(tw => {
+          if (hw.includes(tw)) score++;
+        });
+
+        if (score > maxScore && score >= targetWords.length / 2) { // At least half the words must match
+          maxScore = score;
+          bestMatchIdx = idx;
+        }
       });
-      if (fuzzy !== -1) map[col.key] = fuzzy;
+
+      if (bestMatchIdx !== -1) {
+        map[col.key] = bestMatchIdx;
+        usedIndices.add(bestMatchIdx);
+      }
     });
+
     return map;
   }
 

@@ -9,9 +9,10 @@ import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
 import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
 import {
-  writeData, downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
+  downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
   getMirrorSnapshots, restoreFromMirror
 } from '../../../shared/drive.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
@@ -798,7 +799,7 @@ export async function renderSettings(container, params = {}) {
           existingTransactions.map(t => `${t.date}|${t.description}|${t.amountSpend}|${t.income}`)
         );
 
-        const newData = await writeData('finance', (remote) => {
+        const newData = await localSave('finance', (remote) => {
           const txns = remote.transactions || [];
 
           records.forEach(rec => {

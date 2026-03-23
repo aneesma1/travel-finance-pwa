@@ -11,7 +11,7 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
-import { writeData } from '../../shared/drive.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { syncDocumentAlerts } from './calendar.js';
 import { daysFromToday, expiryStatus, showToast, isOnline } from '../../shared/utils.js';
 
@@ -168,7 +168,7 @@ async function fillMissingCalendarEvents(needed, data) {
       const merged = { ...doc.calEventIds, ...newEventIds };
 
       // Update in Drive (non-blocking)
-      const newData = await writeData('travel', (remote) => {
+      const newData = await localSave('travel', (remote) => {
         const docs = remote.documents || [];
         const idx  = docs.findIndex(d => d.id === doc.id);
         if (idx > -1) docs[idx] = { ...docs[idx], calEventIds: merged };

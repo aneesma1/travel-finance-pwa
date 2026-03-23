@@ -7,7 +7,6 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { uuidv4, showToast, copyToClipboard, today, daysFromToday, expiryStatus, expiryStatusColor } from '../../../shared/utils.js';
@@ -388,7 +387,7 @@ export async function renderPersonProfile(container, params = {}) {
     // Delete
     document.getElementById('delete-member-btn')?.addEventListener('click', async () => {
       if (!confirm(`Delete ${draft.name}'s profile? Their trip and document records will be kept.`)) return;
-      const newData = await writeData('travel', r => ({
+      const newData = await localSave('travel', r => ({
         ...r, members: (r.members || []).filter(m => m.id !== draft.id)
       }));
       await setCachedTravelData(newData);

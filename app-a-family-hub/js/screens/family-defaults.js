@@ -7,7 +7,6 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { uuidv4, showToast, copyToClipboard } from '../../../shared/utils.js';
