@@ -126,4 +126,28 @@ During the first user testing phase, several critical edge cases were discovered
 
 ---
 
+### Git Branch Sync Procedure (recorded 2026-03-23)
+
+This repo has **two branches**: `master` (working) and `main` (GitHub Pages / production display). They must always be kept in sync.
+
+**Symptom of drift**: GitHub shows a yellow banner — *"master had recent pushes — Compare & pull request"* — when `master` is ahead of `main`.
+
+**Fix / Standard procedure after every push**:
+```powershell
+# 1. Commit and push to master as normal
+git add -A
+git commit -m "message"
+git push origin master
+
+# 2. Immediately sync main
+git checkout main
+git merge master --no-edit
+git push origin main
+git checkout master
+```
+
+> A workflow file documenting this is stored at `.agent/workflows/git-push.md` and will be auto-applied by the agent on every future `/git-push` command.
+
+---
+
 *Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*
