@@ -27,19 +27,19 @@ export async function renderTransactionView(container, params = {}) {
   const amountSign  = isIncome && !isSpend ? '+' : isSpend ? '-' : '';
   const amountVal   = isIncome && !isSpend
     ? formatAmount(Number(t.income))
-    : isSpend ? formatAmount(Number(t.amountSpend)) : '--';
+    : isSpend ? formatAmount(Number(t.amountSpend)) : '0.00';
 
   container.innerHTML = `
     <div class="app-header">
       <button class="app-header-action" id="back-btn">←</button>
       <span class="app-header-title">Transaction</span>
-      <button class="app-header-action" id="edit-btn" style="font-size:13px;font-weight:700;color:var(--primary);">Edit</button>
+      <button class="app-header-action" id="edit-btn" style="font-size:14px;font-weight:700;color:var(--primary);padding:4px 8px;">EDIT</button>
     </div>
 
-    <div style="padding:20px 16px;display:flex;flex-direction:column;gap:12px;padding-bottom:100px;">
+    <div id="txn-snapshot-target" style="padding:20px 16px;display:flex;flex-direction:column;gap:12px;padding-bottom:100px;background:var(--bg);">
 
       <!-- Amount hero card -->
-      <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:24px 20px;text-align:center;">
+      <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:24px 20px;text-align:center;box-shadow:var(--shadow-sm);">
         <div style="font-size:36px;font-weight:700;color:${amountColor};">${amountSign}${amountVal}</div>
         <div style="font-size:14px;color:var(--text-secondary);margin-top:4px;">${t.currency || 'QAR'}</div>
         ${isIncome && isSpend ? `
@@ -51,10 +51,11 @@ export async function renderTransactionView(container, params = {}) {
       </div>
 
       <!-- Details card -->
-      <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
+      <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm);">
         ${row('📅', 'Date', formatDisplayDate(t.date))}
         ${row('📝', 'Description', t.description || '--')}
-        ${row('🏷️', 'Category', [t.category1, t.category2].filter(Boolean).join(' › ') || '--')}
+        ${row('🏷️', 'Primary Category', t.category1 || '--')}
+        ${t.category2 ? row('🏷️', 'Sub-Category', t.category2) : ''}
         ${row('🏦', 'Account', t.account || '--')}
         ${t.notes1 ? row('💬', 'Notes', t.notes1) : ''}
         ${row('🕐', 'Recorded', t.timestamp ? new Date(t.timestamp).toLocaleString() : '--')}
@@ -68,13 +69,30 @@ export async function renderTransactionView(container, params = {}) {
         </div>
       ` : ''}
 
-      <!-- Action buttons -->
-      <div style="display:flex;gap:10px;">
-        <button id="copy-btn" style="flex:1;padding:14px;border-radius:var(--radius-lg);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;">
-          📋 Copy for WhatsApp
-        </button>
-        <button id="delete-btn" style="padding:14px 18px;border-radius:var(--radius-lg);border:1.5px solid var(--danger-bg);background:var(--danger-bg);color:var(--danger);font-size:20px;cursor:pointer;">
-          🗑️
+      <!-- Share Options UI (not part of the snapshot) -->
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:10px;" id="share-controls">
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-left:4px;">Share & Export</div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button id="copy-btn" class="btn btn-secondary" style="font-size:13px;padding:12px 8px;">
+            📋 Copy Text
+          </button>
+          <button id="share-text-btn" class="btn btn-secondary" style="font-size:13px;padding:12px 8px;">
+            🔗 Share Text
+          </button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button id="save-image-btn" class="btn btn-secondary" style="font-size:13px;padding:12px 8px;">
+            🖼️ Save Image
+          </button>
+          <button id="share-image-btn" class="btn btn-secondary" style="font-size:13px;padding:12px 8px;">
+            📤 Share Image
+          </button>
+        </div>
+
+        <button id="delete-btn" style="margin-top:12px;padding:14px;border-radius:var(--radius-lg);border:1.5px solid #FEE2E2;background:#FEF2F2;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">
+          🗑️ Delete Transaction
         </button>
       </div>
 
@@ -91,35 +109,103 @@ export async function renderTransactionView(container, params = {}) {
   }
 
   document.getElementById('back-btn').addEventListener('click', () => navigate('transactions'));
-
   document.getElementById('edit-btn').addEventListener('click', () => {
     navigate('add-transaction', { txnId: t.id, mode: 'edit' });
   });
 
-  document.getElementById('copy-btn').addEventListener('click', async () => {
-    const lines = [
-      `💰 ${t.description || 'Transaction'}`,
-      `─────────────────`,
+  const getShareText = () => {
+    return [
+      `💰 *Transaction Details*`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `📝 Description: ${t.description || 'Transaction'}`,
       `📅 Date: ${formatDisplayDate(t.date)}`,
       isSpend  ? `💸 Spend:  ${t.currency} ${formatAmount(Number(t.amountSpend))}` : '',
       isIncome ? `💵 Income: ${t.currency} ${formatAmount(Number(t.income))}` : '',
       `🏦 Account: ${t.account || '--'}`,
-      `🏷️ Category: ${[t.category1, t.category2].filter(Boolean).join(' › ') || '--'}`,
+      `🏷️ Category: ${t.category1 || '--'}`,
+      t.category2 ? `🏷️ Sub-Cat:  ${t.category2}` : '',
       t.notes1 ? `💬 Notes: ${t.notes1}` : '',
-      `─────────────────`,
-      `Shared via Private Vault`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `_Shared via Private Vault_`
     ].filter(Boolean).join('\n');
+  };
 
+  document.getElementById('copy-btn').addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(lines);
-      showToast('Copied to clipboard! Paste in WhatsApp.', 'success');
+      await navigator.clipboard.writeText(getShareText());
+      showToast('Copied to clipboard!', 'success');
+    } catch { showToast('Copy failed', 'warning'); }
+  });
+
+  document.getElementById('share-text-btn').addEventListener('click', async () => {
+    if (navigator.share) {
+      await navigator.share({ title: 'Transaction Details', text: getShareText() }).catch(() => {});
+    } else {
+      document.getElementById('copy-btn').click();
+    }
+  });
+
+  const generateImage = async () => {
+    showToast('Generating image…', 'info', 2000);
+    // Dynamic import html2canvas if possible, or use a simple canvas approach.
+    // For now, let's use a robust native approach: capturing the element to canvas.
+    try {
+      if (!window.html2canvas) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+      const target = document.getElementById('txn-snapshot-target');
+      // Hide share controls during snapshot
+      const controls = document.getElementById('share-controls');
+      controls.style.display = 'none';
+      
+      const canvas = await window.html2canvas(target, {
+        backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim(),
+        scale: 2,
+        logging: false
+      });
+      controls.style.display = 'flex';
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      showToast('Image generation failed', 'error');
+      console.error(err);
+      return null;
+    }
+  };
+
+  document.getElementById('save-image-btn').addEventListener('click', async () => {
+    const dataUrl = await generateImage();
+    if (!dataUrl) return;
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `Txn_${t.date}_${t.description.replace(/\s+/g,'_').slice(0,20)}.png`;
+    a.click();
+    showToast('Image saved!', 'success');
+  });
+
+  document.getElementById('share-image-btn').addEventListener('click', async () => {
+    const dataUrl = await generateImage();
+    if (!dataUrl) return;
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], 'transaction.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Transaction' });
+      } else {
+        showToast('Direct file sharing not supported', 'warning');
+        document.getElementById('save-image-btn').click();
+      }
     } catch {
-      showToast('Copy failed -- try long-pressing the text', 'warning');
+      document.getElementById('save-image-btn').click();
     }
   });
 
   document.getElementById('delete-btn').addEventListener('click', async () => {
-    if (!confirm(`Delete "${t.description || 'this transaction'}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete this transaction?`)) return;
     try {
       const newData = await localSave('finance', remote => ({
         ...remote,
@@ -128,9 +214,7 @@ export async function renderTransactionView(container, params = {}) {
       await setCachedFinanceData(newData);
       showToast('Transaction deleted', 'success');
       navigate('transactions');
-    } catch (err) {
-      showToast('Delete failed: ' + err.message, 'error');
-    }
+    } catch (err) { showToast('Delete failed', 'error'); }
   });
 }
 
@@ -140,7 +224,7 @@ function row(icon, label, value) {
       <span style="font-size:18px;flex-shrink:0;margin-top:1px;">${icon}</span>
       <div style="flex:1;min-width:0;">
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px;">${label}</div>
-        <div style="font-size:14px;color:var(--text);word-break:break-word;">${value}</div>
+        <div style="font-size:14px;color:var(--text);word-break:break-word;font-weight:500;">${value}</div>
       </div>
     </div>
   `;

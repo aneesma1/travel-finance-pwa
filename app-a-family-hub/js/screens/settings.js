@@ -258,7 +258,7 @@ function renderDataTab(data, members, container) {
 
   document.getElementById('import-btn').addEventListener('click', async () => {
     const freshData = await getCachedTravelData();
-    const freshPersons = freshData?.travelPersons || freshData?.members || [];
+    const freshPersons = freshData?.travelPersons || [];
     openImportModal(freshData, freshPersons);
   });
 
@@ -427,7 +427,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.15 · 2026-03-23</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.18 · 2026-03-23</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
@@ -536,11 +536,22 @@ function openImportModal(data, persons) {
 
       let imported = 0, skipped = 0;
       const resolved = records.reduce((acc, rec) => {
-        const rawName = rec.personName?.trim();
-        if (!rawName) { skipped++; return acc; }
-        const personId = personMap[rawName.toLowerCase()];
+        const rawNames = (rec.personName || '').split(/[&,]+/).map(n => n.trim()).filter(Boolean);
+        if (!rawNames.length) { skipped++; return acc; }
+        
+        const mainName = rawNames[0].toLowerCase();
+        const personId = personMap[mainName];
         if (!personId) { skipped++; return acc; }
-        acc.push({ ...rec, id: rec.id || uuidv4(), personId });
+        
+        // Resolve others as travelWith IDs
+        const travelWithIds = rawNames.slice(1).map(n => personMap[n.toLowerCase()]).filter(Boolean);
+        
+        acc.push({ 
+          ...rec, 
+          id: rec.id || uuidv4(), 
+          personId,
+          travelWith: [...new Set([...(rec.travelWith || []), ...travelWithIds])]
+        });
         return acc;
       }, []);
 
@@ -548,7 +559,7 @@ function openImportModal(data, persons) {
 
       try {
         const newData = await localSave('travel', remote => {
-          const travelPersons = [...(remote.travelPersons || remote.members || [])];
+          const travelPersons = [...(remote.travelPersons || [])];
           const existingIds = new Set(travelPersons.map(m => m.id));
           newPersonList.forEach(m => {
             if (!existingIds.has(m.id))
