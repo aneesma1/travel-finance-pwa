@@ -150,4 +150,37 @@ git checkout master
 
 ---
 
-*Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*
+### Category Manager Redesign & Import Fixes (v3.5.11 · 2026-03-23)
+
+- **Vault App: Category Manager Redesign**:
+  - Replaced the dedicated screen-based category manager with a modern **Modal Sheet** (`app-b-private-vault/js/modals/category-manager.js`).
+  - Implemented **Multi-select** mode with a floating action bar for bulk operations.
+  - Added **Merge Selected** functionality to consolidate multiple categories into one.
+  - Added **Rename** and **Bulk Delete** with confirmation prompts.
+  - Removed all **hardcoded defaults** for Categories and Accounts from `add-transaction.js`, `settings.js`, and `dashboard.js`. The app now relies entirely on user-defined data stored in the database.
+  - Integrated `SmartInput` with autosuggestions for adding new categories.
+
+- **Travel App: Import Logic Fixed**:
+  - Resolved "Import not happening" bug caused by a duplicate `#member-modal` div in `settings.js` conflicting with the global container.
+  - Improved `normaliseDate` in `shared/import-tool.js` to handle `YYYY/MM/DD`, `DD.MM.YYYY`, and `DD-MM-YYYY` formats.
+  - Enhanced error logging and deduplication logic in `settings.js` to provide better feedback on failed records.
+
+- **Service Worker & Caching**:
+  - Bumped `CACHE_NAME` to `v3.5.11` in both apps to force re-caching of improved logic and the new category manager modal.
+  - Added `./js/modals/category-manager.js` to the `STATIC_ASSETS` list for offline access.
+
+- **Commit**: `f888ddb` (master), `e95a486` (main) — `v3.5.11: Redesign Category Manager (Vault) & Fix Import (Travel)`
+
+### Import Path & Scoping Fixes (v3.5.12 · 2026-03-23)
+
+- **Vault App: Fix 404 for category-manager.js**:
+  - Found that relative import paths in `modals/category-manager.js` were only going 2 levels up (`../../shared/`) instead of the required 3 (`../../../shared/`) to reach the root-level `shared` directory.
+  - Corrected all shared imports in the modal file.
+  - Updated `index.html` version strings and bumped SW to `v3.5.12`.
+
+- **Travel App: Fix Import Hang**:
+  - Refactored `shared/import-tool.js` to use scoped queries (`container.querySelector`) instead of global lookups (`document.getElementById`). This prevents potential selection of hidden or duplicate elements with generic IDs like `import-btn`.
+  - Added granular console logging (`[import-tool]`) to trace button clicks, progress, and errors during the import sequence.
+  - Bumped SW to `v3.5.12` to ensure the logic update is pulled.
+
+- **Commit**: `[TBD]` — `v3.5.12: Fix Vault 404 (paths) & Travel Import (scoping/logging)`

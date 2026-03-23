@@ -458,14 +458,22 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       </div>
     `;
 
-    document.getElementById('back-to-map').addEventListener('click', () => { step = 'map'; render(); });
-    document.getElementById('import-btn').addEventListener('click', () => doImport(valid));
+    container.querySelector('#back-to-map').addEventListener('click', () => { step = 'map'; render(); });
+    container.querySelector('#import-btn').addEventListener('click', () => {
+      console.info('[import-tool] Import button clicked');
+      doImport(valid);
+    });
   }
 
   // ── Step 4: Import ─────────────────────────────────────────────────────────
   async function doImport(validRows) {
-    const btn = document.getElementById('import-btn');
-    const progress = document.getElementById('import-progress');
+    const btn = container.querySelector('#import-btn');
+    const progress = container.querySelector('#import-progress');
+    if (!btn || !progress) {
+      console.error('[import-tool] Critical UI elements missing in doImport');
+      return;
+    }
+    console.info('[import-tool] Starting import of', validRows.length, 'rows');
     btn.disabled = true;
     btn.textContent = '⏳ Importing…';
     btn.style.opacity = '0.7';
@@ -482,11 +490,13 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       let skippedCount  = 0;
 
       const result = await onImportComplete(records, (imp, skp) => {
+        console.log('[import-tool] Progress:', imp, 'imported,', skp, 'skipped');
         importedCount = imp;
         skippedCount  = skp;
         progress.textContent = `Saved ${imp} records…`;
       });
 
+      console.info('[import-tool] Import complete. result:', result);
       step = 'done';
       container.dataset.importedCount = importedCount;
       container.dataset.skippedCount  = skippedCount;
@@ -496,14 +506,16 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       while (el) { el.scrollTop = 0; el = el.parentElement; }
       // Auto-dispatch complete event after short delay so parent can navigate
       setTimeout(() => {
+        console.log('[import-tool] Dispatching import:complete');
         const event = new CustomEvent('import:complete', { detail: { appType } });
         container.dispatchEvent(event);
       }, 2000);
     } catch (err) {
+      console.error('[import-tool] doImport caught error:', err);
       progress.textContent = '';
       btn.disabled = false;
       btn.textContent = 'Retry Import';
-      document.getElementById('back-to-map').insertAdjacentHTML('afterend',
+      container.querySelector('#back-to-map').insertAdjacentHTML('afterend',
         `<div style="color:var(--danger);font-size:13px;margin-bottom:8px;">Import failed: ${err.message}</div>`
       );
     }
