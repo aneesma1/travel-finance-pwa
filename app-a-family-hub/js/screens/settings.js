@@ -518,13 +518,20 @@ function openImportModal(data, members) {
           const existingIds = new Set(existingMembers.map(m => m.id));
           newMemberList.forEach(m => {
             if (!existingIds.has(m.id))
-              existingMembers.push({ id: m.id, name: m.name, emoji: '👤', color: '#EEF2FF' });
+              existingMembers.push({ id: m.id, name: m.name.trim(), emoji: '👤', color: '#EEF2FF' });
           });
           const trips = [...(remote.trips||[])];
-          const existingKeys = new Set(trips.map(t => t.personId+'|'+t.dateOutIndia));
+          // Deduplication key: personId | YYYY-MM-DD
+          const existingKeys = new Set(trips.map(t => (t.personId||'').trim() + '|' + (t.dateOutIndia||'').trim()));
+          
           resolved.forEach(rec => {
-            const key = rec.personId+'|'+rec.dateOutIndia;
+            const pid = (rec.personId || '').trim();
+            const doi = (rec.dateOutIndia || '').trim();
+            if (!pid || !doi) { skipped++; return; }
+            
+            const key = pid + '|' + doi;
             if (existingKeys.has(key)) { skipped++; return; }
+            
             trips.push(rec);
             existingKeys.add(key);
             imported++;
@@ -533,8 +540,8 @@ function openImportModal(data, members) {
         });
         await setCachedTravelData(newData);
         const msg = imported > 0
-          ? '✅ '+imported+' trips imported!'+(skipped>0?' ('+skipped+' duplicates skipped)':'')
-          : '⚠️ 0 imported — all '+skipped+' already exist';
+          ? '✅ ' + imported + ' trips imported!' + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
+          : '⚠️ 0 imported — all ' + skipped + ' already exist';
         setStatus(msg, imported > 0 ? 'var(--success)' : 'var(--warning)');
         progressCb(imported, skipped);
         importInProgress = false;
@@ -542,7 +549,8 @@ function openImportModal(data, members) {
         return { imported, skipped };
       } catch (err) {
         importInProgress = false;
-        setStatus('❌ Failed: '+(err.message||'Unknown'), 'var(--danger)');
+        console.error('[travel-import] Save failed:', err);
+        setStatus('❌ Failed: ' + (err.message || 'Unknown error during save'), 'var(--danger)');
         throw err;
       }
     }

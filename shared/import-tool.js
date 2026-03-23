@@ -347,12 +347,12 @@ export function renderImportTool(container, { appType, existingData, onImportCom
 
   function normaliseDate(raw) {
     if (!raw) return null;
-    const s = String(raw).trim();
+    let s = String(raw).trim();
 
     // Already YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
-    // DD/MM/YYYY or DD-MM-YYYY
+    // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
     const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
     if (dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
 
@@ -360,10 +360,18 @@ export function renderImportTool(container, { appType, existingData, onImportCom
     const mdy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if (mdy) return `${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
 
+    // YYYY/MM/DD or YYYY.MM.DD
+    const ymd = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+    if (ymd) return `${ymd[1]}-${ymd[2].padStart(2,'0')}-${ymd[3].padStart(2,'0')}`;
+
     // Try native Date parse as last resort
     const d = new Date(s);
-    if (!isNaN(d)) return d.toISOString().split('T')[0];
+    if (!isNaN(d.getTime())) {
+      const yr = d.getFullYear();
+      if (yr > 1900 && yr < 2100) return d.toISOString().split('T')[0];
+    }
 
+    console.warn('[import-tool] Failed to normalise date:', raw);
     return null;
   }
 

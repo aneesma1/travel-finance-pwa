@@ -5,7 +5,7 @@
 
 'use strict';
 
-const CACHE_NAME    = 'private-vault-v3.5.10';
+const CACHE_NAME    = 'private-vault-v3.5.11';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   './js/screens/transactions.js',
   './js/screens/analytics.js',
   './js/screens/settings.js',
+  './js/modals/category-manager.js',
   '../shared/utils.js',
   '../shared/auth.js',
   '../shared/drive.js',

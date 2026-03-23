@@ -13,9 +13,6 @@ import { renderPhotoSlots } from '../../../shared/photo-picker.js';
 import { SmartInput }  from '../../../shared/smart-input.js';
 import { uuidv4, today, showToast, formatAmount } from '../../../shared/utils.js';
 
-const DEFAULT_CATEGORIES = ['Food','Groceries','Rent','Salary','Transport','Medical','Education','Shopping','Utilities','Travel','Entertainment','Transfer','Investment','Insurance','Freelance','Other'];
-const DEFAULT_ACCOUNTS   = ['Cash','Card','Bank','Other'];
-
 export async function renderAddTransaction(container, params = {}) {
   const { txnId, mode } = params;
   const isEdit = mode === 'edit' && txnId;
@@ -25,9 +22,9 @@ export async function renderAddTransaction(container, params = {}) {
 
   const existing = isEdit ? transactions.find(t => t.id === txnId) : null;
 
-  // Merge saved categories with defaults
-  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...savedCats])];
-  const allAccounts   = [...new Set([...DEFAULT_ACCOUNTS,   ...savedAccounts])];
+  // Rely on saved categories/accounts from data
+  const allCategories = [...new Set(savedCats)].sort();
+  const allAccounts   = [...new Set(savedAccounts.length ? savedAccounts : ['Cash', 'Card', 'Bank'])].sort();
 
   // Smart-search suggestions from history
   const descSuggestions = [...new Set(transactions.map(t => t.description).filter(Boolean))];
@@ -42,7 +39,7 @@ export async function renderAddTransaction(container, params = {}) {
     category1:   existing?.category1   || '',
     category2:   existing?.category2   || '',
     notes1:      existing?.notes1      || '',
-    account:     existing?.account     || 'Card',
+    account:     existing?.account     || (allAccounts[0] || 'Cash'),
     photos:      existing?.photos      || [],
   };
 
@@ -236,7 +233,7 @@ export async function renderAddTransaction(container, params = {}) {
   function getModule() {
     return { categoryEmoji: (cat) => {
       const map = { 'Food':'🍽️','Groceries':'🛒','Rent':'🏠','Salary':'💵','Transport':'🚗','Medical':'🏥','Education':'📚','Shopping':'🛍️','Utilities':'⚡','Travel':'✈️','Entertainment':'🎬','Transfer':'🔄','Investment':'📈','Insurance':'🛡️','Freelance':'💻','Other':'📌' };
-      return map[cat] || '📌';
+      return map[cat] || '🏷️';
     }};
   }
 
