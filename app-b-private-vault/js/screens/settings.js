@@ -8,12 +8,15 @@
 import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '../../../shared/db.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
 import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
+import { clearAuth, getUser } from '../../../shared/auth.js';
 import {
   downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
   getMirrorSnapshots, restoreFromMirror
 } from '../../../shared/drive.js';
+import {
+  currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard
+} from '../../../shared/utils.js';
 import { localSave } from '../../../shared/sync-manager.js';
-import { clearAuth, getUser } from '../../../shared/auth.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
@@ -146,6 +149,21 @@ export async function renderSettings(container, params = {}) {
         </div>
         ${data?.lastSync ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>` : ''}
       </div>
+
+      <div class="section-title" style="color:var(--danger);margin-top:24px;">⛔ Danger Zone</div>
+      <div class="card" style="margin:0 16px;border:1px solid var(--danger);background:rgba(220,38,38,0.05);">
+        <div class="list-row" id="reset-db-btn" style="border:none;border-radius:var(--radius-lg);">
+          <span style="font-size:20px;">🔥</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;color:var(--danger);">Reset All Data</div>
+            <div style="font-size:11px;color:var(--text-muted);">Permanently delete all finance records.</div>
+          </div>
+          <span style="color:var(--danger);font-weight:700;font-size:12px;">RESET</span>
+        </div>
+      </div>
+      <div style="padding:12px 24px;font-size:11px;color:var(--text-muted);line-height:1.4;">
+        ⚠️ Resetting will wipe your local cache <b>and</b> your Drive mirror. This is irreversible. Please <b>Backup Now</b> before resetting.
+      </div>
     `;
 
     // Open Category Manager Modal
@@ -194,6 +212,24 @@ export async function renderSettings(container, params = {}) {
       if (!confirm('Clear local cache? Data will be re-downloaded from Drive on next open.')) return;
       await clearAllCachedData();
       showToast('Cache cleared', 'success');
+    });
+
+    document.getElementById('reset-db-btn').addEventListener('click', async () => {
+      if (!confirm('⚠️ RESET DATABASE?\n\nThis will PERMANENTLY DELETE all your transactions, categories, and account settings.\n\nHave you taken a backup first?')) return;
+      if (!confirm('SECOND CONFIRMATION:\n\nThis action cannot be undone. All your data in the cloud (Google Drive) will also be wiped out. Are you absolutely sure?')) return;
+      if (!confirm('FINAL WARNING:\n\nType OK in your mind and click OK to DESTROY all records.')) return;
+
+      try {
+        showToast('Resetting database…', 'info', 3000);
+        // Wipe remote first (empty object)
+        await localSave('finance', () => ({ transactions: [], categories: [], accounts: [] }));
+        // Wipe local
+        await clearAllCachedData();
+        showToast('Database reset successfully', 'success');
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (err) {
+        showToast('Reset failed: ' + err.message, 'error');
+      }
     });
   }
 
@@ -541,7 +577,7 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.5.9 · 2026-03-23</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.5.15 · 2026-03-23</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
       </div>
