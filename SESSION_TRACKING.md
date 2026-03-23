@@ -96,6 +96,12 @@ During the first user testing phase, several critical edge cases were discovered
 - **Family Hub Import File Picker (Mobile)**: User reported file picker still unresponsive. Replaced programmatic `.click()` on hidden input with a native HTML `<label for="import-file-input">` wrapper around the drop zone. This guarantees native browser focus forwarding which bypasses WebView popup/click restrictions.
 - **Service Worker Cache / "No changes visible"**: User reported no changes were reflecting on their device even after reload. Due to PWA caching, `v3.5.5` files were still loading, compounded by `writeData` crash throwing errors in the background. Manually bumped all HTML headers, App Info screens, and `sw.js` `CACHE_NAME` strings to **v3.5.7** to forcefully trigger the SW `activate` sequence and wipe old caches. This will guarantee `v3.5.7` deployment visible to the user.
 
+### Final Polishing & Edge Cases (v3.5.8)
+- **Null Object Rendering Crash**: In `app-b-private-vault/js/screens/transactions.js` and `dashboard.js`, testing revealed an edge case where if `data.transactions` contained a `null` unparsable item, `t.currency` would throw a fatal `TypeError` midway through `renderList()`. This resulted in the PWA rendering a completely permanent blank screen for the user right under the filter bar. Injected `if (!t) return false;` rules and a defensive HTML-rendering `try/catch` block explicitly to print frontend exceptions.
+- **Aggressive WebView File Picker Isolation**: Found that the programmatic `<label>` click workaround from v3.5.7 *still* hung on extremely strict WebView wrappers (which often block synthesized UI events from labels to inputs with `opacity: 0` or `z-index: -1`). Completely reconstructed `shared/import-tool.js` `drop-zone` by implementing full `position: relative` isolation and expanding the `type="file"` input 100% physically over the UI with `opacity: 0.01; z-index: 10`. This mandates that any tap strictly hits the `HTMLInputElement` bounds natively, triggering the OS prompt.
+- **Force Service-Worker Invalidation**: Upgraded HTML comments, `settings.js` app-info strings, and `sw.js` cache hashes to **v3.5.8** to force a guaranteed rehydration of the cache.
+- Successfully merged branch `master` into branch `main` to align GitHub Pages' production tracking URL seamlessly.
+
 ---
 
 *Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*
