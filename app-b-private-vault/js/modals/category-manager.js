@@ -150,20 +150,21 @@ export async function openCategoryManager(containerEl) {
     const items = [...selected];
     const totalUsage = transactions.filter(t => items.includes(t.category1) || items.includes(t.category2)).length;
     
-    let msg = `Delete ${items.length} categories?`;
+    let msg = `Are you sure you want to delete ${items.length} categories?`;
     if (totalUsage > 0) {
-      msg += `\nWarning: ${totalUsage} transactions will be left without these categories.`;
+      msg += `<br/><br/><b style="color:var(--danger)">Warning:</b> ${totalUsage} transactions use these categories. They will be left blank.`;
     }
 
-    if (!confirm(msg)) return;
+    const { showConfirmModal } = await import('../../../shared/utils.js');
+    const ok = await showConfirmModal('Delete Categories', msg, { confirmText: 'Delete', danger: true });
+    if (!ok) return;
 
     try {
       const newData = await localSave('finance', r => {
         const remainingCats = (r.categories || []).filter(c => !items.includes(c));
         const updatedTxns = (r.transactions || []).map(t => {
-          let modified = false;
-          if (items.includes(t.category1)) { t.category1 = ''; modified = true; }
-          if (items.includes(t.category2)) { t.category2 = ''; modified = true; }
+          if (items.includes(t.category1)) t.category1 = '';
+          if (items.includes(t.category2)) t.category2 = '';
           return t;
         });
         return { ...r, categories: remainingCats, transactions: updatedTxns };
@@ -186,23 +187,26 @@ export async function openCategoryManager(containerEl) {
       return;
     }
 
-    // Modal within modal for selection? Or simple prompt?
-    // Let's use a simple picker
-    const target = prompt(`Merge ${items.length} categories into which existing one?\nOptions: ${others.join(', ')}`);
-    if (!target || !others.includes(target)) {
-      if (target) showToast('Invalid target category', 'warning');
-      return;
+    const { showInputModal, showConfirmModal } = await import('../../../shared/utils.js');
+    const target = await showInputModal('Merge Categories', `Merge ${items.length} items into:`, others[0]);
+    if (!target) return;
+    
+    if (!others.includes(target)) {
+      const ok = await showConfirmModal('Create & Merge?', `"${target}" doesn't exist. Create it and merge selected items into it?`);
+      if (!ok) return;
     }
 
     try {
       const newData = await localSave('finance', r => {
-        const remainingCats = (r.categories || []).filter(c => !items.includes(c));
+        let finalCats = (r.categories || []).filter(c => !items.includes(c));
+        if (!finalCats.includes(target)) finalCats.push(target);
+        
         const updatedTxns = (r.transactions || []).map(t => {
           if (items.includes(t.category1)) t.category1 = target;
           if (items.includes(t.category2)) t.category2 = target;
           return t;
         });
-        return { ...r, categories: remainingCats, transactions: updatedTxns };
+        return { ...r, categories: finalCats.sort(), transactions: updatedTxns };
       });
       await setCachedFinanceData(newData);
       cats = newData.categories;
@@ -214,9 +218,10 @@ export async function openCategoryManager(containerEl) {
   }
 
   async function promptRename(oldName) {
-    const newName = prompt('Rename "' + oldName + '" to:', oldName);
-    if (!newName || newName.trim() === oldName) return;
-    const val = newName.trim();
+    const { showInputModal } = await import('../../../shared/utils.js');
+    const val = await showInputModal('Rename Category', 'New name for "' + oldName + '":', oldName);
+    if (!val || val === oldName) return;
+    
     if (val.length > 25) { showToast('Name too long', 'warning'); return; }
     if (cats.includes(val)) { showToast('Name already exists', 'warning'); return; }
 

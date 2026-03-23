@@ -208,6 +208,29 @@ function renderDataTab(data, members, container) {
       </div>
     </div>
 
+    <div class="section-title" style="margin-top:24px;">🛠️ Data Maintenance</div>
+    <div class="card" style="margin:0 16px;">
+      <div class="list-row" id="sync-travelers-btn" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
+        <span style="font-size:20px;">🔄</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Sync Travelers from Contacts</div>
+          <div style="font-size:12px;color:var(--text-muted);">Recover trips hidden by data siloing</div>
+        </div>
+        <span style="color:var(--primary);font-weight:600;font-size:12px;">SYNC</span>
+      </div>
+      <div class="list-row" id="fix-combined-names-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
+        <span style="font-size:20px;">✂️</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Split Combined Names</div>
+          <div style="font-size:12px;color:var(--text-muted);">Fix names like "A, B, C" in your list</div>
+        </div>
+        <span style="color:var(--primary);font-weight:600;font-size:12px;">FIX</span>
+      </div>
+    </div>
+    <div style="padding:10px 24px;font-size:11px;color:var(--text-muted);line-height:1.4;">
+      ℹ️ In v3.5.17, Travel data was siloed. Use <b>Sync</b> to link your existing trips back to your contacts.
+    </div>
+
     <div class="section-title" style="color:var(--danger);margin-top:24px;">⛔ Danger Zone</div>
     <div class="card" style="margin:0 16px;border:1px solid var(--danger);background:rgba(220,38,38,0.05);">
       <div class="list-row" id="reset-db-btn" style="border:none;border-radius:var(--radius-lg);">
@@ -302,6 +325,109 @@ function renderDataTab(data, members, container) {
       URL.revokeObjectURL(a.href);
       showToast('✅ '+count+' photos exported', 'success');
     } catch (err) { showToast('ZIP failed: '+err.message, 'error'); }
+  });
+
+  document.getElementById('sync-travelers-btn').addEventListener('click', async () => {
+    const { showConfirmModal } = await import('../../../shared/utils.js');
+    const ok = await showConfirmModal('Sync Data', 'This will scan all existing trips and link them to your Travel list. If some travelers are missing, they will be copied from your Contact list. Continue?');
+    if (!ok) return;
+
+    try {
+      showToast('Syncing data…', 'info', 3000);
+      const newData = await localSave('travel', remote => {
+        const members = remote.members || [];
+        const travelPersons = [...(remote.travelPersons || [])];
+        const trips = [...(remote.trips || [])];
+        
+        // 1. Ensure all members exist in travelPersons (by name)
+        members.forEach(m => {
+          if (!travelPersons.some(tp => tp.name.toLowerCase() === m.name.toLowerCase())) {
+            travelPersons.push({ 
+              id: 'tp-' + uuidv4().slice(0,8), 
+              name: m.name, 
+              emoji: m.emoji || '👤', 
+              color: m.color || '#EEF2FF',
+              _migratedFrom: m.id 
+            });
+          }
+        });
+
+        // Create a name-to-TP-ID map
+        const nameToId = {};
+        travelPersons.forEach(tp => { nameToId[tp.name.toLowerCase()] = tp.id; });
+        // Create a MemberID-to-TP-ID map
+        const memberToTpId = {};
+        members.forEach(m => { 
+          const targetId = nameToId[m.name.toLowerCase()];
+          if (targetId) memberToTpId[m.id] = targetId;
+        });
+
+        // 2. Update trips
+        trips.forEach(t => {
+          // If personId points to a member, redirect it to TP
+          if (memberToTpId[t.personId]) t.personId = memberToTpId[t.personId];
+          // Update travelWith array similarly
+          if (t.travelWith) {
+            t.travelWith = t.travelWith.map(id => memberToTpId[id] || id);
+          }
+        });
+
+        return { ...remote, travelPersons, trips };
+      });
+      await setCachedTravelData(newData);
+      showToast('✅ Data synced successfully!', 'success');
+      setTimeout(() => navigate('travel-log'), 1000);
+    } catch (err) { showToast('Sync failed: ' + err.message, 'error'); }
+  });
+
+  document.getElementById('fix-combined-names-btn').addEventListener('click', async () => {
+    const { showConfirmModal } = await import('../../../shared/utils.js');
+    const ok = await showConfirmModal('Fix Combined Names', 'This will find entries like "A, B, C" and split them into individual travelers. Trips will be updated to include companions correctly. Continue?');
+    if (!ok) return;
+
+    try {
+      showToast('Cleaning names…', 'info', 3000);
+      const newData = await localSave('travel', remote => {
+        const travelPersons = [...(remote.travelPersons || [])];
+        const trips = [...(remote.trips || [])];
+        const itemsToSplit = travelPersons.filter(tp => tp.name.includes(',') || tp.name.includes('&'));
+        
+        if (itemsToSplit.length === 0) return remote;
+
+        itemsToSplit.forEach(tp => {
+          const names = tp.name.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
+          if (names.length <= 1) return;
+
+          // Prime traveler is the first one
+          const primeName = names[0];
+          const otherNames = names.slice(1);
+
+          // Update the original record to be just the prime name
+          tp.name = primeName;
+
+          // Create new records for others if they don't exist
+          const otherIds = otherNames.map(name => {
+            let existing = travelPersons.find(x => x.name.toLowerCase() === name.toLowerCase());
+            if (existing) return existing.id;
+            const newId = 'tp-' + uuidv4().slice(0,8);
+            travelPersons.push({ id: newId, name, emoji: '👤', color: '#EEF2FF' });
+            return newId;
+          });
+
+          // Update trips that pointed to this combined record
+          trips.forEach(t => {
+            if (t.personId === tp.id) {
+              t.travelWith = [...new Set([...(t.travelWith || []), ...otherIds])];
+            }
+          });
+        });
+
+        return { ...remote, travelPersons, trips };
+      });
+      await setCachedTravelData(newData);
+      showToast('✅ Names cleaned!', 'success');
+      setTimeout(() => navigate('travel-log'), 1000);
+    } catch (err) { showToast('Cleanup failed', 'error'); }
   });
 
   document.getElementById('clear-cache-btn').addEventListener('click', async () => {
@@ -427,7 +553,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.18 · 2026-03-23</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.19 · 2026-03-23</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>

@@ -33,7 +33,9 @@ export async function renderTransactionView(container, params = {}) {
     <div class="app-header">
       <button class="app-header-action" id="back-btn">←</button>
       <span class="app-header-title">Transaction</span>
-      <button class="app-header-action" id="edit-btn" style="font-size:14px;font-weight:700;color:var(--primary);padding:4px 8px;">EDIT</button>
+      <button class="app-header-action" id="edit-btn" style="font-size:13px; font-weight:700; background:var(--primary-bg); color:var(--primary); padding:6px 14px; border-radius:99px; border:none; box-shadow:var(--shadow-sm);">
+        ✏️ EDIT
+      </button>
     </div>
 
     <div id="txn-snapshot-target" style="padding:20px 16px;display:flex;flex-direction:column;gap:12px;padding-bottom:100px;background:var(--bg);">
