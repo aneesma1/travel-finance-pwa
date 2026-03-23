@@ -411,10 +411,12 @@ export async function renderTransactions(container) {
   const TXN_PAGE_SIZE = 30;
 
   function renderList(resetPage = true) {
-    if (resetPage) _txnPage = 1;
-    // Filter
-    let filtered = transactions.filter(t => {
-      if (t.currency !== activeCurrency) return false;
+    try {
+      if (resetPage) _txnPage = 1;
+      // Filter
+      let filtered = transactions.filter(t => {
+        if (!t) return false;
+        if (t.currency !== activeCurrency) return false;
       if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
       if (activeMonth  && Number(t.date?.slice(5,7)) !== activeMonth)    return false;
       if (activeCategory && t.category1 !== activeCategory)              return false;
@@ -541,6 +543,14 @@ export async function renderTransactions(container) {
       end.textContent = `All ${totalFiltered} records shown`;
       wrap.appendChild(end);
     }
+  } catch (err) {
+    console.error('Transactions render error:', err);
+    document.getElementById('txn-list-wrap').innerHTML = `
+      <div style="padding: 24px; color: #DC2626; font-family: monospace; font-size: 13px; word-break: break-all;">
+        <b>Render Crashed</b><br><br>${err.message}<br><br>${err.stack}
+      </div>
+    `;
+  }
   }
 
   function buildSwipeRow(t, isLast) {

@@ -68,19 +68,21 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         </div>
 
         <!-- Drop zone -->
-        <label for="import-file-input" id="drop-zone" style="
-          display:block; border:2px dashed var(--border); border-radius:var(--radius-lg);
+        <label id="drop-zone" style="
+          display:block; position:relative; overflow:hidden; border:2px dashed var(--border); border-radius:var(--radius-lg);
           padding:40px 24px; text-align:center; cursor:pointer;
           transition:all 0.15s; background:var(--surface);
         ">
-          <div style="font-size:40px;margin-bottom:12px;">📂</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">
-            Tap to pick a file
+          <div style="pointer-events:none;">
+            <div style="font-size:40px;margin-bottom:12px;">📂</div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">
+              Tap to pick a file
+            </div>
+            <div style="font-size:13px;color:var(--text-muted);">.xlsx · .xls · .csv</div>
           </div>
-          <div style="font-size:13px;color:var(--text-muted);">.xlsx · .xls · .csv</div>
+          <!-- Real input overlay perfectly over the box -->
+          <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="position:absolute; top:0; left:0; right:0; bottom:0; width:100%; height:100%; opacity:0.01; cursor:pointer; z-index:10;" />
         </label>
-
-        <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="opacity:0;position:absolute;width:1px;height:1px;z-index:-1;overflow:hidden;" />
 
         <div id="file-error" style="color:var(--danger);font-size:13px;margin-top:12px;text-align:center;min-height:18px;"></div>
 

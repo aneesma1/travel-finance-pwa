@@ -171,6 +171,7 @@ export async function renderDashboard(container) {
   function renderContent({ transactions, activeCurrency, activeYear, activeMonth, activeCategory, activeAccount }) {
     // Apply all filters
     let filtered = transactions.filter(t => {
+      if (!t) return false;
       if (t.currency !== activeCurrency) return false;
       if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false; // null = all years
       if (activeMonth && Number(t.date?.slice(5,7)) !== activeMonth)  return false;
