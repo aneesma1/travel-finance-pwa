@@ -93,6 +93,8 @@ During the first user testing phase, several critical edge cases were discovered
 - **Bug 3 (Vault Security Section Inactive):** Found that `openSecurityDashboard` inside `shared/security-dashboard.js` strictly required a parent modal named `member-modal` or `settings-modal`. Since App B uses an ID named `modal`, the function silently aborted. Updated the code to dynamically query `modal` properly.
 - **Bug 4 (Import Form Hanging on WebViews):** Solved an issue where the file picker `display:none` styling prevented Android WebView click-jacks from functioning. Updated `import-tool.js` CSS to `opacity:0;position:absolute;z-index:-1;` which triggers native OS file dialogues properly.
 - **Bug 5 (App Meta Info Bump):** Bumped the entire stack via the Python toolset from `v3.5.5` to `v3.5.6` matching the release timeframe.
+- **Family Hub Import File Picker (Mobile)**: User reported file picker still unresponsive. Replaced programmatic `.click()` on hidden input with a native HTML `<label for="import-file-input">` wrapper around the drop zone. This guarantees native browser focus forwarding which bypasses WebView popup/click restrictions.
+- **Service Worker Cache / "No changes visible"**: User reported no changes were reflecting on their device even after reload. Due to PWA caching, `v3.5.5` files were still loading, compounded by `writeData` crash throwing errors in the background. Manually bumped all HTML headers, App Info screens, and `sw.js` `CACHE_NAME` strings to **v3.5.7** to forcefully trigger the SW `activate` sequence and wipe old caches. This will guarantee `v3.5.7` deployment visible to the user.
 
 ---
 
