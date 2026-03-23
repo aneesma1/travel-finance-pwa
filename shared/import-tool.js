@@ -67,22 +67,23 @@ export function renderImportTool(container, { appType, existingData, onImportCom
           Your existing ${appType === 'travel' ? 'trips' : 'transactions'} will be preserved -- duplicates are skipped.
         </div>
 
-        <!-- Drop zone -->
-        <label id="drop-zone" style="
-          display:block; position:relative; overflow:hidden; border:2px dashed var(--border); border-radius:var(--radius-lg);
-          padding:40px 24px; text-align:center; cursor:pointer;
-          transition:all 0.15s; background:var(--surface);
+        <!-- Drop zone (Simplified) -->
+        <div id="drop-zone" style="
+          display:block; border:2px dashed var(--border); border-radius:var(--radius-lg);
+          padding:40px 24px; text-align:center; background:var(--surface);
         ">
-          <div style="pointer-events:none;">
-            <div style="font-size:40px;margin-bottom:12px;">📂</div>
-            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">
-              Tap to pick a file
-            </div>
-            <div style="font-size:13px;color:var(--text-muted);">.xlsx · .xls · .csv</div>
+          <div style="font-size:40px;margin-bottom:12px;">📂</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px;">
+            Select a file to import
           </div>
-          <!-- Real input overlay perfectly over the box -->
-          <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="position:absolute; top:0; left:0; right:0; bottom:0; width:100%; height:100%; opacity:0.01; cursor:pointer; z-index:10;" />
-        </label>
+          <!-- Real input, completely visible and standard -->
+          <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="
+            display:inline-block; max-width:100%; font-size:14px; padding:10px;
+            background:var(--surface-3); border-radius:var(--radius-md); border:1px solid var(--border);
+            cursor:pointer;
+          " />
+          <div style="font-size:13px;color:var(--text-muted);margin-top:12px;">.xlsx · .xls · .csv</div>
+        </div>
 
         <div id="file-error" style="color:var(--danger);font-size:13px;margin-top:12px;text-align:center;min-height:18px;"></div>
 
