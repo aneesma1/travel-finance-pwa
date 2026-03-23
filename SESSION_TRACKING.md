@@ -199,6 +199,32 @@ git checkout master
 
 - **Commit**: `fd15391` (master), `76c760a` (main) — `v3.5.13: Fix Vault router, Travel Log defaults, and add Share feature`
 
+### Vault UX & Travel Log Refinements (v3.5.16 · 2026-03-23)
+
+-   **Vault App: Transaction View & Sharing**:
+    -   **Field Display**: Separated Category 1 and Category 2 into distinct rows for better visibility.
+    -   **Edit Functionality**: Added an "EDIT" button to the transaction header.
+    -   **Advanced Sharing**: Implemented Sharing as Formatted Text and Image generation (via `html2canvas`) for better reporting.
+-   **Travel App: Log & Import**:
+    -   **UI Enhancement**: Rendered "Accompanied by" list as styled chips.
+    -   **Import Logic**: Updated `onImportComplete` to split comma-separated names, correctly assigning companions to the `travelWith` array instead of creating malformed person names.
+-   **Service Worker**: Bumped to `v3.5.16`.
+
+### Strict Travel Siloing (v3.5.17 · 2026-03-23)
+
+-   **Travel App: Data Independence**:
+    -   **Decoupled Travelers**: Removed all fallbacks to the shared `members` list. The Travel section now strictly uses `travelPersons` for all operations.
+    -   **Import Isolation**: Modified the import tool when triggered from Travel Hub to strictly update `travelPersons`, ensuring personal contacts/emergency data remain separate.
+    -   **Bug Fix**: Resolved a `ReferenceError` in `add-trip.js` that occurred when sharing trip details due to an incorrect variable reference.
+-   **Service Worker**: Bumped to `v3.5.17`.
+
+### Vault Category Flexibility (v3.5.18 · 2026-03-23)
+
+-   **Vault App: Category Formatting**:
+    -   **Reverted Cleaning**: Removed the strict character-cleaning logic. Categories now support free-text input including spaces and numbers (e.g., "Home Rent 1") as requested by the user.
+-   **Service Worker**: Bumped to `v3.5.18` across the suite.
+-   **Commit**: `[TBD]` — `v3.5.18: Strict Travel Siloing and Vault UX Fixes`
+
 ---
 
 *Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*

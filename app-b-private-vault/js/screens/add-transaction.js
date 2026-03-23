@@ -164,23 +164,21 @@ export async function renderAddTransaction(container, params = {}) {
     });
 
     // Category 1
-    new PillSelect(document.getElementById('cat1-pills'), {
-      options: allCategories.map(c => ({ value: c, label: c })),
-      selected: state.category1,
-      color: 'emerald',
-      allowAdd: true,
-      onSelect: v => { state.category1 = v || ''; updatePreview(); },
-      onAdd: () => promptAddOption('category', 'cat1-pills', allCategories, 1)
+    new SmartInput(document.getElementById('cat1-pills'), {
+      suggestions: allCategories,
+      value: state.category1,
+      placeholder: 'Category (e.g. Food)',
+      onInput: v => { state.category1 = (v || '').trim(); updatePreview(); },
+      onSelect: v => { state.category1 = (v || '').trim(); updatePreview(); }
     });
 
     // Category 2
-    new PillSelect(document.getElementById('cat2-pills'), {
-      options: allCategories.map(c => ({ value: c, label: c })),
-      selected: state.category2,
-      color: 'emerald',
-      allowAdd: true,
-      onSelect: v => { state.category2 = v || ''; },
-      onAdd: () => promptAddOption('category', 'cat2-pills', allCategories, 2)
+    new SmartInput(document.getElementById('cat2-pills'), {
+      suggestions: allCategories,
+      value: state.category2,
+      placeholder: 'Sub-category (optional)',
+      onInput: v => { state.category2 = (v || '').trim(); },
+      onSelect: v => { state.category2 = (v || '').trim(); }
     });
 
     // Notes

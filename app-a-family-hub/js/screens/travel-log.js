@@ -33,8 +33,7 @@ export async function renderTravelLog(container, params = {}) {
   if (!data) { showEmpty(document.getElementById('log-content'), 'No data available'); return; }
 
   const { travelPersons = [], trips = [] } = data;
-  // Migration fallback: if no travelPersons, use members
-  const persons = travelPersons.length ? travelPersons : (data.members || []);
+  const persons = travelPersons;
 
   // Merge any incoming params with URL hash
   if (params.personId) setHashParams({ person: params.personId });
@@ -42,6 +41,7 @@ export async function renderTravelLog(container, params = {}) {
   const filterPerson = hashParams.person || '';
   // Default year logic: if current year has no data, default to 'all'
   const hasCurrentYearData = trips.some(t => t.dateOutIndia?.startsWith(String(currentYear())));
+  // If no year in hash, default to 'all' to ensure imported data is visible
   const filterYear = hashParams.year || (hasCurrentYearData ? String(currentYear()) : 'all');
 
   document.getElementById('header-export-btn')?.addEventListener('click', () => {
@@ -166,7 +166,14 @@ export async function renderTravelLog(container, params = {}) {
             <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
               ${formatDisplayDate(trip.dateOutIndia)} → ${trip.dateInIndia ? formatDisplayDate(trip.dateInIndia) : 'Present'}
             </div>
-            ${travelWith.length ? `<div style="font-size:11px;color:var(--primary);margin-top:2px;">with ${travelWith.join(', ')}</div>` : ''}
+            ${travelWith.length ? `
+              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
+                <span style="font-size:10px;color:var(--text-muted);margin-right:2px;align-self:center;">with</span>
+                ${travelWith.map(name => `
+                  <span style="font-size:10px;background:var(--primary-bg);color:var(--primary);padding:1px 6px;border-radius:99px;font-weight:600;">${name}</span>
+                `).join('')}
+              </div>
+            ` : ''}
           </div>
           <div style="text-align:right;flex-shrink:0;">
             <div style="font-size:14px;font-weight:700;color:var(--primary);">${daysLabel}</div>

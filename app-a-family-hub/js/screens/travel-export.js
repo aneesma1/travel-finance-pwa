@@ -407,7 +407,7 @@ async function exportPDF(trips, members, documents, deliver) {
 
     // ── Document expiry summary (Skip if shared docs) ──────────────────────────
     const memberDocs = documents.filter(d => d.personId === member.id);
-    if (memberDocs.length && !member.id.startsWith('tp-')) { // heuristic for shared member
+    if (memberDocs.length) {
       y += 6;
       if (y > 260) { doc.addPage('a4','portrait'); y = margin; }
 

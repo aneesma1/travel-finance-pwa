@@ -11,8 +11,11 @@ export async function openCategoryManager(containerEl) {
   const data = await getCachedFinanceData();
   let { transactions = [], categories = [] } = data || {};
   
-  // Ensure categories is a sorted unique array
-  let cats = [...new Set(categories)].sort();
+  // Extract categories from transactions to ensure imported ones show up
+  const dynamicCats = transactions.flatMap(t => [t.category1, t.category2]).filter(Boolean);
+  
+  // Ensure categories is a sorted unique array including dynamic ones
+  let cats = [...new Set([...categories, ...dynamicCats])].sort();
 
   let selected = new Set();
   let modalEl = document.getElementById('modal');

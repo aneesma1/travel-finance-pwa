@@ -24,8 +24,7 @@ export async function renderAddTrip(container, params = {}) {
 
   const data = await getCachedTravelData();
   const { travelPersons = [], trips = [] } = data || {};
-  // Fallback to shared members if no travelPersons exist yet (migration)
-  const persons = travelPersons.length ? travelPersons : (data?.members || []);
+  const persons = travelPersons;
 
   // Load existing trip if editing
   let existingTrip = isExisting ? trips.find(t => t.id === tripId) : null;
@@ -105,7 +104,7 @@ export async function renderAddTrip(container, params = {}) {
       state.flightInward ? `✈️ Inward: ${state.flightInward}` : '',
       state.flightOutward? `✈️ Outward: ${state.flightOutward}` : '',
       state.reason       ? `📝 Reason: ${state.reason}` : '',
-      state.travelWith.length ? `👥 With: ${state.travelWith.map(id => members.find(m => m.id === id)?.name).join(', ')}` : '',
+      state.travelWith.length ? `👥 With: ${state.travelWith.map(id => persons.find(m => m.id === id)?.name).join(', ')}` : '',
       `━━━━━━━━━━━━━━━━━━━━`,
       `_Shared from Family Hub PWA_`
     ].filter(Boolean).join('\n');
@@ -161,7 +160,7 @@ export async function renderAddTrip(container, params = {}) {
   async function saveNewPerson(person) {
     try {
       const newData = await localSave('travel', (remote) => {
-        const travelPersons = remote.travelPersons || remote.members || [];
+        const travelPersons = remote.travelPersons || [];
         travelPersons.push(person);
         return { ...remote, travelPersons };
       });
@@ -337,7 +336,16 @@ export async function renderAddTrip(container, params = {}) {
           ${row('Inward Flight', state.flightInward)}
           ${row('Outward Flight', state.flightOutward)}
           ${row('Reason', state.reason)}
-          ${row('Travelling with', travelWithNames.join(', '))}
+          ${travelWithNames.length ? `
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-light);">
+              <span style="font-size:13px;color:var(--text-muted);">Travelling with</span>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:200px;">
+                ${travelWithNames.map(name => `
+                  <span style="font-size:10px;background:var(--primary-bg);color:var(--primary);padding:2px 8px;border-radius:99px;font-weight:600;">${name}</span>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
         </div>
       </div>
 
