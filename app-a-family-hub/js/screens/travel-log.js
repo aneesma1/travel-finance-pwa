@@ -139,8 +139,9 @@ export async function renderTravelLog(container, params = {}) {
         .map(id => personMap[id]?.name).filter(Boolean);
 
       const dest = trip.destination || 'Qatar';
+      const days = trip.daysInQatar || 0;
       const daysLabel = trip.daysInQatar != null
-        ? `${trip.daysInQatar}d in ${dest}`
+        ? `${days}d in ${dest}`
         : trip.dateInQatar && !trip.dateOutQatar
           ? `${daysBetween(trip.dateInQatar, new Date().toISOString().split('T')[0])}d so far`
           : '--';

@@ -51,6 +51,8 @@ export async function renderDashboard(container) {
   }
 
   const { transactions = [], categories = [] } = data;
+  const savedAccounts = [...new Set(transactions.map(t => t.account).filter(Boolean))];
+  if (!savedAccounts.length) savedAccounts.push('Cash', 'Card', 'Bank');
 
   // Read filters from URL hash
   const p = getHashParams();

@@ -206,7 +206,23 @@ function renderDataTab(data, members, container) {
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Clear Local Cache</div><div style="font-size:12px;color:var(--text-muted);">Force fresh re-download from Drive</div></div>
         <span style="color:var(--text-muted);">›</span>
       </div>
-    </div>`;
+    </div>
+
+    <div class="section-title" style="color:var(--danger);margin-top:24px;">⛔ Danger Zone</div>
+    <div class="card" style="margin:0 16px;border:1px solid var(--danger);background:rgba(220,38,38,0.05);">
+      <div class="list-row" id="reset-db-btn" style="border:none;border-radius:var(--radius-lg);">
+        <span style="font-size:20px;">🔥</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--danger);">Reset All Data</div>
+          <div style="font-size:11px;color:var(--text-muted);">Permanently delete all travel records.</div>
+        </div>
+        <span style="color:var(--danger);font-weight:700;font-size:12px;">RESET</span>
+      </div>
+    </div>
+    <div style="padding:12px 24px;font-size:11px;color:var(--text-muted);line-height:1.4;">
+      ⚠️ Resetting will wipe your local cache <b>and</b> your Drive mirror. This is irreversible. Please <b>Backup Now</b> before resetting.
+    </div>
+  `;
 
   document.getElementById('backup-btn').addEventListener('click', async () => {
     const cached = await getCachedTravelData();
@@ -293,6 +309,24 @@ function renderDataTab(data, members, container) {
     await clearAllCachedData();
     showToast('Cache cleared — reloading…', 'success');
     setTimeout(() => window.location.reload(), 1200);
+  });
+
+  document.getElementById('reset-db-btn').addEventListener('click', async () => {
+    if (!confirm('⚠️ RESET DATABASE?\n\nThis will PERMANENTLY DELETE all your trips, travel persons, and documents.\n\nHave you taken a backup first?')) return;
+    if (!confirm('SECOND CONFIRMATION:\n\nThis action cannot be undone. All your data in the cloud (Google Drive) will also be wiped out. Are you absolutely sure?')) return;
+    if (!confirm('FINAL WARNING:\n\nType OK in your mind and click OK to DESTROY all records.')) return;
+
+    try {
+      showToast('Resetting database…', 'info', 3000);
+      // Wipe remote first (empty object)
+      await localSave('travel', () => ({ trips: [], travelPersons: [], members: [], documents: [] }));
+      // Wipe local
+      await clearAllCachedData();
+      showToast('Database reset successfully', 'success');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      showToast('Reset failed: ' + err.message, 'error');
+    }
   });
 }
 
@@ -393,7 +427,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.9 · 2026-03-23</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.15 · 2026-03-23</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
@@ -486,7 +520,7 @@ function openImportModal(data, persons) {
       const personMap = {};
       persons.forEach(m => { personMap[m.name.toLowerCase().trim()] = m.id; });
 
-      const newMembersToCreate = {};
+      const newPersonsToCreate = {};
       records.forEach(rec => {
         const rawName = rec.personName?.trim();
         if (!rawName) return;
