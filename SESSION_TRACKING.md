@@ -96,11 +96,33 @@ During the first user testing phase, several critical edge cases were discovered
 - **Family Hub Import File Picker (Mobile)**: User reported file picker still unresponsive. Replaced programmatic `.click()` on hidden input with a native HTML `<label for="import-file-input">` wrapper around the drop zone. This guarantees native browser focus forwarding which bypasses WebView popup/click restrictions.
 - **Service Worker Cache / "No changes visible"**: User reported no changes were reflecting on their device even after reload. Due to PWA caching, `v3.5.5` files were still loading, compounded by `writeData` crash throwing errors in the background. Manually bumped all HTML headers, App Info screens, and `sw.js` `CACHE_NAME` strings to **v3.5.7** to forcefully trigger the SW `activate` sequence and wipe old caches. This will guarantee `v3.5.7` deployment visible to the user.
 
-### Final Polishing & Edge Cases (v3.5.8)
+### Final Polishing & Edge Cases (v3.5.8 & v3.5.9)
 - **Null Object Rendering Crash**: In `app-b-private-vault/js/screens/transactions.js` and `dashboard.js`, testing revealed an edge case where if `data.transactions` contained a `null` unparsable item, `t.currency` would throw a fatal `TypeError` midway through `renderList()`. This resulted in the PWA rendering a completely permanent blank screen for the user right under the filter bar. Injected `if (!t) return false;` rules and a defensive HTML-rendering `try/catch` block explicitly to print frontend exceptions.
-- **Aggressive WebView File Picker Isolation**: Found that the programmatic `<label>` click workaround from v3.5.7 *still* hung on extremely strict WebView wrappers (which often block synthesized UI events from labels to inputs with `opacity: 0` or `z-index: -1`). Completely reconstructed `shared/import-tool.js` `drop-zone` by implementing full `position: relative` isolation and expanding the `type="file"` input 100% physically over the UI with `opacity: 0.01; z-index: 10`. This mandates that any tap strictly hits the `HTMLInputElement` bounds natively, triggering the OS prompt.
-- **Force Service-Worker Invalidation**: Upgraded HTML comments, `settings.js` app-info strings, and `sw.js` cache hashes to **v3.5.8** to force a guaranteed rehydration of the cache.
+- **Chrome Standard File Picker Input Isolation**: The programmatic `<label>` click workaround from prior builds failed to operate even on Chrome Desktop browsers. Abandoned all CSS "opacity trickery" inside `shared/import-tool.js` `drop-zone` completely. Injected a fully visible, raw `<input type="file">` button structurally natively onto the modal screen, ensuring pure HTML spec compliance that cannot be stripped or intercepted by plugins or clickjacks.
+- **Force Service-Worker Invalidation**: Upgraded HTML comments, `settings.js` app-info strings, and `sw.js` cache hashes to **v3.5.9** to force a guaranteed rehydration of the cache.
 - Successfully merged branch `master` into branch `main` to align GitHub Pages' production tracking URL seamlessly.
+
+---
+
+### Bug Fixes — writeData Migration & Import Fix (v3.5.10 · 2026-03-23)
+
+- **`writeData is not defined` — Root Cause Fixed**: The core architectural issue was that several screen files were still importing and calling `writeData` from `shared/drive.js` directly, which is not intended to be called from UI screens. Migrated every remaining direct `writeData` call to `localSave` from `shared/sync-manager.js` across all affected files:
+  - `app-b-private-vault/js/screens/settings.js`
+  - `app-b-private-vault/js/screens/add-transaction.js`
+  - `app-a-family-hub/js/screens/settings.js`
+  - `app-a-family-hub/js/screens/person-profile.js`
+  - `app-a-family-hub/js/screens/add-document.js`
+  - `app-a-family-hub/js/screens/family-defaults.js`
+  - `app-a-family-hub/js/screens/add-trip.js`
+  - `app-a-family-hub/js/expiry-checker.js`
+  
+  Removed all now-unused `import { writeData }` lines from these files.
+
+- **Travel App Import — Column Mapping Bug Fixed**: The `autoMapColumns` function in `shared/import-tool.js` had a critical fuzzy-matching bug where all four date columns (`Date Out India`, `Date In Qatar`, `Date Out Qatar`, `Date In India`) would collapse onto the same first-matched source column because the old logic matched on any single keyword (e.g. the word "date"). Rewrote the function to:
+  1. Track already-used source column indices with a `Set` to prevent duplicate mappings.
+  2. Score each candidate by counting how many significant words match (requiring at least half the words to match), so each target column maps to the uniquely best-scoring source column.
+
+- **Commit**: `a824823` — `fix: migrate writeData to localSave across all screens; fix import column mapping`
 
 ---
 

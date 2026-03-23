@@ -6,7 +6,6 @@
 'use strict';
 
 import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { PillSelect }  from '../../../shared/pill-select.js';
@@ -248,11 +247,11 @@ export async function renderAddTransaction(container, params = {}) {
       list.push(name.trim());
       // Save to Drive in background
       if (type === 'category') {
-        writeData('finance', r => ({
+        localSave('finance', r => ({
           ...r, categories: [...new Set([...(r.categories||[]), name.trim()])]
         })).then(d => setCachedFinanceData(d)).catch(() => {});
       } else {
-        writeData('finance', r => ({
+        localSave('finance', r => ({
           ...r, accounts: [...new Set([...(r.accounts||[]), name.trim()])]
         })).then(d => setCachedFinanceData(d)).catch(() => {});
       }

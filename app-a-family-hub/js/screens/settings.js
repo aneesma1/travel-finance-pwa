@@ -5,7 +5,7 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
-import { writeData, downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror } from '../../../shared/drive.js';
+import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
@@ -112,7 +112,7 @@ function renderPeopleTab(container, data, members, user) {
     document.getElementById('close-access').addEventListener('click', () => modal.classList.add('hidden'));
     modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
     const onSave = async (newData) => {
-      const saved = await writeData('travel', () => newData);
+      const saved = await localSave('travel', () => newData);
       await setCachedTravelData(saved);
       showToast('Access updated', 'success');
       renderAccessControl(document.getElementById('access-control-container'), saved, getUser()?.email || '', onSave);

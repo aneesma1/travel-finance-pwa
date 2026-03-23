@@ -6,7 +6,6 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { PillSelect } from '../../../shared/pill-select.js';
@@ -431,7 +430,7 @@ export async function renderAddDocument(container, params = {}) {
     if (!confirm('Delete this document record? Calendar events will also be removed.')) return;
     try {
       if (existing?.calSynced) await deleteAllDocumentAlerts(existing).catch(() => {});
-      const newData = await writeData('travel', (remote) => ({
+      const newData = await localSave('travel', (remote) => ({
         ...remote,
         documents: (remote.documents || []).filter(d => d.id !== docId)
       }));
