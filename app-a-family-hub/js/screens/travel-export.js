@@ -10,7 +10,7 @@ import { timestampSuffix } from '../../../shared/drive.js';
 import { copyToClipboard, showToast, formatDisplayDate, daysBetween } from '../../../shared/utils.js';
 
 // ── Entry point -- opens the export bottom sheet ───────────────────────────────
-export function openTravelExportSheet(members, trips, documents) {
+export function openTravelExportSheet(persons, trips, documents) {
   document.getElementById('travel-export-sheet')?.remove();
   document.getElementById('travel-export-backdrop')?.remove();
 
@@ -52,7 +52,7 @@ export function openTravelExportSheet(members, trips, documents) {
           'padding:8px 14px;border-radius:20px;border:1.5px solid var(--primary);',
           'background:var(--primary-bg);color:var(--primary);font-size:13px;',
           'font-weight:600;cursor:pointer;">👥 All</button>',
-        members.map(m =>
+        persons.map(m =>
           '<button class="tex-pill" data-person="' + m.id + '" style="' +
           'padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);' +
           'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">' +
@@ -212,7 +212,7 @@ export function openTravelExportSheet(members, trips, documents) {
   function getFilteredTrips() {
     const fromVal = document.getElementById('tex-from').value;
     const toVal   = document.getElementById('tex-to').value;
-    const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
+    const personMap = Object.fromEntries(persons.map(m => [m.id, m]));
 
     return trips
       .filter(t => {
@@ -224,7 +224,7 @@ export function openTravelExportSheet(members, trips, documents) {
         return true;
       })
       .sort((a, b) => new Date(a.dateOutIndia) - new Date(b.dateOutIndia))
-      .map(t => ({ ...t, _member: memberMap[t.personId] || { name: 'Unknown', emoji: '👤' } }));
+      .map(t => ({ ...t, _person: personMap[t.personId] || { name: 'Unknown', emoji: '👤' } }));
   }
 
   // ── Export actions ────────────────────────────────────────────────────────
@@ -240,10 +240,10 @@ export function openTravelExportSheet(members, trips, documents) {
     status.textContent = 'Preparing ' + filtered.length + ' trips…';
 
     try {
-      if (selFmt === 'pdf')      await exportPDF(filtered, members, documents, deliver);
+      if (selFmt === 'pdf')      await exportPDF(filtered, persons, documents, deliver);
       else if (selFmt === 'xlsx') await exportExcel(filtered, deliver);
       else if (selFmt === 'csv')  await exportCSV(filtered, deliver);
-      else if (selFmt === 'whatsapp') await exportWhatsApp(filtered, members);
+      else if (selFmt === 'whatsapp') await exportWhatsApp(filtered, persons);
       status.textContent = '✅ Done!';
       setTimeout(() => { if (selFmt !== 'whatsapp') close(); }, 1200);
     } catch (err) {
@@ -275,7 +275,7 @@ async function exportPDF(trips, members, documents, deliver) {
   const byPerson = {};
   trips.forEach(t => {
     const pid = t.personId;
-    if (!byPerson[pid]) byPerson[pid] = { member: t._member, trips: [] };
+    if (!byPerson[pid]) byPerson[pid] = { person: t._person, trips: [] };
     byPerson[pid].trips.push(t);
   });
 
@@ -327,7 +327,7 @@ async function exportPDF(trips, members, documents, deliver) {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     doc.text('Total Trips', margin + 20, y + 15);
-    doc.text('Days in Qatar', margin + 65, y + 15);
+    doc.text('Dest. Days', margin + 65, y + 15);
     doc.text('Years Travelled', margin + 120, y + 15);
     y += 26;
 
@@ -359,11 +359,12 @@ async function exportPDF(trips, members, documents, deliver) {
     const cols = [
       { label: '#',           x: margin + 1,   w: 6  },
       { label: 'Departed India', x: margin + 7,   w: 26 },
-      { label: 'Arrived Qatar', x: margin + 33,  w: 26 },
-      { label: 'Left Qatar',   x: margin + 59,  w: 26 },
-      { label: 'Days',         x: margin + 85,  w: 14 },
-      { label: 'Flight In',    x: margin + 99,  w: 24 },
-      { label: 'Reason',       x: margin + 123, w: 59 },
+      { label: 'Destination',   x: margin + 33,  w: 22 },
+      { label: 'Arrived',       x: margin + 55,  w: 22 },
+      { label: 'Left',          x: margin + 77,  w: 22 },
+      { label: 'Days',          x: margin + 99,  w: 12 },
+      { label: 'Flight In',     x: margin + 111, w: 20 },
+      { label: 'Reason',        x: margin + 131, w: 51 },
     ];
 
     cols.forEach(c => doc.text(c.label, c.x, y + 5));
@@ -384,6 +385,7 @@ async function exportPDF(trips, members, documents, deliver) {
         const row = [
           String(idx + 1),
           fmtDate(trip.dateOutIndia),
+          trip.destination || 'Qatar',
           fmtDate(trip.dateInQatar),
           trip.dateOutQatar ? fmtDate(trip.dateOutQatar) : 'Still here',
           trip.daysInQatar != null ? String(trip.daysInQatar) : '--',
@@ -403,9 +405,9 @@ async function exportPDF(trips, members, documents, deliver) {
         y += 7;
       });
 
-    // ── Document expiry summary ───────────────────────────────────────────────
+    // ── Document expiry summary (Skip if shared docs) ──────────────────────────
     const memberDocs = documents.filter(d => d.personId === member.id);
-    if (memberDocs.length) {
+    if (memberDocs.length && !member.id.startsWith('tp-')) { // heuristic for shared member
       y += 6;
       if (y > 260) { doc.addPage('a4','portrait'); y = margin; }
 
@@ -445,7 +447,7 @@ async function exportPDF(trips, members, documents, deliver) {
   });
 
   const ts = timestampSuffix();
-  const peopleNames = [...new Set(trips.map(t => t._member?.name))].join('-');
+  const peopleNames = [...new Set(trips.map(t => t._person?.name))].join('-');
   const filename = 'Travel_History_' + peopleNames.replace(/\s+/g,'-').slice(0,30) + '_' + ts + '.pdf';
 
   if (deliver === 'share' && navigator.canShare && navigator.canShare({ files: [new File([''], filename)] })) {
@@ -470,8 +472,8 @@ async function exportExcel(trips, deliver) {
   }
 
   const headers = [
-    'Person', 'Departed India', 'Arrived Qatar',
-    'Left Qatar', 'Returned India', 'Days in Qatar',
+    'Person', 'Destination', 'Departed India', 'Arrived',
+    'Left', 'Returned India', 'Days Stayed',
     'Flight Inward', 'Flight Outward', 'Reason', 'Travelled With'
   ];
 
@@ -517,13 +519,14 @@ async function exportExcel(trips, deliver) {
 // ── CSV Export ────────────────────────────────────────────────────────────────
 async function exportCSV(trips, deliver) {
   const headers = [
-    'Person','Departed India','Arrived Qatar',
-    'Left Qatar','Returned India','Days in Qatar',
-    'Flight Inward','Flight Outward','Reason','Travelled With'
+    'Person', 'Destination', 'Departed India', 'Arrived',
+    'Left', 'Returned India', 'Days Stayed',
+    'Flight Inward', 'Flight Outward', 'Reason', 'Travelled With'
   ];
 
   const rows = trips.map(t => [
-    t._member?.name || 'Unknown',
+    t._person?.name || 'Unknown',
+    t.destination   || 'Qatar',
     t.dateOutIndia  || '',
     t.dateInQatar   || '',
     t.dateOutQatar  || '',
@@ -570,18 +573,19 @@ async function exportWhatsApp(trips, members) {
 
   const lines = ['✈️ *Travel History Report*', '📅 ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }), ''];
 
-  Object.values(byPerson).forEach(({ member, trips: pTrips }) => {
+  Object.values(byPerson).forEach(({ person, trips: pTrips }) => {
     const totalDays = pTrips.reduce((s, t) => s + (t.daysInQatar || 0), 0);
-    lines.push('👤 *' + member.name + '*  (' + pTrips.length + ' trips · ' + totalDays + 'd total in Qatar)');
+    lines.push('👤 *' + person.name + '*  (' + pTrips.length + ' trips · ' + totalDays + 'd total)');
     lines.push('─────────────────────');
 
     pTrips.sort((a,b) => new Date(b.dateOutIndia) - new Date(a.dateOutIndia))
       .forEach((t, i) => {
+        const d = t.destination || 'Qatar';
         lines.push(
-          (i+1) + '. ' + fmtDate(t.dateOutIndia) +
+          (i+1) + '. ' + d + ': ' + fmtDate(t.dateOutIndia) +
           ' → ' + (t.dateInIndia ? fmtDate(t.dateInIndia) : 'Present')
         );
-        if (t.daysInQatar != null) lines.push('   🕐 ' + t.daysInQatar + ' days in Qatar');
+        if (t.daysInQatar != null) lines.push('   🕐 ' + t.daysInQatar + ' days in ' + d);
         if (t.flightInward)  lines.push('   ✈️ In: ' + t.flightInward);
         if (t.flightOutward) lines.push('   ✈️ Out: ' + t.flightOutward);
         if (t.reason)        lines.push('   📝 ' + t.reason);

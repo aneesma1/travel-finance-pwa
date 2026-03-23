@@ -184,3 +184,21 @@ git checkout master
   - Bumped SW to `v3.5.12` to ensure the logic update is pulled.
 
 - **Commit**: `6e48e55` (master), `b2aa46a` (main) — `v3.5.12: Fix Vault 404 (paths) & Travel Import (scoping/logging)`
+
+### Vault Syntax Fix & Travel Log Enhancements (v3.5.13 · 2026-03-23)
+
+- **Vault App: Syntax Fix**:
+  - Removed duplicate `renderAnalytics` and `renderSettings` imports in `router.js` that were causing a fatal crash.
+
+- **Travel App: Log Visibility & Sharing**:
+  - **Filter Logic**: Updated `travel-log.js` to default to `Year: All` if there is no data for the current calendar year. This ensures imported history (e.g., from 2024/2025) is immediately visible.
+  - **Export Integration**: Added an "📤 Export" button directly to the Travel Log header, allowing quick access to PDF/Excel reports.
+  - **Trip Sharing**: Added a "📤 Share Details" button to the trip view/review screen. Supports native sharing (WhatsApp, etc.) or clipboard copy.
+  - **Add/Edit Trip**: Verified and refined the 5-step trip form for full support of all fields including flights and companions.
+  - **Service Worker**: Bumped to `v3.5.13` to deliver these UI/logic improvements.
+
+- **Commit**: `fd15391` (master), `76c760a` (main) — `v3.5.13: Fix Vault router, Travel Log defaults, and add Share feature`
+
+---
+
+*Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*
