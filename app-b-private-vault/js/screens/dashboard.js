@@ -60,17 +60,17 @@ export async function renderDashboard(container) {
   const activeCategory = p.category || '';
   const activeAccount  = p.account  || '';
 
-  renderFilterBar({ activeCurrency, activeYear, activeMonth, activeCategory, activeAccount, transactions, categories });
+  renderFilterBar({ activeCurrency, activeYear, activeMonth, activeCategory, activeAccount, transactions, categories, accounts: savedAccounts });
   renderContent({ transactions, activeCurrency, activeYear, activeMonth, activeCategory, activeAccount });
 
   // ── Filter bar ──────────────────────────────────────────────────────
-  function renderFilterBar({ activeCurrency, activeYear, activeMonth, activeCategory, activeAccount, transactions, categories }) {
+  function renderFilterBar({ activeCurrency, activeYear, activeMonth, activeCategory, activeAccount, transactions, categories, accounts }) {
     const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b) => b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
-    const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
-    const allAccounts   = ['Cash','Card','Bank','Other'];
+    const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))].sort();
+    const allAccounts   = [...new Set(accounts && accounts.length ? accounts : ['Cash', 'Card', 'Bank'])].sort();
     const isDefaultState = activeCurrency === 'QAR' && !activeYear && activeMonth === 0 && !activeCategory && !activeAccount;
-    const activeCount   = isDefaultState ? 0 : 1; // any non-default = show clear
+    const activeCount   = isDefaultState ? 0 : 1; 
 
     document.getElementById('filter-bar-wrap').innerHTML = `
       <div style="background:var(--surface);border-bottom:1px solid var(--border);">
@@ -442,5 +442,5 @@ export function categoryEmoji(cat) {
     'Utilities': '⚡', 'Travel': '✈️', 'Entertainment': '🎬', 'Transfer': '🔄',
     'Investment': '📈', 'Insurance': '🛡️', 'Freelance': '💻', 'Other': '📌',
   };
-  return map[cat] || '📌';
+  return map[cat] || '🏷️';
 }

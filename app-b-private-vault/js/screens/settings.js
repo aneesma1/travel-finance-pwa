@@ -16,8 +16,8 @@ import { localSave } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
-import { formatDisplayDate, showToast, isOnline, currentMonth, currentYear, uuidv4 } from '../../../shared/utils.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
+import { openCategoryManager } from '../modals/category-manager.js';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -148,9 +148,9 @@ export async function renderSettings(container, params = {}) {
       </div>
     `;
 
-    // Navigate to dedicated Category Manager screen
+    // Open Category Manager Modal
     document.getElementById('manage-cats-btn')?.addEventListener('click', () => {
-      navigate('category-manager');
+      openCategoryManager(container);
     });
 
     // Category management moved to dedicated screen (category-manager.js)
@@ -199,9 +199,6 @@ export async function renderSettings(container, params = {}) {
 
   // ── EXPORT TAB ────────────────────────────────────────────────────────────
   function renderExportTab(transactions, data) {
-    const DEFAULT_CATS = ['Food','Groceries','Rent','Salary','Transport','Medical',
-      'Education','Shopping','Utilities','Travel','Entertainment',
-      'Transfer','Investment','Insurance','Freelance','Other'];
     const tab = document.getElementById('tab-content');
     const yr  = currentYear();
     const mo  = currentMonth();
@@ -239,14 +236,14 @@ export async function renderSettings(container, params = {}) {
             <label class="form-label">Category 1</label>
             <select class="form-input" id="exp-cat1" style="padding:10px 12px;">
               <option value="">All</option>
-              ${[...new Set([...DEFAULT_CATS,...savedCats])].sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+              ${savedCats.sort().map(c => `<option value="${c}">${c}</option>`).join('')}
             </select>
           </div>
           <div>
             <label class="form-label">Category 2</label>
             <select class="form-input" id="exp-cat2" style="padding:10px 12px;">
               <option value="">All</option>
-              ${[...new Set([...DEFAULT_CATS,...savedCats])].sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+              ${savedCats.sort().map(c => `<option value="${c}">${c}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -521,121 +518,7 @@ export async function renderSettings(container, params = {}) {
     });
   }
 
-  // ── Rename category sheet ─────────────────────────────────────────────────
-  function openRenameCatSheet(oldName, onConfirm) {
-    document.getElementById('rename-cat-sheet')?.remove();
-    document.getElementById('rename-cat-backdrop')?.remove();
-    const sheet = document.createElement('div');
-    sheet.id = 'rename-cat-sheet';
-    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 40px;box-shadow:0 -4px 24px rgba(0,0,0,0.18);';
-    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>' +
-      '<div style="font-size:16px;font-weight:700;margin-bottom:4px;">Rename Category</div>' +
-      '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Renaming <strong>' + oldName + '</strong> will update all transactions</div>' +
-      '<input id="rename-cat-input" type="text" class="form-input" value="' + oldName + '" style="margin-bottom:12px;" />' +
-      '<button id="rename-cat-confirm" class="btn btn-primary btn-full">Rename</button>';
-    const backdrop = document.createElement('div');
-    backdrop.id = 'rename-cat-backdrop';
-    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
-    document.body.appendChild(backdrop);
-    document.body.appendChild(sheet);
-    const input = document.getElementById('rename-cat-input');
-    input.select();
-    const close = () => { sheet.remove(); backdrop.remove(); };
-    backdrop.addEventListener('click', close);
-    const confirm = () => {
-      const val = input.value.trim();
-      if (!val || val === oldName) { close(); return; }
-      close(); onConfirm(val);
-    };
-    document.getElementById('rename-cat-confirm').addEventListener('click', confirm);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') confirm(); });
-    setTimeout(() => input?.focus(), 100);
-  }
 
-  // ── Add category sheet ───────────────────────────────────────────────────
-  function openAddCatSheet(onConfirm) {
-    document.getElementById('add-cat-sheet')?.remove();
-    document.getElementById('add-cat-backdrop')?.remove();
-
-    const sheet = document.createElement('div');
-    sheet.id = 'add-cat-sheet';
-    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 40px;box-shadow:0 -4px 24px rgba(0,0,0,0.18);';
-    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>' +
-      '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">New Category</div>' +
-      '<input id="add-cat-input" type="text" class="form-input" placeholder="e.g. Groceries, Rent, Salary…" style="margin-bottom:12px;" />' +
-      '<button id="add-cat-confirm" class="btn btn-primary btn-full">Add Category</button>';
-
-    const backdrop = document.createElement('div');
-    backdrop.id = 'add-cat-backdrop';
-    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
-    document.body.appendChild(backdrop);
-    document.body.appendChild(sheet);
-
-    const input = document.getElementById('add-cat-input');
-    const close = () => { sheet.remove(); backdrop.remove(); };
-    backdrop.addEventListener('click', close);
-    setTimeout(() => input?.focus(), 100);
-
-    const confirm = () => {
-      const val = input.value.trim();
-      if (!val) { showToast('Enter a category name', 'warning'); return; }
-      close();
-      onConfirm(val);
-    };
-    document.getElementById('add-cat-confirm').addEventListener('click', confirm);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') confirm(); });
-  }
-
-  // ── Reassign category modal sheet ─────────────────────────────────────────
-  function openReassignSheet(fromCat, others, onConfirm) {
-    document.getElementById('reassign-sheet')?.remove();
-    document.getElementById('reassign-backdrop')?.remove();
-
-    const sheet = document.createElement('div');
-    sheet.id = 'reassign-sheet';
-    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 40px;box-shadow:0 -4px 24px rgba(0,0,0,0.18);';
-
-    sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;"></div>' +
-      '<div style="font-size:16px;font-weight:700;margin-bottom:4px;">Reassign Category</div>' +
-      '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Move all <strong>' + fromCat + '</strong> transactions to:</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;" id="reassign-pills">' +
-        others.map(c => '<button class="rp" data-cat="' + c + '" style="padding:9px 16px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer;">' + c + '</button>').join('') +
-      '</div>' +
-      '<button id="reassign-confirm" class="btn btn-primary btn-full" disabled style="opacity:0.5;">Select a category above</button>';
-
-    const backdrop = document.createElement('div');
-    backdrop.id = 'reassign-backdrop';
-    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
-    document.body.appendChild(backdrop);
-    document.body.appendChild(sheet);
-
-    let selected = null;
-    const close = () => { sheet.remove(); backdrop.remove(); };
-    backdrop.addEventListener('click', close);
-
-    sheet.querySelectorAll('.rp').forEach(btn => {
-      btn.addEventListener('click', () => {
-        selected = btn.dataset.cat;
-        sheet.querySelectorAll('.rp').forEach(b => {
-          const active = b === btn;
-          b.style.border = '1.5px solid ' + (active ? 'var(--primary)' : 'var(--border)');
-          b.style.background = active ? 'var(--primary-bg)' : 'transparent';
-          b.style.color = active ? 'var(--primary)' : 'var(--text)';
-          b.style.fontWeight = active ? '600' : '400';
-        });
-        const confirm = document.getElementById('reassign-confirm');
-        confirm.disabled = false;
-        confirm.style.opacity = '1';
-        confirm.textContent = 'Reassign to "' + selected + '"';
-      });
-    });
-
-    document.getElementById('reassign-confirm').addEventListener('click', () => {
-      if (!selected) return;
-      close();
-      onConfirm(selected);
-    });
-  }
 
   // ── ACCOUNT TAB ───────────────────────────────────────────────────────────
   function renderAccountTab(user, data) {
