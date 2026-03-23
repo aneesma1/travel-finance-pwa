@@ -6,7 +6,6 @@
 'use strict';
 
 import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { txnRow } from './dashboard.js';
@@ -214,6 +213,9 @@ export async function renderTransactions(container) {
   const activeCategory = p.category || '';
   const activeAccount  = p.account  || '';
 
+  let _txnPage = 1;
+  const TXN_PAGE_SIZE = 30;
+
   renderFilterBar();
   renderList();
 
@@ -407,8 +409,6 @@ export async function renderTransactions(container) {
     });
   }
 
-  let _txnPage = 1;
-  const TXN_PAGE_SIZE = 30;
 
   function renderList(resetPage = true) {
     try {

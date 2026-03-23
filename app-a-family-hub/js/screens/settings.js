@@ -42,9 +42,15 @@ export async function renderSettings(container, params = {}) {
         </button>`).join('')}
     </div>
     <div id="tab-content" style="padding-bottom:32px;"></div>
-    <div class="modal-overlay hidden" id="member-modal"></div>
     <input type="file" id="restore-file-input" accept=".json" style="display:none;" />
   `;
+
+  // Reset the global modal to hidden state when navigating to settings
+  const globalModal = document.getElementById('member-modal');
+  if (globalModal) {
+    globalModal.classList.add('hidden');
+    globalModal.innerHTML = '';
+  }
 
   document.querySelectorAll('.settings-tab').forEach(btn => {
     btn.addEventListener('click', () => renderSettings(container, { tab: btn.dataset.tab }));
