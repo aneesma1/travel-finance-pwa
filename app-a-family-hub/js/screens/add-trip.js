@@ -1,4 +1,4 @@
-// v3.5.20 — 2026-03-24
+// v3.5.21 — 2026-03-24
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
@@ -7,14 +7,14 @@
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
 import { localSave } from '../../../shared/sync-manager.js';
-import { navigate } from '../router.js';
 import { PillSelect }  from '../../../shared/pill-select.js';
 import { SmartInput }  from '../../../shared/smart-input.js';
 import {
   uuidv4, today, toISODate, daysBetween, formatDisplayDate, showToast
 } from '../../../shared/utils.js';
+import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
 
-const STEPS = ['Person', 'Dates', 'Flights', 'Reason', 'Review'];
+const STEPS = ['Person', 'Dates', 'Flights', 'Reason', 'Photos', 'Review'];
 
 export async function renderAddTrip(container, params = {}) {
   const { tripId, mode } = params;
@@ -41,6 +41,7 @@ export async function renderAddTrip(container, params = {}) {
     reason:       existingTrip?.reason       || '',
     travelWith:   existingTrip?.travelWith   || [],
     destination:  existingTrip?.destination  || 'Qatar',
+    photos:       existingTrip?.photos       || [],
   };
 
   let currentStep = isViewMode ? (STEPS.length - 1) : 0;  // view starts on Review
@@ -123,10 +124,10 @@ export async function renderAddTrip(container, params = {}) {
 
     switch (currentStep) {
       case 0: renderPersonStep(stepContent, persons); break;
-      case 1: renderDatesStep(stepContent); break;
       case 2: renderFlightsStep(stepContent); break;
       case 3: renderReasonStep(stepContent, persons); break;
-      case 4: renderReviewStep(stepContent, persons); break;
+      case 4: renderPhotosStep(stepContent); break;
+      case 5: renderReviewStep(stepContent, persons); break;
     }
   }
 
@@ -303,11 +304,29 @@ export async function renderAddTrip(container, params = {}) {
     }
   }
 
+  // ── Step 4: Photos ──────────────────────────────────────────────────
+  function renderPhotosStep(el) {
+    el.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Attach Photos <span style="color:var(--text-muted);font-weight:400;">(tickets, visa, receipts)</span></label>
+        <div id="trip-photo-slots" style="margin-bottom:12px;"></div>
+        <p style="font-size:12px;color:var(--text-muted);">Max 3 photos per trip entry.</p>
+      </div>
+    `;
+
+    renderPhotoSlots(document.getElementById('trip-photo-slots'), state.photos, 3, (newPhotos) => {
+      state.photos = newPhotos;
+    });
+  }
+
   // ── Step 4: Review ──────────────────────────────────────────────────
   function renderReviewStep(el, persons) {
     const person = persons.find(m => m.id === state.personId) || { name: 'Unknown', emoji: '👤' };
     const daysInDest = state.dateInQatar && state.dateOutQatar
       ? daysBetween(state.dateInQatar, state.dateOutQatar) : null;
+    const daysSoFar = state.dateInQatar && !state.dateOutQatar
+      ? daysBetween(state.dateInQatar, today()) : null;
+      
     const travelWithNames = (state.travelWith || [])
       .map(id => persons.find(m => m.id === id)?.name).filter(Boolean);
 
@@ -325,6 +344,7 @@ export async function renderAddTrip(container, params = {}) {
           <div>
             <div style="font-size:16px;font-weight:700;color:#fff;">${person?.name || 'Unknown'}</div>
             ${daysInDest !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysInDest} days in ${state.destination}</div>` : ''}
+            ${daysSoFar !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysSoFar} days so far</div>` : ''}
           </div>
         </div>
         <div style="padding:0 16px 8px;">
@@ -347,6 +367,8 @@ export async function renderAddTrip(container, params = {}) {
             </div>
           ` : ''}
         </div>
+        
+        <div id="review-photos" style="padding:0 16px 16px;"></div>
       </div>
 
       <div style="margin-top:20px;display:flex;gap:10px;">
@@ -356,6 +378,10 @@ export async function renderAddTrip(container, params = {}) {
 
       <div id="save-error" style="color:var(--danger);font-size:13px;margin-top:12px;text-align:center;"></div>
     `;
+    
+    if (state.photos?.length) {
+      renderPhotoThumbnails(document.getElementById('review-photos'), state.photos);
+    }
   }
 
   // ── Validation ──────────────────────────────────────────────────────
@@ -402,6 +428,7 @@ export async function renderAddTrip(container, params = {}) {
       flightOutward:state.flightOutward,
       reason:       state.reason,
       travelWith:   state.travelWith,
+      photos:       state.photos || [],
     };
 
     // Duplicate check for new trips

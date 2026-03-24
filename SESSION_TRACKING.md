@@ -249,6 +249,19 @@ git checkout master
 -   **Service Worker**: Bumped all apps to **v3.5.20**.
 -   **Commit**: `[TBD]` — `v3.5.20: Companion Sync and Stay Duration enhancements`
 
+### Image Attachments into Edit Mode (v3.5.21 · 2026-03-24)
+
+-   **Travel App: Image Support**:
+    -   **Add/Edit Trip**: Added a new "Photos" step to the trip entry wizard using the shared `renderPhotoSlots` component.
+    -   **Visibility**: Integrated `renderPhotoThumbnails` into the final "Review" step, ensuring attached photos are visible during both creation and viewing/editing.
+    -   **Persistence**: Updated `saveTrip` logic to support the `photos` array.
+-   **Travel App: UX Improvements**:
+    -   **Review Step**: Enhanced the header to show "X days so far" for ongoing trips, matching the Travel Log behavior.
+-   **Vault App: Verification**:
+    -   Confirmed that `add-transaction.js` already supports image attachments in both new and edit modes via the `renderPhotoSlots` integration.
+-   **Service Worker**: Bumped all apps and shared utilities to **v3.5.21**.
+-   **Commit**: `[TBD]` — `v3.5.21: Image attachments in edit mode and Travel Hub UX refinements`
+
 ---
 
 *Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*
