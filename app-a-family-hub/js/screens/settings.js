@@ -553,7 +553,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.19 · 2026-03-23</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.20 · 2026-03-24</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
@@ -665,19 +665,27 @@ function openImportModal(data, persons) {
         const rawNames = (rec.personName || '').split(/[&,]+/).map(n => n.trim()).filter(Boolean);
         if (!rawNames.length) { skipped++; return acc; }
         
-        const mainName = rawNames[0].toLowerCase();
-        const personId = personMap[mainName];
-        if (!personId) { skipped++; return acc; }
-        
-        // Resolve others as travelWith IDs
-        const travelWithIds = rawNames.slice(1).map(n => personMap[n.toLowerCase()]).filter(Boolean);
-        
-        acc.push({ 
-          ...rec, 
-          id: rec.id || uuidv4(), 
-          personId,
-          travelWith: [...new Set([...(rec.travelWith || []), ...travelWithIds])]
-        });
+        // Create a trip for each person in the row
+        const rowTrips = rawNames.map((name, idx) => {
+          const pid = personMap[name.toLowerCase()];
+          if (!pid) return null;
+          
+          // Other people in this row become 'travelWith' companions
+          const companions = rawNames
+            .filter((_, i) => i !== idx)
+            .map(n => personMap[n.toLowerCase()])
+            .filter(Boolean);
+
+          return { 
+            ...rec, 
+            id: uuidv4(), 
+            personId: pid,
+            travelWith: [...new Set([...(rec.travelWith || []), ...companions])]
+          };
+        }).filter(Boolean);
+
+        if (rowTrips.length === 0) { skipped++; return acc; }
+        acc.push(...rowTrips);
         return acc;
       }, []);
 

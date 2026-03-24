@@ -1,9 +1,9 @@
 import os
 
-target_version = "v3.5.5"
-new_version = "v3.5.6"
-target_date = "2026-03-22"
-new_date = "2026-03-23"
+target_version = "v3.5.19"
+new_version = "v3.5.20"
+target_date = "2026-03-23"
+new_date = "2026-03-24"
 
 count = 0
 for root, dirs, files in os.walk('.'):
