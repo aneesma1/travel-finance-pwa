@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.21 — 2026-03-24
 
 // ─── app-b-private-vault/js/screens/transaction-view.js ─────────────────────
 // Transaction View -- read-only display with edit button and WhatsApp copy
