@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.20 — 2026-03-24
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -533,7 +533,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         dateOutQatar: row.dateOutQatar  || null,
         dateInIndia:  row.dateInIndia   || null,
         daysInQatar:  row.dateInQatar && row.dateOutQatar
-          ? Math.round(Math.abs((new Date(row.dateOutQatar) - new Date(row.dateInQatar)) / 86400000))
+          ? Math.round(Math.abs((new Date(row.dateOutQatar + 'T00:00:00') - new Date(row.dateInQatar + 'T00:00:00')) / 86400000))
           : null,
         flightInward: row.flightInward  || '',
         flightOutward:row.flightOutward || '',

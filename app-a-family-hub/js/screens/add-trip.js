@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.20 — 2026-03-24
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
@@ -397,7 +397,7 @@ export async function renderAddTrip(container, params = {}) {
       dateInQatar:  state.dateInQatar,
       dateOutQatar: state.dateOutQatar || null,
       dateInIndia:  state.dateInIndia  || null,
-      daysInQatar:  daysInDest,
+      daysInQatar:  daysInQatar,
       flightInward: state.flightInward,
       flightOutward:state.flightOutward,
       reason:       state.reason,
@@ -421,13 +421,35 @@ export async function renderAddTrip(container, params = {}) {
 
       const newData = await localSave('travel', (remote) => {
         const trips = remote.trips || [];
+        
+        // 1. Prepare all trips to be saved (Main + Companions if new)
+        const tripsToSave = [tripData];
+        
+        if (!isEdit && state.travelWith.length > 0) {
+          state.travelWith.forEach(companionId => {
+            const companionTrip = {
+              ...tripData,
+              id: uuidv4(),
+              personId: companionId,
+              // Replace companionId in travelWith with the main personId
+              travelWith: [
+                state.personId,
+                ...state.travelWith.filter(bid => bid !== companionId)
+              ]
+            };
+            tripsToSave.push(companionTrip);
+          });
+        }
+
+        // 2. Update the trips array
         if (isEdit) {
           const idx = trips.findIndex(t => t.id === tripData.id);
           if (idx > -1) trips[idx] = tripData;
           else trips.push(tripData);
         } else {
-          trips.push(tripData);
+          trips.push(...tripsToSave);
         }
+        
         return { ...remote, trips };
       });
 

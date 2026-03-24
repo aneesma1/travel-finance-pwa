@@ -237,6 +237,18 @@ git checkout master
 -   **Service Worker**: Bumped all apps to **v3.5.19**.
 -   **Commit**: `[TBD]` — `v3.5.19: UI Polish and Travel Hub Data Maintenance`
 
+### Companion Sync & Stay Duration (v3.5.20 · 2026-03-24)
+
+-   **Travel App: Multi-Person Sync**:
+    -   **Manual Entry**: Updated `saveTrip` in `add-trip.js` to automatically create duplicate trip records for every companion listed in the `travelWith` array.
+    -   **Data Import**: Updated `onImportComplete` in `settings.js` to split multi-name rows (e.g., "Person A, Person B") into separate, linked trip entries during the import process.
+-   **Travel App: Stay Duration**:
+    -   **UI Enhancement**: Redesigned the `travel-log.js` row to display the "Days Stayed" duration in a prominent styled badge.
+    -   **Bug Fix**: Resolved a variable naming conflict in `add-trip.js` that prevented durations from being saved correctly.
+    -   **Import Logic**: Refined `daysInQatar` calculation in `import-tool.js` for better accuracy with Excel date formats.
+-   **Service Worker**: Bumped all apps to **v3.5.20**.
+-   **Commit**: `[TBD]` — `v3.5.20: Companion Sync and Stay Duration enhancements`
+
 ---
 
 *Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*

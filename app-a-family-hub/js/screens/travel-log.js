@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.20 — 2026-03-24
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -189,9 +189,9 @@ export async function renderTravelLog(container, params = {}) {
               </div>
             ` : ''}
           </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:14px;font-weight:700;color:var(--primary);">${daysLabel}</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${trip.flightInward || '--'}</div>
+          <div style="text-align:right;flex-shrink:0;min-width:70px;">
+            <div style="font-size:12px;font-weight:700;background:var(--primary-bg);color:var(--primary);padding:2px 8px;border-radius:6px;display:inline-block;">${daysLabel}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:500;">${trip.flightInward || '--'}</div>
           </div>
           <span style="color:var(--text-muted);font-size:16px;margin-left:4px;">›</span>
         </div>
