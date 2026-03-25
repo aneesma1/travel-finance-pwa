@@ -281,6 +281,7 @@ git checkout master
     -   Fixed `ReferenceError: hasOrphaned is not defined` (TDZ) in `travel-log.js` by moving data fetching to the top.
     -   Patched `index.html` to prevent background sync from navigating the user away from their current screen (e.g., Travel Log) to the Dashboard.
 - [x] **Maintenance**: Bumped project version to **v3.5.22** across all components.
+- [x] **Commit**: `0a9667f` (master), `549fd5c` (main) — `v3.5.22: Fix Vault save error, image crash, Category Merge, and Travel Log TDZ`
 
 ---
 
