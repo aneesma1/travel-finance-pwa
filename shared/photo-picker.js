@@ -276,25 +276,23 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
 
     container.appendChild(wrap);
 
-    // ── Global Ctrl+V paste handler (PC) ─────────────────────────────────────
-    if (pc) {
-      container._pasteHandler = async (e) => {
-        if (!e.clipboardData) return;
-        const item = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
-        if (!item) return;
-        const emptySlot = slots.findIndex(s => s === null);
-        if (emptySlot === -1) return;
-        e.preventDefault();
-        try {
-          const file = item.getAsFile();
-          const compressed = await compressImage(file);
-          slots[emptySlot] = compressed;
-          onChange([...slots]);
-          render();
-        } catch { /* ignore */ }
-      };
-      document.addEventListener('paste', container._pasteHandler);
-    }
+    // ── Global Ctrl+V paste handler ──────────────────────────────────────────
+    container._pasteHandler = async (e) => {
+      if (!e.clipboardData) return;
+      const item = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
+      if (!item) return;
+      const emptySlot = slots.findIndex(s => s === null);
+      if (emptySlot === -1) return;
+      e.preventDefault();
+      try {
+        const file = item.getAsFile();
+        const compressed = await compressImage(file);
+        slots[emptySlot] = compressed;
+        onChange([...slots]);
+        render();
+      } catch { /* ignore */ }
+    };
+    document.addEventListener('paste', container._pasteHandler);
   }
 
   // Cleanup on container removal
