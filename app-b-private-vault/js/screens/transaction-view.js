@@ -161,21 +161,28 @@ export async function renderTransactionView(container, params = {}) {
         });
       }
       const target = document.getElementById('txn-snapshot-target');
+      if (!target) throw new Error('Snapshot target not found');
+
       // Hide share controls during snapshot
       const controls = document.getElementById('share-controls');
-      controls.style.display = 'none';
+      if (controls) controls.style.display = 'none';
       
+      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg')?.trim() || '#F8FAFC';
+
       const canvas = await window.html2canvas(target, {
-        backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim(),
+        backgroundColor: bgColor,
         scale: 2,
+        useCORS: true,
         logging: false
       });
-      controls.style.display = 'flex';
       return canvas.toDataURL('image/png');
     } catch (err) {
       showToast('Image generation failed', 'error');
-      console.error(err);
+      console.error('[vault-view] Image generation error:', err);
       return null;
+    } finally {
+      const controls = document.getElementById('share-controls');
+      if (controls) controls.style.display = 'flex';
     }
   };
 

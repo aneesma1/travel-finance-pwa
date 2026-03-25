@@ -188,7 +188,7 @@ export async function openCategoryManager(containerEl) {
     }
 
     const { showInputModal, showConfirmModal } = await import('../../../shared/utils.js');
-    const target = await showInputModal('Merge Categories', `Merge ${items.length} items into:`, others[0]);
+    const target = await showInputModal('Merge Categories', `Merge ${items.length} items into:`, others[0], { suggestions: others });
     if (!target) return;
     
     if (!others.includes(target)) {
