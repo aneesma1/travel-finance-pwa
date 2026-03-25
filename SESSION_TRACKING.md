@@ -274,22 +274,23 @@ git checkout master
     - **Shared**: Robust sync-manager, custom themed modals (confirm/input), and refined import fuzzy logic.
 
 - [x] **Bug Fixes: Private Vault**:
-    -   Fixed `ReferenceError: DEFAULT_ACCOUNTS is not defined` in `add-transaction.js` by removing obsolete constant references.
-    -   Hardened `generateImage` in `transaction-view.js` with background color fallbacks and UI restoration logic to prevent share crashes.
-    -   Enhanced `showInputModal` in `shared/utils.js` with `datalist` support and updated `CategoryManager` to show existing categories during merge.
+    -   Fixed `ReferenceError: DEFAULT_ACCOUNTS is not defined` (v3.5.22).
+    -   Hardened `generateImage` in `transaction-view.js` (v3.5.22).
+    -   Enhanced `showInputModal` with `datalist` support (v3.5.22).
+    -   **Image Paste**: Enabled the global `paste` listener regardless of the `isPC()` check to support touch-screen Windows laptops/tablets.
 - [x] **Bug Fixes: Family Hub (Travel)**:
-    -   Fixed `ReferenceError: hasOrphaned is not defined` (TDZ) in `travel-log.js` by moving data fetching to the top.
-    -   Patched `index.html` to prevent background sync from navigating the user away from their current screen (e.g., Travel Log) to the Dashboard.
-- [x] **Maintenance**: Bumped project version to **v3.5.22** across all components.
-- [x] **Commit**: `0a9667f` (master), `549fd5c` (main) — `v3.5.22: Fix Vault save error, image crash, Category Merge, and Travel Log TDZ`
+    -   Fixed `ReferenceError: hasOrphaned is not defined` (TDZ) (v3.5.22).
+    -   Patched `index.html` navigation "yank" prevention (v3.5.22).
+    -   **Data Visibility**: Hardened `renderTrips` and `renderFilters` in `travel-log.js` with null-checks and `.filter(Boolean)`. Optimized `filterYear` to default to `'all'` if the current year has no trips, ensuring immediate visibility of imported history.
+- [x] **Maintenance**: Bumped project version to **v3.5.23** across all components.
 
 ---
 
 ## Session End: 2026-03-25
 
-### Project Status (v3.5.22)
-- **State**: Critical bugs resolved; PWA stability improved for both Vault and Travel apps.
+### Project Status (v3.5.23)
+- **State**: Stable and verified; all critical Vault and Travel bugs resolved.
 - **Highlights**:
-    - **Vault**: Transaction save failure and image generation crashes fixed.
-    - **Travel**: Navigation "yank" and Travel Log rendering crash fixed.
-    - **Shared**: Enhanced common input modal with autocomplete capabilities.
+    - **Vault**: Transaction saving, image sharing, and clipboard pasting now robust.
+    - **Travel**: History visibility restored and navigation interruptions fixed.
+    - **Shared**: Common components hardened against inconsistent data inputs.

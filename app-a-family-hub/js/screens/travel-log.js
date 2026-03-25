@@ -48,14 +48,16 @@ export async function renderTravelLog(container, params = {}) {
   document.getElementById('add-trip-fab').addEventListener('click', () => navigate('add-trip'));
   document.getElementById('fix-silo-btn')?.addEventListener('click', () => navigate('settings', { tab: 'data' }));
 
-  const persons = travelPersons;
+  const persons = Array.isArray(travelPersons) ? travelPersons.filter(Boolean) : [];
+  const safeTrips = Array.isArray(trips) ? trips.filter(Boolean) : [];
 
   // Merge any incoming params with URL hash
   if (params.personId) setHashParams({ person: params.personId });
   const hashParams = getHashParams();
   const filterPerson = hashParams.person || '';
+
   // Default year logic: if current year has no data, default to 'all'
-  const hasCurrentYearData = trips.some(t => t.dateOutIndia?.startsWith(String(currentYear())));
+  const hasCurrentYearData = safeTrips.some(t => t.dateOutIndia?.startsWith(String(currentYear())));
   // If no year in hash, default to 'all' to ensure imported data is visible
   const filterYear = hashParams.year || (hasCurrentYearData ? String(currentYear()) : 'all');
 
@@ -68,7 +70,7 @@ export async function renderTravelLog(container, params = {}) {
 
   function renderFilters(members, filterPerson, filterYear) {
     const bar = document.getElementById('filter-bar-container');
-    const years = [...new Set(trips.map(t => t.dateOutIndia?.slice(0, 4)).filter(Boolean))].sort((a,b)=>b-a);
+    const years = [...new Set(safeTrips.map(t => t.dateOutIndia?.slice(0, 4)).filter(Boolean))].sort((a,b)=>b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
 
     bar.innerHTML = `
@@ -111,9 +113,15 @@ export async function renderTravelLog(container, params = {}) {
   function renderTrips(persons, trips, filterPerson, filterYear, resetPage = true) {
     if (resetPage) _tripPage = 1;
     const logContent = document.getElementById('log-content');
-    const personMap  = Object.fromEntries(persons.map(m => [m.id, m]));
+    if (!logContent) return; // Guard
+    const personMap = Object.fromEntries(persons.map(m => [m.id, m]));
 
-    let filtered = [...trips].sort((a, b) => new Date(b.dateOutIndia) - new Date(a.dateOutIndia));
+    let filtered = safeTrips.sort((a, b) => {
+      const da = a.dateOutIndia ? new Date(a.dateOutIndia) : 0;
+      const db = b.dateOutIndia ? new Date(b.dateOutIndia) : 0;
+      return db - da;
+    });
+
     if (filterPerson) filtered = filtered.filter(t => t.personId === filterPerson);
     if (filterYear && filterYear !== 'all') {
       filtered = filtered.filter(t => t.dateOutIndia?.startsWith(filterYear));
@@ -130,6 +138,7 @@ export async function renderTravelLog(container, params = {}) {
     // Year totals per person
     const yearlyTotals = {};
     filtered.forEach(t => {
+      if (!t.personId) return;
       if (!yearlyTotals[t.personId]) yearlyTotals[t.personId] = 0;
       yearlyTotals[t.personId] += (t.daysInQatar || 0);
     });
