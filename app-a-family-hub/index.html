@@ -285,7 +285,11 @@
     watchSync();
 
     initNav();
-    navigate('dashboard');
+    // Only auto-navigate to dashboard if we are at the root or already on dashboard
+    const currentHash = window.location.hash;
+    if (!currentHash || currentHash === '#dashboard') {
+      navigate('dashboard');
+    }
 
     // ── Security: register session + start heartbeat ───────────────
     registerSession('App A').catch(() => {});

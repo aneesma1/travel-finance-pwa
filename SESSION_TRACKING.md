@@ -247,7 +247,7 @@ git checkout master
     -   **Bug Fix**: Resolved a variable naming conflict in `add-trip.js` that prevented durations from being saved correctly.
     -   **Import Logic**: Refined `daysInQatar` calculation in `import-tool.js` for better accuracy with Excel date formats.
 -   **Service Worker**: Bumped all apps to **v3.5.20**.
--   **Commit**: `[TBD]` — `v3.5.20: Companion Sync and Stay Duration enhancements`
+-   **Commit**: `25fb463` (master), `0defc00` (main) — `v3.5.20: Companion Sync and Stay Duration enhancements`
 
 ### Image Attachments into Edit Mode (v3.5.21 · 2026-03-24)
 
@@ -260,8 +260,35 @@ git checkout master
 -   **Vault App: Verification**:
     -   Confirmed that `add-transaction.js` already supports image attachments in both new and edit modes via the `renderPhotoSlots` integration.
 -   **Service Worker**: Bumped all apps and shared utilities to **v3.5.21**.
--   **Commit**: `[TBD]` — `v3.5.21: Image attachments in edit mode and Travel Hub UX refinements`
+-   **Commit**: `4e31c7d` (master), `39cbfc3` (main) — `v3.5.21: Image attachments in edit mode and Travel Hub UX refinements`
 
 ---
 
-*Note: Whenever a new change is implemented, it will be accurately appended to the corresponding section above, preserving the context and nature of the modification.*
+## Session Start: 2026-03-25
+
+### Current Project Status (v3.5.21)
+- **State**: Mission-ready with full image attachment support across the suite.
+- **Recent Highlights**:
+    - **Travel Hub**: Image attachments in Trip Entry (v3.5.21), Stay Duration badges, and Companion Sync (v3.5.20).
+    - **Private Vault**: prominent EDIT buttons, Category Manager redesign, and verified image attachment slots.
+    - **Shared**: Robust sync-manager, custom themed modals (confirm/input), and refined import fuzzy logic.
+
+- [x] **Bug Fixes: Private Vault**:
+    -   Fixed `ReferenceError: DEFAULT_ACCOUNTS is not defined` in `add-transaction.js` by removing obsolete constant references.
+    -   Hardened `generateImage` in `transaction-view.js` with background color fallbacks and UI restoration logic to prevent share crashes.
+    -   Enhanced `showInputModal` in `shared/utils.js` with `datalist` support and updated `CategoryManager` to show existing categories during merge.
+- [x] **Bug Fixes: Family Hub (Travel)**:
+    -   Fixed `ReferenceError: hasOrphaned is not defined` (TDZ) in `travel-log.js` by moving data fetching to the top.
+    -   Patched `index.html` to prevent background sync from navigating the user away from their current screen (e.g., Travel Log) to the Dashboard.
+- [x] **Maintenance**: Bumped project version to **v3.5.22** across all components.
+
+---
+
+## Session End: 2026-03-25
+
+### Project Status (v3.5.22)
+- **State**: Critical bugs resolved; PWA stability improved for both Vault and Travel apps.
+- **Highlights**:
+    - **Vault**: Transaction save failure and image generation crashes fixed.
+    - **Travel**: Navigation "yank" and Travel Log rendering crash fixed.
+    - **Shared**: Enhanced common input modal with autocomplete capabilities.

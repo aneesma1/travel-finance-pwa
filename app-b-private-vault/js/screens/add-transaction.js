@@ -330,8 +330,8 @@ export async function renderAddTransaction(container, params = {}) {
       const newData = await localSave('finance', (remote) => {
         const txns = remote.transactions || [];
         // Persist any new custom categories/accounts
-        const cats = [...new Set([...(remote.categories || []), ...allCategories.filter(c => !DEFAULT_CATEGORIES.includes(c))])];
-        const accs = [...new Set([...(remote.accounts   || []), ...allAccounts.filter(a   => !DEFAULT_ACCOUNTS.includes(a))])];
+        const cats = [...new Set([...(remote.categories || []), ...allCategories])].sort();
+        const accs = [...new Set([...(remote.accounts   || []), ...allAccounts])].sort();
 
         if (isEdit) {
           const idx = txns.findIndex(t => t.id === txnData.id);

@@ -239,16 +239,30 @@ export function showConfirmModal(title, message, options = {}) {
 }
 
 export function showInputModal(title, label, defaultValue = '', options = {}) {
+  const { suggestions = [] } = options;
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '10001';
+    
+    // Build datalist if suggestions provided
+    const datalistId = suggestions.length ? 'modal-datalist-' + uuidv4().slice(0,8) : null;
+    const datalistHtml = datalistId ? `
+      <datalist id="${datalistId}">
+        ${suggestions.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('')}
+      </datalist>
+    ` : '';
+
     overlay.innerHTML = `
       <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
         <div style="padding:20px 24px;">
           <div style="font-size:17px; font-weight:700; margin-bottom:16px;">${title}</div>
           <label class="form-label">${label}</label>
-          <input type="text" id="modal-input" class="form-input" value="${defaultValue}" autocomplete="off" style="margin-top:4px;" />
+          <input type="text" id="modal-input" class="form-input" 
+            value="${defaultValue}" autocomplete="off" 
+            ${datalistId ? `list="${datalistId}"` : ''}
+            style="margin-top:4px;" />
+          ${datalistHtml}
           <div style="margin-top:24px; display:flex; gap:12px;">
             <button id="modal-cancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
             <button id="modal-confirm" class="btn btn-primary" style="flex:1;">Save</button>

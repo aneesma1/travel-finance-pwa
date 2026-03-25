@@ -17,6 +17,13 @@ import {
 } from '../../../shared/utils.js';
 
 export async function renderTravelLog(container, params = {}) {
+  const data = await getCachedTravelData();
+  const { travelPersons = [], trips = [], members = [] } = data || {};
+  
+  // Detect orphaned trips (linked to members but not travelPersons)
+  const tpIds = new Set(travelPersons.map(p => p.id));
+  const hasOrphaned = trips.some(t => t.personId && !tpIds.has(t.personId) && (members||[]).some(m => m.id === t.personId));
+
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">✈️ Travel Log</span>
@@ -36,18 +43,12 @@ export async function renderTravelLog(container, params = {}) {
     <button class="fab" id="add-trip-fab">＋</button>
   `;
 
+  if (!data) { showEmpty(document.getElementById('log-content'), 'No data available'); return; }
+
   document.getElementById('add-trip-fab').addEventListener('click', () => navigate('add-trip'));
   document.getElementById('fix-silo-btn')?.addEventListener('click', () => navigate('settings', { tab: 'data' }));
 
-  const data = await getCachedTravelData();
-  if (!data) { showEmpty(document.getElementById('log-content'), 'No data available'); return; }
-
-  const { travelPersons = [], trips = [], members = [] } = data;
   const persons = travelPersons;
-
-  // Detect orphaned trips (linked to members but not travelPersons)
-  const tpIds = new Set(travelPersons.map(p => p.id));
-  const hasOrphaned = trips.some(t => t.personId && !tpIds.has(t.personId) && members.some(m => m.id === t.personId));
 
   // Merge any incoming params with URL hash
   if (params.personId) setHashParams({ person: params.personId });
