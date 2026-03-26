@@ -277,7 +277,13 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
     container.appendChild(wrap);
 
     // ── Global Ctrl+V paste handler ──────────────────────────────────────────
+    if (container._pasteHandler) {
+      document.removeEventListener('paste', container._pasteHandler);
+    }
     container._pasteHandler = async (e) => {
+      // Don't intercept if focus is in an input or textarea
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+
       if (!e.clipboardData) return;
       const item = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
       if (!item) return;

@@ -286,11 +286,28 @@ git checkout master
 
 ---
 
-## Session End: 2026-03-25
+---
 
-### Project Status (v3.5.23)
-- **State**: Stable and verified; all critical Vault and Travel bugs resolved.
+## Session Start: 2026-03-26
+
+### Vault and Travel Hub Enhancements (v3.5.24)
+- **Vault App: Image Paste Fix**: Hardened `paste` listener in `photo-picker.js` to prevent duplication and ignore pastes when typing in inputs.
+- **Travel App: Visibility & Defaults**:
+    - Defaulted `filterYear` to `'all'` in `travel-log.js` for immediate history visibility.
+    - Removed the "Data Maintenance" section from settings as requested.
+- **Travel App: Enhanced Import**:
+    - Fixed a bug in `import-tool.js` where `travelWith` was ignored.
+    - Updated `settings.js` to create separate, linked trip records for everyone listed in a row (Primary + Companions).
+- **Travel App: Manual Entry**: Added a checkbox to optionally duplicate travel details for companions.
+- **Maintenance**: Bumped project version to **v3.5.24** across all components.
+- **Commit**: `[TBD]` — `v3.5.24: Vault paste fix and Travel Hub import/entry enhancements`
+
+---
+
+## Session End: 2026-03-26
+
+### Project Status (v3.5.24)
+- **State**: Enhanced and simplified; import logic more robust and duplication feature added.
 - **Highlights**:
-    - **Vault**: Transaction saving, image sharing, and clipboard pasting now robust.
-    - **Travel**: History visibility restored and navigation interruptions fixed.
-    - **Shared**: Common components hardened against inconsistent data inputs.
+    - **Vault**: Image pasting is now reliable and doesn't interfere with text input.
+    - **Travel**: Import process is automated for multi-person rows; log defaults to "All" years for better user experience.
