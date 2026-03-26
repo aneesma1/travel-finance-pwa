@@ -1,4 +1,4 @@
-// v3.5.21 — 2026-03-24
+// v3.5.24 — 2026-03-26
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
@@ -281,6 +281,12 @@ export async function renderAddTrip(container, params = {}) {
         <div class="form-group">
           <label class="form-label">Travelling with</label>
           <div id="travel-with-pills"></div>
+          <div style="margin-top:12px; display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--surface-3); border-radius:var(--radius-md); border:1px solid var(--border);">
+            <input type="checkbox" id="create-copy-check" checked style="width:18px;height:18px;cursor:pointer;" />
+            <label for="create-copy-check" style="font-size:12px;font-weight:600;color:var(--text);cursor:pointer;">
+              Create same travel details for each person
+            </label>
+          </div>
         </div>
       ` : ''}
     `;
@@ -453,19 +459,22 @@ export async function renderAddTrip(container, params = {}) {
         const tripsToSave = [tripData];
         
         if (!isEdit && state.travelWith.length > 0) {
-          state.travelWith.forEach(companionId => {
-            const companionTrip = {
-              ...tripData,
-              id: uuidv4(),
-              personId: companionId,
-              // Replace companionId in travelWith with the main personId
-              travelWith: [
-                state.personId,
-                ...state.travelWith.filter(bid => bid !== companionId)
-              ]
-            };
-            tripsToSave.push(companionTrip);
-          });
+          const shouldDuplicate = document.getElementById('create-copy-check')?.checked;
+          if (shouldDuplicate) {
+            state.travelWith.forEach(companionId => {
+              const companionTrip = {
+                ...tripData,
+                id: uuidv4(),
+                personId: companionId,
+                // Replace companionId in travelWith with the main personId
+                travelWith: [
+                  state.personId,
+                  ...state.travelWith.filter(bid => bid !== companionId)
+                ]
+              };
+              tripsToSave.push(companionTrip);
+            });
+          }
         }
 
         // 2. Update the trips array

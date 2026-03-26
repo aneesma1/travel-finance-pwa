@@ -1,4 +1,4 @@
-// v3.5.21 — 2026-03-24
+// v3.5.24 — 2026-03-26
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -59,7 +59,7 @@ export async function renderTravelLog(container, params = {}) {
   // Default year logic: if current year has no data, default to 'all'
   const hasCurrentYearData = safeTrips.some(t => t.dateOutIndia?.startsWith(String(currentYear())));
   // If no year in hash, default to 'all' to ensure imported data is visible
-  const filterYear = hashParams.year || (hasCurrentYearData ? String(currentYear()) : 'all');
+  const filterYear = hashParams.year || 'all';
 
   document.getElementById('header-export-btn')?.addEventListener('click', () => {
     openTravelExportSheet(persons, trips, data.documents || []);

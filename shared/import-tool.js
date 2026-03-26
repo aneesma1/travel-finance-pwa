@@ -1,4 +1,4 @@
-// v3.5.21 — 2026-03-24
+// v3.5.24 — 2026-03-26
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -527,7 +527,8 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       return {
         id:           uuidv4(),
         timestamp:    row.timestamp || new Date().toISOString(),
-        personName:   row.personName,   // Resolved to personId by the caller
+        personName:      row.personName,   // Temporary, resolved to personId by caller
+        travelWithNames: row.travelWith,   // Temporary, resolved by caller
         dateOutIndia: row.dateOutIndia,
         dateInQatar:  row.dateInQatar,
         dateOutQatar: row.dateOutQatar  || null,
@@ -538,7 +539,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         flightInward: row.flightInward  || '',
         flightOutward:row.flightOutward || '',
         reason:       row.reason        || '',
-        travelWith:   [],
+        travelWith:   [], // To be populated by caller
       };
     } else {
       return {
