@@ -1,4 +1,4 @@
-// v3.5.10 — 2026-03-26
+// v3.5.10 — 2026-03-28
 // ─── app-b-private-vault/js/modals/category-manager.js ───────────────────────
 // Category Manager Modal: Multi-select, Rename, Merge, Delete
 

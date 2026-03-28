@@ -1,4 +1,4 @@
-// v3.5.24 — 2026-03-26
+// v3.5.25 — 2026-03-28
 
 // ─── app-a-family-hub/js/router.js ──────────────────────────────────────────
 // Client-side router for Family Hub

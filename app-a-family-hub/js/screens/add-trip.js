@@ -1,4 +1,4 @@
-// v3.5.24 — 2026-03-26
+// v3.5.25 — 2026-03-28
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
@@ -124,6 +124,7 @@ export async function renderAddTrip(container, params = {}) {
 
     switch (currentStep) {
       case 0: renderPersonStep(stepContent, persons); break;
+      case 1: renderDatesStep(stepContent); break;
       case 2: renderFlightsStep(stepContent); break;
       case 3: renderReasonStep(stepContent, persons); break;
       case 4: renderPhotosStep(stepContent); break;
