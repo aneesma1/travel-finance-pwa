@@ -304,10 +304,28 @@ git checkout master
 
 ---
 
-## Session End: 2026-03-26
+---
 
-### Project Status (v3.5.24)
-- **State**: Enhanced and simplified; import logic more robust and duplication feature added.
+## Session Start: 2026-03-28
+
+### Vault and Travel Hub Fixes (v3.5.25)
+- **Vault App: Paste with Review**:
+    - Replaced the basic "Press Ctrl+V" overlay in `shared/photo-picker.js` with a premium **Paste Review Modal**.
+    - The new modal supports native clipboard reading (where permitted) and manual `Ctrl+V`.
+    - Added an **Image Preview** state so users can see the pasted image before clicking "Add Photo".
+- **Travel App: Entry Wizard Fix**:
+    - Resolved a critical bug in `add-trip.js` where Step 2 (Dates) was missing from the rendering logic, causing the form to get stuck.
+- **Travel App: Data Visibility**:
+    - Hardened `travel-log.js` filter logic to ensure all records are visible when "All" years is selected, regardless of date formatting.
+- **Maintenance**: Bumped project version to **v3.5.25** across all components (15 files updated).
+- **Commit**: `[TBD]` — `v3.5.25: Vault paste review and Travel Hub entry/visibility fixes`
+
+---
+
+## Session End: 2026-03-28
+
+### Project Status (v3.5.25)
+- **State**: Stabilized and polished.
 - **Highlights**:
-    - **Vault**: Image pasting is now reliable and doesn't interfere with text input.
-    - **Travel**: Import process is automated for multi-person rows; log defaults to "All" years for better user experience.
+    - **Vault**: Image pasting is now interactive with a mandatory review step for better UX.
+    - **Travel**: The 6-step entry wizard is now fully functional; historical and imported data is properly visible in the log.

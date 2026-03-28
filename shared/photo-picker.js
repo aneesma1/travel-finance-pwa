@@ -38,90 +38,118 @@ export async function compressImage(file) {
   });
 }
 
-// ── Paste from clipboard (Ctrl+V or snipping tool) ───────────────────────────
-function pasteFromClipboard(slotIndex, slots, onChange, rerender) {
-  // Primary: try clipboard API (requires permission, may fail)
-  // Fallback: show a temporary focused paste area for Ctrl+V
-  if (navigator.clipboard?.read) {
-    navigator.clipboard.read().then(items => {
-      for (const item of items) {
-        const imgType = item.types.find(t => t.startsWith('image/'));
-        if (imgType) {
-          item.getType(imgType).then(blob => {
-            const file = new File([blob], 'pasted.png', { type: imgType });
-            compressImage(file).then(compressed => {
-              slots[slotIndex] = compressed;
-              onChange([...slots]);
-              rerender();
-            });
-          });
-          return;
-        }
-      }
-      // No image in clipboard API — try paste area fallback
-      showPasteArea(slotIndex, slots, onChange, rerender);
-    }).catch(() => {
-      showPasteArea(slotIndex, slots, onChange, rerender);
-    });
-  } else {
-    showPasteArea(slotIndex, slots, onChange, rerender);
-  }
-}
-
-function showPasteArea(slotIndex, slots, onChange, rerender) {
-  // Remove any existing paste overlay
+// ── Paste from clipboard (with Review Modal) ─────────────────────────────
+async function showPasteDialog(slotIndex, slots, onChange, rerender) {
+  // Remove any existing overlay
   document.getElementById('paste-overlay')?.remove();
 
   const overlay = document.createElement('div');
   overlay.id = 'paste-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:2000;display:flex;align-items:center;justify-content:center;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);';
 
-  const box = document.createElement('div');
-  box.style.cssText = 'background:#fff;border-radius:16px;padding:28px 32px;max-width:320px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);';
-  box.innerHTML =
-    '<div style="font-size:40px;margin-bottom:12px;">📋</div>' +
-    '<div style="font-size:17px;font-weight:700;margin-bottom:10px;color:#111;">Paste Image</div>' +
-    '<div style="font-size:14px;color:#555;margin-bottom:20px;line-height:1.6;">' +
-      'Copy an image first (Snipping Tool, screenshot, etc.)<br>' +
-      'Then press <strong>Ctrl+V</strong>' +
-    '</div>' +
-    '<button id="paste-cancel-btn" style="padding:10px 28px;border-radius:20px;border:1.5px solid #ddd;background:transparent;cursor:pointer;font-size:14px;">Cancel</button>';
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--surface);border-radius:24px;width:100%;max-width:400px;box-shadow:0 20px 50px rgba(0,0,0,0.3);overflow:hidden;animation:sheetUp 0.3s ease-out;';
 
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
+  let pastedImage = null;
 
-  // Listen on document - works without focus tricks
+  function updateContent() {
+    if (!pastedImage) {
+      modal.innerHTML = `
+        <div style="padding:32px 24px;text-align:center;">
+          <div style="font-size:48px;margin-bottom:16px;">📋</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:12px;color:var(--text);">Paste from Clipboard</div>
+          <div style="font-size:14px;color:var(--text-muted);line-height:1.6;margin-bottom:24px;">
+            Copy an image (Snipping Tool, Right-click copy, etc.) then press <b>Ctrl+V</b> or tap the button below if supported.
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <button id="paste-manual-btn" class="btn btn-primary" style="width:100%;padding:12px;">Trigger System Paste</button>
+            <button id="paste-cancel-btn" class="btn btn-secondary" style="width:100%;padding:12px;">Cancel</button>
+          </div>
+        </div>
+      `;
+    } else {
+      modal.innerHTML = `
+        <div style="padding:24px;">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px;text-align:center;">Review Pasted Image</div>
+          <div style="background:#000;border-radius:12px;overflow:hidden;margin-bottom:20px;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;">
+            <img src="${pastedImage}" style="max-width:100%;max-height:100%;object-fit:contain;" />
+          </div>
+          <div style="display:flex;gap:12px;">
+            <button id="paste-ok-btn" class="btn btn-primary" style="flex:2;padding:12px;">✅ Add Photo</button>
+            <button id="paste-retry-btn" class="btn btn-secondary" style="flex:1;padding:12px;">Retry</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Bind events
+    const cancelBtn = modal.querySelector('#paste-cancel-btn');
+    if (cancelBtn) cancelBtn.onclick = () => { overlay.remove(); document.removeEventListener('paste', handlePaste); };
+
+    const manualBtn = modal.querySelector('#paste-manual-btn');
+    if (manualBtn) manualBtn.onclick = async () => {
+      try {
+        if (!navigator.clipboard?.read) {
+          showToast('Native paste not supported here. Use Ctrl+V', 'warning');
+          return;
+        }
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const type = item.types.find(t => t.startsWith('image/'));
+          if (type) {
+            const blob = await item.getType(type);
+            const file = new File([blob], 'pasted.png', { type });
+            const compressed = await compressImage(file);
+            pastedImage = compressed;
+            updateContent();
+            return;
+          }
+        }
+        showToast('No image in clipboard', 'warning');
+      } catch (err) {
+        showToast('Clipboard access denied. Try Ctrl+V', 'warning');
+      }
+    };
+
+    const okBtn = modal.querySelector('#paste-ok-btn');
+    if (okBtn) okBtn.onclick = () => {
+      slots[slotIndex] = pastedImage;
+      onChange([...slots]);
+      rerender();
+      overlay.remove();
+      document.removeEventListener('paste', handlePaste);
+    };
+
+    const retryBtn = modal.querySelector('#paste-retry-btn');
+    if (retryBtn) retryBtn.onclick = () => { pastedImage = null; updateContent(); };
+  }
+
   const handlePaste = async (e) => {
-    e.preventDefault();
-    const items = Array.from(e.clipboardData?.items || []);
-    const imgItem = items.find(it => it.type.startsWith('image/'));
-    if (imgItem) {
-      const file = imgItem.getAsFile();
+    const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
+    if (item) {
+      e.preventDefault();
+      const file = item.getAsFile();
       if (file) {
-        overlay.remove();
         try {
           const compressed = await compressImage(file);
-          slots[slotIndex] = compressed;
-          onChange([...slots]);
-          rerender();
-        } catch (err) {
-          showToast('Could not process image', 'error');
-        }
-        return;
+          pastedImage = compressed;
+          updateContent();
+        } catch { showToast('Image processing failed', 'error'); }
       }
     }
-    showToast('No image in clipboard — copy an image first', 'warning', 3000);
   };
 
-  document.addEventListener('paste', handlePaste, { once: true });
+  document.addEventListener('paste', handlePaste);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  updateContent();
 
-  const cancel = () => {
-    document.removeEventListener('paste', handlePaste);
-    overlay.remove();
+  overlay.onclick = (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      document.removeEventListener('paste', handlePaste);
+    }
   };
-
-  document.getElementById('paste-cancel-btn').addEventListener('click', cancel);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) cancel(); });
 }
 
 function showToast(msg, type, dur) {
@@ -222,7 +250,7 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
         const pasteBtn = document.createElement('button');
         pasteBtn.style.cssText = 'display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:var(--radius-md);border:1px solid var(--primary-border);background:var(--primary-bg);color:var(--primary);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;';
         pasteBtn.innerHTML = '📋 Paste clipboard';
-        pasteBtn.addEventListener('click', () => pasteFromClipboard(i, slots, onChange, render));
+        pasteBtn.addEventListener('click', () => showPasteDialog(i, slots, onChange, render));
         slot.appendChild(pasteBtn);
 
       } else {
@@ -267,7 +295,7 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
         const pasteBtn = document.createElement('button');
         pasteBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 8px;border-radius:var(--radius-md);border:1px solid var(--primary-border);background:var(--primary-bg);color:var(--primary);font-size:12px;cursor:pointer;font-family:inherit;';
         pasteBtn.innerHTML = '📋 Paste';
-        pasteBtn.addEventListener('click', () => pasteFromClipboard(i, slots, onChange, render));
+        pasteBtn.addEventListener('click', () => showPasteDialog(i, slots, onChange, render));
         slot.appendChild(pasteBtn);
       }
 
@@ -286,17 +314,13 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
 
       if (!e.clipboardData) return;
       const item = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
-      if (!item) return;
       const emptySlot = slots.findIndex(s => s === null);
       if (emptySlot === -1) return;
-      e.preventDefault();
-      try {
-        const file = item.getAsFile();
-        const compressed = await compressImage(file);
-        slots[emptySlot] = compressed;
-        onChange([...slots]);
-        render();
-      } catch { /* ignore */ }
+      
+      // If NOT already in a paste dialog, opening it will handle the paste event again
+      // but we need to pass the current event's data if possible, or just open the dialog.
+      // Better: trigger the dialog for the first empty slot.
+      showPasteDialog(emptySlot, slots, onChange, render);
     };
     document.addEventListener('paste', container._pasteHandler);
   }
