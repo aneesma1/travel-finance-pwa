@@ -1,4 +1,4 @@
-// v3.5.34 — 2026-03-31
+// v3.5.37 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -42,14 +42,12 @@ export async function renderTravelLog(container, params = {}) {
     return t;
   }) : [];
 
-  // ── Extract unique persons by splitting ALL combined name fields ──
+  // ── Extract unique persons and years ──
   const personNamesSet = new Set();
-  const personInfoMap = {};  // name → { name, emoji, color }
+  const personInfoMap = {};
   const yearsSet = new Set();
 
   safeTrips.forEach(t => {
-    // Treat the primary personName as a single entry (as it is in the data)
-    // Only split companion names for chip discovery
     const namesInTrip = [
       t.personName || '',
       ...(t.travelWithNames || '').split(/[&,]+/)
@@ -71,6 +69,19 @@ export async function renderTravelLog(container, params = {}) {
     if (yr) yearsSet.add(yr);
   });
   const uniquePersons = [...personNamesSet].sort().map(n => personInfoMap[n]);
+  const availableYears = [...yearsSet].sort((a,b) => b - a);
+
+  // Default year logic: use URL param, or current year IF it has data, otherwise default to latest year with data or 'all'
+  const urlYear = params.year || getHashParams().year;
+  const cYr = String(currentYear());
+  let filterYear = urlYear;
+  if (!filterYear) {
+    if (yearsSet.has(cYr)) filterYear = cYr;
+    else if (availableYears.length > 0) filterYear = availableYears[0];
+    else filterYear = 'all';
+  }
+
+  let filterPerson = params.person || getHashParams().person;
 
   container.innerHTML = `
     <div class="app-header">
@@ -89,8 +100,9 @@ export async function renderTravelLog(container, params = {}) {
   // Merge any incoming params with URL hash
   if (params.personId) setHashParams({ person: params.personId });
   const hashParams = getHashParams();
-  const filterPerson = hashParams.person || '';
-  const filterYear = hashParams.year || 'all';
+  filterPerson = hashParams.person || '';
+  // If no year in hash, we already calculated a smart default in 'filterYear' above
+  if (hashParams.year) filterYear = hashParams.year;
 
   document.getElementById('header-export-btn')?.addEventListener('click', () => {
     openTravelExportSheet(uniquePersons, safeTrips, data.documents || []);
@@ -101,8 +113,10 @@ export async function renderTravelLog(container, params = {}) {
 
   function renderFilters(filterPerson, filterYear) {
     const bar = document.getElementById('filter-bar-container');
-    const years = [...new Set(safeTrips.map(t => t.dateOutIndia?.slice(0, 4)).filter(Boolean))].sort((a,b)=>b-a);
-    if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
+    const yearsDisplay = [...availableYears];
+    if (!yearsDisplay.includes(String(currentYear()))) {
+      yearsDisplay.unshift(String(currentYear()));
+    }
 
     bar.innerHTML = `
       <div class="filter-bar">
@@ -117,7 +131,7 @@ export async function renderTravelLog(container, params = {}) {
           <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 4px;"></div>
           <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Year</span>
           <button class="filter-chip ${filterYear === 'all' ? 'active' : ''}" data-filter="year" data-value="all">All</button>
-          ${years.map(y => `
+          ${yearsDisplay.map(y => `
             <button class="filter-chip ${filterYear === y ? 'active' : ''}" data-filter="year" data-value="${y}">${y}</button>
           `).join('')}
         </div>
@@ -147,9 +161,14 @@ export async function renderTravelLog(container, params = {}) {
     if (!logContent) return;
 
     let filtered = [...safeTrips].sort((a, b) => {
-      const da = a.dateOutIndia ? new Date(a.dateOutIndia).getTime() : 0;
-      const db = b.dateOutIndia ? new Date(b.dateOutIndia).getTime() : 0;
-      return (Number.isNaN(db) ? 0 : db) - (Number.isNaN(da) ? 0 : da);
+      const da = a.dateOutIndia || '';
+      const db = b.dateOutIndia || '';
+      // Try ISO first
+      const ta = new Date(da).getTime();
+      const tb = new Date(db).getTime();
+      if (!isNaN(ta) && !isNaN(tb)) return tb - ta;
+      // Fallback to string comparison (desc)
+      return db.localeCompare(da);
     });
 
     // Filter by person name
