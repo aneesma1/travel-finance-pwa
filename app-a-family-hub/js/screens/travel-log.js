@@ -1,4 +1,4 @@
-// v3.5.38 — 2026-03-31
+// v3.5.41 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -11,7 +11,7 @@ import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { openTravelExportSheet } from './travel-export.js';
 import {
-  formatDisplayDate, daysBetween, currentYear,
+  formatDisplayDate, daysBetween, today, currentYear,
   getHashParams, setHashParams,
   showToast
 } from '../../../shared/utils.js';

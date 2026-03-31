@@ -1,4 +1,4 @@
-// v3.5.39 — 2026-03-31
+// v3.5.40 — 2026-03-31
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -19,8 +19,6 @@ export const TRAVEL_COLUMNS = [
   { key: 'flightOutward', label: 'Outward Flight From Qatar', required: false },
   { key: 'reason',        label: 'Reason for Travel',         required: false },
   { key: 'travelWith',    label: 'Travel With',               required: false },
-  { key: 'daysInQatar',   label: 'Days outside Qatar',        required: false },
-  { key: 'daysInIndia',   label: 'Days in India',             required: false },
 ];
 
 export const FINANCE_COLUMNS = [
