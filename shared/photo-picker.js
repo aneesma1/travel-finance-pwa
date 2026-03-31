@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.30 — 2026-03-31
 
 // ─── shared/photo-picker.js ──────────────────────────────────────────────────
 // Shared photo capture component
@@ -7,6 +7,8 @@
 // Compresses to 800px max / JPEG 75%
 
 'use strict';
+
+import { showToast as globalToast } from './utils.js';
 
 const MAX_DIM = 800;
 const QUALITY = 0.75;
@@ -38,8 +40,15 @@ export async function compressImage(file) {
   });
 }
 
+// Track whether the paste dialog is currently open
+let _pasteDialogOpen = false;
+
 // ── Paste from clipboard (with Review Modal) ─────────────────────────────
 async function showPasteDialog(slotIndex, slots, onChange, rerender) {
+  // Prevent duplicate dialogs
+  if (_pasteDialogOpen) return;
+  _pasteDialogOpen = true;
+
   // Remove any existing overlay
   document.getElementById('paste-overlay')?.remove();
 
@@ -51,6 +60,12 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
   modal.style.cssText = 'background:var(--surface);border-radius:24px;width:100%;max-width:400px;box-shadow:0 20px 50px rgba(0,0,0,0.3);overflow:hidden;animation:sheetUp 0.3s ease-out;';
 
   let pastedImage = null;
+
+  function closeDialog() {
+    _pasteDialogOpen = false;
+    overlay.remove();
+    document.removeEventListener('paste', handlePaste);
+  }
 
   function updateContent() {
     if (!pastedImage) {
@@ -84,13 +99,13 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
 
     // Bind events
     const cancelBtn = modal.querySelector('#paste-cancel-btn');
-    if (cancelBtn) cancelBtn.onclick = () => { overlay.remove(); document.removeEventListener('paste', handlePaste); };
+    if (cancelBtn) cancelBtn.onclick = closeDialog;
 
     const manualBtn = modal.querySelector('#paste-manual-btn');
     if (manualBtn) manualBtn.onclick = async () => {
       try {
         if (!navigator.clipboard?.read) {
-          showToast('Native paste not supported here. Use Ctrl+V', 'warning');
+          globalToast('Native paste not supported here. Use Ctrl+V', 'warning');
           return;
         }
         const items = await navigator.clipboard.read();
@@ -105,9 +120,9 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
             return;
           }
         }
-        showToast('No image in clipboard', 'warning');
+        globalToast('No image in clipboard', 'warning');
       } catch (err) {
-        showToast('Clipboard access denied. Try Ctrl+V', 'warning');
+        globalToast('Clipboard access denied. Try Ctrl+V', 'warning');
       }
     };
 
@@ -115,9 +130,9 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
     if (okBtn) okBtn.onclick = () => {
       slots[slotIndex] = pastedImage;
       onChange([...slots]);
+      closeDialog();
       rerender();
-      overlay.remove();
-      document.removeEventListener('paste', handlePaste);
+      globalToast('Photo added!', 'success');
     };
 
     const retryBtn = modal.querySelector('#paste-retry-btn');
@@ -128,33 +143,26 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
     const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
     if (item) {
       e.preventDefault();
+      e.stopImmediatePropagation(); // Prevent global handler from also firing
       const file = item.getAsFile();
       if (file) {
         try {
           const compressed = await compressImage(file);
           pastedImage = compressed;
           updateContent();
-        } catch { showToast('Image processing failed', 'error'); }
+        } catch { globalToast('Image processing failed', 'error'); }
       }
     }
   };
 
-  document.addEventListener('paste', handlePaste);
+  document.addEventListener('paste', handlePaste, true); // Use capture phase to fire FIRST
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   updateContent();
 
   overlay.onclick = (e) => {
-    if (e.target === overlay) {
-      overlay.remove();
-      document.removeEventListener('paste', handlePaste);
-    }
+    if (e.target === overlay) closeDialog();
   };
-}
-
-function showToast(msg, type, dur) {
-  // Use global showToast if available, else silent
-  if (typeof window !== 'undefined' && window._showToast) window._showToast(msg, type, dur);
 }
 
 // ── Render photo slots ────────────────────────────────────────────────────────
@@ -309,17 +317,19 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
       document.removeEventListener('paste', container._pasteHandler);
     }
     container._pasteHandler = async (e) => {
+      // Skip if paste dialog is already open (dialog has its own handler)
+      if (_pasteDialogOpen) return;
+
       // Don't intercept if focus is in an input or textarea
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
 
       if (!e.clipboardData) return;
       const item = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
+      if (!item) return;
       const emptySlot = slots.findIndex(s => s === null);
       if (emptySlot === -1) return;
       
-      // If NOT already in a paste dialog, opening it will handle the paste event again
-      // but we need to pass the current event's data if possible, or just open the dialog.
-      // Better: trigger the dialog for the first empty slot.
+      // Open dialog for the first empty slot
       showPasteDialog(emptySlot, slots, onChange, render);
     };
     document.addEventListener('paste', container._pasteHandler);

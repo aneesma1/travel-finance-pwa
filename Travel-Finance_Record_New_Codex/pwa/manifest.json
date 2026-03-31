@@ -1,0 +1,10 @@
+{
+  "name": "Travel Finance Record",
+  "short_name": "TF Record",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f4",
+  "theme_color": "#0f766e",
+  "description": "Travel and finance records powered by Google Sheets",
+  "icons": []
+}

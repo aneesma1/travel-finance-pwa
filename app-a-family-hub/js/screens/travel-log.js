@@ -1,43 +1,62 @@
-// v3.5.25 — 2026-03-28
+// v3.5.30 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
+// SIMPLIFIED: Uses personName directly from trips — no travelPersons linking needed
 
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { openTravelExportSheet } from './travel-export.js';
 import {
   formatDisplayDate, daysBetween, currentYear,
-  getHashParams, setHashParams, clearHashParams,
-  showToast, isOnline
+  getHashParams, setHashParams,
+  showToast
 } from '../../../shared/utils.js';
 
 export async function renderTravelLog(container, params = {}) {
   const data = await getCachedTravelData();
   const { travelPersons = [], trips = [], members = [] } = data || {};
-  
-  // Detect orphaned trips (linked to members but not travelPersons)
-  const tpIds = new Set(travelPersons.map(p => p.id));
-  const hasOrphaned = trips.some(t => t.personId && !tpIds.has(t.personId) && (members||[]).some(m => m.id === t.personId));
+
+  // ── Backfill personName from travelPersons for legacy trips ──
+  const tpMap = Object.fromEntries(travelPersons.map(p => [p.id, p]));
+  const safeTrips = Array.isArray(trips) ? trips.filter(Boolean).map(t => {
+    // If trip has personId but no personName, look up from travelPersons
+    if (t.personId && !t.personName) {
+      const person = tpMap[t.personId];
+      if (person) t.personName = person.name;
+      else t.personName = 'Unknown';
+    }
+    // Ensure every trip has a personName
+    if (!t.personName) t.personName = 'Unknown';
+    return t;
+  }) : [];
+
+  // ── Extract unique persons from trip data itself (self-contained) ──
+  const personNamesSet = new Set();
+  const personInfoMap = {};  // name → { name, emoji, color }
+  safeTrips.forEach(t => {
+    const name = (t.personName || 'Unknown').trim();
+    if (!personNamesSet.has(name)) {
+      personNamesSet.add(name);
+      // Try to get emoji/color from travelPersons if a match exists
+      const tp = travelPersons.find(p => p.name?.toLowerCase() === name.toLowerCase());
+      personInfoMap[name] = {
+        name,
+        emoji: tp?.emoji || '👤',
+        color: tp?.color || '#EEF2FF',
+      };
+    }
+  });
+  const uniquePersons = [...personNamesSet].sort().map(n => personInfoMap[n]);
 
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">✈️ Travel Log</span>
       <button class="app-header-action" id="header-export-btn" title="Export History">📤</button>
     </div>
-    ${hasOrphaned ? `
-      <div id="migration-banner" style="background:#FEF3C7; border-bottom:1px solid #F59E0B; padding:10px 16px; display:flex; align-items:center; gap:12px;">
-        <span style="font-size:20px;">⚠️</span>
-        <div style="flex:1; font-size:12px; line-height:1.4; color:#92400E;">
-          <b>Missing trips?</b> Some records are still linked to your Contact list.
-        </div>
-        <button id="fix-silo-btn" class="btn" style="background:#F59E0B; color:#fff; padding:6px 12px; font-size:11px; font-weight:700;">FIX NOW</button>
-      </div>
-    ` : ''}
     <div id="filter-bar-container"></div>
     <div id="log-content"></div>
     <button class="fab" id="add-trip-fab">＋</button>
@@ -46,29 +65,21 @@ export async function renderTravelLog(container, params = {}) {
   if (!data) { showEmpty(document.getElementById('log-content'), 'No data available'); return; }
 
   document.getElementById('add-trip-fab').addEventListener('click', () => navigate('add-trip'));
-  document.getElementById('fix-silo-btn')?.addEventListener('click', () => navigate('settings', { tab: 'data' }));
-
-  const persons = Array.isArray(travelPersons) ? travelPersons.filter(Boolean) : [];
-  const safeTrips = Array.isArray(trips) ? trips.filter(Boolean) : [];
 
   // Merge any incoming params with URL hash
   if (params.personId) setHashParams({ person: params.personId });
   const hashParams = getHashParams();
   const filterPerson = hashParams.person || '';
-
-  // Default year logic: if current year has no data, default to 'all'
-  const hasCurrentYearData = safeTrips.some(t => t.dateOutIndia?.startsWith(String(currentYear())));
-  // If no year in hash, default to 'all' to ensure imported data is visible
   const filterYear = hashParams.year || 'all';
 
   document.getElementById('header-export-btn')?.addEventListener('click', () => {
-    openTravelExportSheet(persons, trips, data.documents || []);
+    openTravelExportSheet(uniquePersons, safeTrips, data.documents || []);
   });
 
-  renderFilters(persons, filterPerson, filterYear);
-  renderTrips(persons, trips, filterPerson, filterYear);
+  renderFilters(filterPerson, filterYear);
+  renderTrips(filterPerson, filterYear);
 
-  function renderFilters(members, filterPerson, filterYear) {
+  function renderFilters(filterPerson, filterYear) {
     const bar = document.getElementById('filter-bar-container');
     const years = [...new Set(safeTrips.map(t => t.dateOutIndia?.slice(0, 4)).filter(Boolean))].sort((a,b)=>b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
@@ -78,9 +89,9 @@ export async function renderTravelLog(container, params = {}) {
         <div class="filter-chips">
           <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Person</span>
           <button class="filter-chip ${!filterPerson ? 'active' : ''}" data-filter="person" data-value="">All</button>
-          ${persons.map(m => `
-            <button class="filter-chip ${filterPerson === m.id ? 'active' : ''}" data-filter="person" data-value="${m.id}">
-              ${m.emoji || '👤'} ${m.name}
+          ${uniquePersons.map(p => `
+            <button class="filter-chip ${filterPerson === p.name ? 'active' : ''}" data-filter="person" data-value="${p.name}">
+              ${p.emoji || '👤'} ${p.name}
             </button>
           `).join('')}
           <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 4px;"></div>
@@ -110,19 +121,19 @@ export async function renderTravelLog(container, params = {}) {
   let _tripPage = 1;
   const PAGE_SIZE = 25;
 
-  function renderTrips(persons, trips, filterPerson, filterYear, resetPage = true) {
+  function renderTrips(filterPerson, filterYear, resetPage = true) {
     if (resetPage) _tripPage = 1;
     const logContent = document.getElementById('log-content');
-    if (!logContent) return; // Guard
-    const personMap = Object.fromEntries(persons.map(m => [m.id, m]));
+    if (!logContent) return;
 
-    let filtered = safeTrips.sort((a, b) => {
+    let filtered = [...safeTrips].sort((a, b) => {
       const da = a.dateOutIndia ? new Date(a.dateOutIndia) : 0;
       const db = b.dateOutIndia ? new Date(b.dateOutIndia) : 0;
       return db - da;
     });
 
-    if (filterPerson) filtered = filtered.filter(t => t.personId === filterPerson);
+    // Filter by person NAME (not id)
+    if (filterPerson) filtered = filtered.filter(t => t.personName === filterPerson);
     if (filterYear && filterYear !== 'all') {
       filtered = filtered.filter(t => t.dateOutIndia?.startsWith(filterYear));
     }
@@ -138,14 +149,14 @@ export async function renderTravelLog(container, params = {}) {
     // Year totals per person
     const yearlyTotals = {};
     filtered.forEach(t => {
-      if (!t.personId) return;
-      if (!yearlyTotals[t.personId]) yearlyTotals[t.personId] = 0;
-      yearlyTotals[t.personId] += (t.daysInQatar || 0);
+      const name = t.personName || 'Unknown';
+      if (!yearlyTotals[name]) yearlyTotals[name] = 0;
+      yearlyTotals[name] += (t.daysInQatar || 0);
     });
 
     logContent.innerHTML = `
       <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:13px;color:var(--text-muted);">${filtered.length} trip${filtered.length !== 1 ? 's' : ''}</span>
+        <span style="font-size:13px;color:var(--text-muted);">${filtered.length} trip${filtered.length !== 1 ? 's' : ''}${totalCount > filtered.length ? ` of ${totalCount}` : ''}</span>
         ${Object.keys(yearlyTotals).length === 1
           ? `<span style="font-size:13px;font-weight:600;color:var(--primary);">
                Total Qatar days: ${Object.values(yearlyTotals)[0]}
@@ -157,10 +168,19 @@ export async function renderTravelLog(container, params = {}) {
 
     const list = document.getElementById('trips-list');
 
-    filtered.forEach((trip, idx) => {
-      const person = personMap[trip.personId] || { name: 'Unknown', emoji: '👤', color: '#EEF2FF' };
-      const travelWith = (trip.travelWith || [])
-        .map(id => personMap[id]?.name).filter(Boolean);
+    filtered.forEach((trip) => {
+      const pName = trip.personName || 'Unknown';
+      const pInfo = personInfoMap[pName] || { name: pName, emoji: '👤', color: '#EEF2FF' };
+
+      // Travel companions — show from travelWithNames (plain text) or travelWith (IDs)
+      let travelWithDisplay = [];
+      if (trip.travelWithNames) {
+        // New format: plain text string
+        travelWithDisplay = trip.travelWithNames.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
+      } else if (trip.travelWith?.length) {
+        // Legacy format: array of IDs
+        travelWithDisplay = trip.travelWith.map(id => tpMap[id]?.name).filter(Boolean);
+      }
 
       const dest = trip.destination || 'Qatar';
       const days = trip.daysInQatar || 0;
@@ -178,22 +198,22 @@ export async function renderTravelLog(container, params = {}) {
       row.className = 'swipe-row-container';
       row.innerHTML = `
         <div class="list-row trip-row" data-trip-id="${trip.id}">
-          <div class="person-avatar" style="background:${person.color || '#EEF2FF'};width:40px;height:40px;font-size:18px;flex-shrink:0;">
-            ${person.emoji || '👤'}
+          <div class="person-avatar" style="background:${pInfo.color || '#EEF2FF'};width:40px;height:40px;font-size:18px;flex-shrink:0;">
+            ${pInfo.emoji || '👤'}
           </div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:15px;font-weight:600;color:var(--text);">${person.name}</span>
+              <span style="font-size:15px;font-weight:600;color:var(--text);">${pName}</span>
               ${statusDot}
               <span style="font-size:12px;color:var(--text-muted);">${trip.reason || ''}</span>
             </div>
             <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
-              ${formatDisplayDate(trip.dateOutIndia)} → ${trip.dateInIndia ? formatDisplayDate(trip.dateInIndia) : 'Present'}
+              ${trip.dateOutIndia ? formatDisplayDate(trip.dateOutIndia) : 'No date'} → ${trip.dateInIndia ? formatDisplayDate(trip.dateInIndia) : 'Present'}
             </div>
-            ${travelWith.length ? `
+            ${travelWithDisplay.length ? `
               <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
                 <span style="font-size:10px;color:var(--text-muted);margin-right:2px;align-self:center;">with</span>
-                ${travelWith.map(name => `
+                ${travelWithDisplay.map(name => `
                   <span style="font-size:10px;background:var(--primary-bg);color:var(--primary);padding:1px 6px;border-radius:99px;font-weight:600;">${name}</span>
                 `).join('')}
               </div>

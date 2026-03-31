@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.30 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -53,7 +53,7 @@ export function openTravelExportSheet(persons, trips, documents) {
           'background:var(--primary-bg);color:var(--primary);font-size:13px;',
           'font-weight:600;cursor:pointer;">👥 All</button>',
         persons.map(m =>
-          '<button class="tex-pill" data-person="' + m.id + '" style="' +
+          '<button class="tex-pill" data-person="' + (m.id || m.name) + '" style="' +
           'padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);' +
           'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">' +
           (m.emoji || '👤') + ' ' + m.name + '</button>'
@@ -212,19 +212,26 @@ export function openTravelExportSheet(persons, trips, documents) {
   function getFilteredTrips() {
     const fromVal = document.getElementById('tex-from').value;
     const toVal   = document.getElementById('tex-to').value;
-    const personMap = Object.fromEntries(persons.map(m => [m.id, m]));
+    const personMap = Object.fromEntries(persons.map(m => [m.id || m.name, m]));
 
     return trips
       .filter(t => {
-        // People filter
-        if (!selPeople.has('all') && !selPeople.has(t.personId)) return false;
+        // People filter — match by personId or personName
+        if (!selPeople.has('all')) {
+          const matchById = t.personId && selPeople.has(t.personId);
+          const matchByName = t.personName && selPeople.has(t.personName);
+          if (!matchById && !matchByName) return false;
+        }
         // Date range filter
         if (fromVal && t.dateOutIndia && t.dateOutIndia < fromVal) return false;
         if (toVal   && t.dateOutIndia && t.dateOutIndia > toVal)   return false;
         return true;
       })
       .sort((a, b) => new Date(a.dateOutIndia) - new Date(b.dateOutIndia))
-      .map(t => ({ ...t, _person: personMap[t.personId] || { name: 'Unknown', emoji: '👤' } }));
+      .map(t => ({
+        ...t,
+        _person: personMap[t.personId] || personMap[t.personName] || { name: t.personName || 'Unknown', emoji: '👤' }
+      }));
   }
 
   // ── Export actions ────────────────────────────────────────────────────────
@@ -281,21 +288,21 @@ async function exportPDF(trips, members, documents, deliver) {
 
   let pageNum = 0;
 
-  Object.values(byPerson).forEach(({ member, trips: pTrips }) => {
+  Object.values(byPerson).forEach(({ person, trips: pTrips }) => {
     if (pageNum > 0) doc.addPage('a4', 'portrait');
     pageNum++;
 
     let y = margin;
 
     // ── Header band ──────────────────────────────────────────────────────────
-    const rgb = hexToRgbPdf(member.color || '#3730A3');
+    const rgb = hexToRgbPdf(person?.color || '#3730A3');
     doc.setFillColor(rgb.r, rgb.g, rgb.b);
     doc.roundedRect(margin, y, contentW, 22, 3, 3, 'F');
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text((member.emoji || '') + ' ' + member.name, margin + 5, y + 9);
+    doc.text((person?.emoji || '') + ' ' + (person?.name || 'Unknown'), margin + 5, y + 9);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
@@ -406,7 +413,7 @@ async function exportPDF(trips, members, documents, deliver) {
       });
 
     // ── Document expiry summary (Skip if shared docs) ──────────────────────────
-    const memberDocs = documents.filter(d => d.personId === member.id);
+    const memberDocs = documents.filter(d => d.personId === (person?.id || person?.name));
     if (memberDocs.length) {
       y += 6;
       if (y > 260) { doc.addPage('a4','portrait'); y = margin; }
@@ -478,7 +485,8 @@ async function exportExcel(trips, deliver) {
   ];
 
   const rows = trips.map(t => [
-    t._member?.name || 'Unknown',
+    t._person?.name || t.personName || 'Unknown',
+    t.destination   || 'Qatar',
     t.dateOutIndia  || '',
     t.dateInQatar   || '',
     t.dateOutQatar  || '',
@@ -487,7 +495,7 @@ async function exportExcel(trips, deliver) {
     t.flightInward  || '',
     t.flightOutward || '',
     t.reason        || '',
-    (t.travelWith   || []).join(', '),
+    t.travelWithNames || (t.travelWith || []).join(', '),
   ]);
 
   const wb = window.XLSX.utils.book_new();

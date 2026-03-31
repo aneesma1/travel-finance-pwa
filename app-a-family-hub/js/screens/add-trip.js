@@ -1,4 +1,4 @@
-// v3.5.25 — 2026-03-28
+// v3.5.30 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
@@ -32,6 +32,7 @@ export async function renderAddTrip(container, params = {}) {
   // Form state
   const state = {
     personId:     existingTrip?.personId     || '',
+    personName:   existingTrip?.personName   || '',
     dateOutIndia: existingTrip?.dateOutIndia || '',
     dateInQatar:  existingTrip?.dateInQatar  || '',
     dateOutQatar: existingTrip?.dateOutQatar || '',
@@ -148,7 +149,11 @@ export async function renderAddTrip(container, params = {}) {
       selected: state.personId,
       multi: false,
       color: 'indigo',
-      onSelect: (val) => { state.personId = val || ''; }
+      onSelect: (val) => {
+        state.personId = val || '';
+        const selected = persons.find(m => m.id === val);
+        state.personName = selected?.name || '';
+      }
     });
 
     document.getElementById('add-new-person-btn').addEventListener('click', () => {
@@ -421,10 +426,15 @@ export async function renderAddTrip(container, params = {}) {
     const daysInQatar = state.dateInQatar && state.dateOutQatar
       ? daysBetween(state.dateInQatar, state.dateOutQatar) : null;
 
+    // Resolve personName from the selected person
+    const selectedPerson = persons.find(m => m.id === state.personId);
+    const personName = state.personName || selectedPerson?.name || 'Unknown';
+
     const tripData = {
       id:           isEdit ? existingTrip.id : uuidv4(),
       timestamp:    isEdit ? existingTrip.timestamp : new Date().toISOString(),
       personId:     state.personId,
+      personName:   personName,
       destination:  state.destination,
       dateOutIndia: state.dateOutIndia,
       dateInQatar:  state.dateInQatar,
@@ -435,6 +445,7 @@ export async function renderAddTrip(container, params = {}) {
       flightOutward:state.flightOutward,
       reason:       state.reason,
       travelWith:   state.travelWith,
+      travelWithNames: state.travelWith.map(id => persons.find(m => m.id === id)?.name).filter(Boolean).join(', '),
       photos:       state.photos || [],
     };
 

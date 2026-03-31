@@ -1,8 +1,9 @@
-// v3.5.25 — 2026-03-28
+// v3.5.30 — 2026-03-31
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
-// Steps: (1) Pick file → (2) Map columns → (3) Preview + validate → (4) Import
+// Steps: (1) Pick file → (2) Map columns → (3) Preview → (4) Import
+// PHILOSOPHY: Never fail. Import everything as-is. User can edit later.
 
 'use strict';
 
@@ -11,9 +12,9 @@ import { uuidv4 } from './utils.js';
 // ── Travel data column definitions ───────────────────────────────────────────
 export const TRAVEL_COLUMNS = [
   { key: 'timestamp',    label: 'Timestamp',               required: false },
-  { key: 'personName',   label: 'Name of Person',          required: true  },
-  { key: 'dateOutIndia', label: 'Date Out India',          required: true  },
-  { key: 'dateInQatar',  label: 'Date In Qatar',           required: true  },
+  { key: 'personName',   label: 'Name of Person',          required: false },
+  { key: 'dateOutIndia', label: 'Date Out India',          required: false },
+  { key: 'dateInQatar',  label: 'Date In Qatar',           required: false },
   { key: 'dateOutQatar', label: 'Date Out Qatar',          required: false },
   { key: 'dateInIndia',  label: 'Date In India',           required: false },
   { key: 'flightInward', label: 'Inward Flight to Qatar',  required: false },
@@ -64,7 +65,9 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         </div>
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6;">
           Accepts <strong>.xlsx</strong>, <strong>.xls</strong>, or <strong>.csv</strong> files.<br>
-          Your existing ${appType === 'travel' ? 'trips' : 'transactions'} will be preserved -- duplicates are skipped.
+          ${appType === 'travel' 
+            ? '<strong>All rows will be imported as-is</strong> — you can edit any entry later.'
+            : 'Your existing transactions will be preserved — duplicates are skipped.'}
         </div>
 
         <!-- Drop zone (Simplified) -->
@@ -97,19 +100,16 @@ export function renderImportTool(container, { appType, existingData, onImportCom
               <span style="
                 background:var(--surface);border:1px solid var(--border);
                 padding:3px 10px;border-radius:999px;font-size:11px;color:var(--text-secondary);
-                ${c.required ? 'font-weight:700;color:var(--primary);' : ''}
-              ">${c.label}${c.required ? ' *' : ''}</span>
+              ">${c.label}</span>
             `).join('')}
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">* Required fields</div>
+          ${appType === 'travel' ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 All fields are optional — import whatever you have!</div>' : ''}
         </div>
       </div>
     `;
 
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('import-file-input');
-
-    // Native <label for> handles the click automatically
 
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -210,7 +210,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
           if (hw.includes(tw)) score++;
         });
 
-        if (score > maxScore && score >= targetWords.length / 2) { // At least half the words must match
+        if (score > maxScore && score >= targetWords.length / 2) {
           maxScore = score;
           bestMatchIdx = idx;
         }
@@ -232,6 +232,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Map Columns</div>
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">
           ${rawRows.length} data rows found in file. Map your columns to the app fields below.
+          ${appType === 'travel' ? '<br>💡 <strong>All fields are optional</strong> — skip any you don\'t have.' : ''}
         </div>
 
         <div style="display:flex;flex-direction:column;gap:10px;" id="mapping-rows"></div>
@@ -253,8 +254,8 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);';
       row.innerHTML = `
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:${col.required ? '700' : '500'};color:${col.required ? 'var(--primary)' : 'var(--text)'};">
-            ${col.label}${col.required ? ' *' : ''}
+          <div style="font-size:13px;font-weight:500;color:var(--text);">
+            ${col.label}
           </div>
         </div>
         <select data-col="${col.key}" style="
@@ -282,12 +283,15 @@ export function renderImportTool(container, { appType, existingData, onImportCom
 
     document.getElementById('back-to-pick').addEventListener('click', () => { step = 'pick'; render(); });
     document.getElementById('preview-btn').addEventListener('click', () => {
-      // Validate required fields mapped
-      const missing = COLUMNS.filter(c => c.required && columnMap[c.key] === undefined).map(c => c.label);
-      if (missing.length) {
-        document.getElementById('map-error').textContent = `Required fields not mapped: ${missing.join(', ')}`;
-        return;
+      // For finance: still require date + description
+      if (appType === 'finance') {
+        const missing = COLUMNS.filter(c => c.required && columnMap[c.key] === undefined).map(c => c.label);
+        if (missing.length) {
+          document.getElementById('map-error').textContent = `Required fields not mapped: ${missing.join(', ')}`;
+          return;
+        }
       }
+      // For travel: no required fields — just import whatever is mapped
       parsedRows = parseRows();
       step = 'preview';
       render();
@@ -297,7 +301,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
   // ── Parse raw rows using column map ───────────────────────────────────────
   function parseRows() {
     return rawRows.map((row, rowIdx) => {
-      const parsed = { _rowIndex: rowIdx + 2, _errors: [] };
+      const parsed = { _rowIndex: rowIdx + 2, _warnings: [] };
 
       COLUMNS.forEach(col => {
         const srcIdx = columnMap[col.key];
@@ -309,7 +313,6 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         if (val instanceof Date) {
           val = val.toISOString().split('T')[0];
         } else if (typeof val === 'number' && col.key.toLowerCase().includes('date')) {
-          // Excel serial date — 0 or negative = blank/invalid cell
           if (val <= 0) {
             val = '';
           } else {
@@ -321,15 +324,15 @@ export function renderImportTool(container, { appType, existingData, onImportCom
           val = String(val ?? '').trim();
         }
 
-        // Validate required
-        if (col.required && (!val || val === '')) {
-          parsed._errors.push(`${col.label} is required`);
-        }
-
-        // Normalise dates: accept DD/MM/YYYY, DD-MM-YYYY, etc.
+        // Try to normalise dates (best effort — keep raw value if normalisation fails)
         if (col.key.toLowerCase().includes('date') && val) {
-          val = normaliseDate(val);
-          if (!val) parsed._errors.push(`${col.label}: invalid date format`);
+          const normalised = normaliseDate(val);
+          if (normalised) {
+            val = normalised;
+          } else {
+            // Keep the raw value — don't discard it. User can fix later.
+            parsed._warnings.push(`${col.label}: date format may need editing`);
+          }
         }
 
         // Normalise currency
@@ -371,14 +374,12 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       if (yr > 1900 && yr < 2100) return d.toISOString().split('T')[0];
     }
 
-    console.warn('[import-tool] Failed to normalise date:', raw);
-    return null;
+    return null; // normalisation failed — caller keeps raw value
   }
 
   // ── Step 3: Preview ────────────────────────────────────────────────────────
   function renderPreview() {
-    const valid   = parsedRows.filter(r => r._errors.length === 0);
-    const invalid = parsedRows.filter(r => r._errors.length > 0);
+    const withWarnings = parsedRows.filter(r => r._warnings.length > 0);
     const preview = parsedRows.slice(0, 5);
 
     container.innerHTML = `
@@ -388,17 +389,15 @@ export function renderImportTool(container, { appType, existingData, onImportCom
         <!-- Summary bar -->
         <div style="display:flex;gap:8px;margin-bottom:20px;">
           <div style="flex:1;background:var(--success-bg);border-radius:var(--radius-md);padding:12px;text-align:center;">
-            <div style="font-size:22px;font-weight:700;color:var(--success);">${valid.length}</div>
-            <div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.3px;">Ready</div>
+            <div style="font-size:22px;font-weight:700;color:var(--success);">${parsedRows.length}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.3px;">Ready to Import</div>
           </div>
-          <div style="flex:1;background:${invalid.length > 0 ? 'var(--danger-bg)' : 'var(--surface-3)'};border-radius:var(--radius-md);padding:12px;text-align:center;">
-            <div style="font-size:22px;font-weight:700;color:${invalid.length > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${invalid.length}</div>
-            <div style="font-size:11px;font-weight:700;color:${invalid.length > 0 ? 'var(--danger)' : 'var(--text-muted)'};text-transform:uppercase;letter-spacing:0.3px;">Errors</div>
+          ${withWarnings.length > 0 ? `
+          <div style="flex:1;background:var(--warning-bg);border-radius:var(--radius-md);padding:12px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:#92400E;">${withWarnings.length}</div>
+            <div style="font-size:11px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:0.3px;">With Warnings</div>
           </div>
-          <div style="flex:1;background:var(--surface-3);border-radius:var(--radius-md);padding:12px;text-align:center;">
-            <div style="font-size:22px;font-weight:700;color:var(--text-muted);">${parsedRows.length}</div>
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;">Total</div>
-          </div>
+          ` : ''}
         </div>
 
         <!-- Preview rows (first 5) -->
@@ -418,15 +417,15 @@ export function renderImportTool(container, { appType, existingData, onImportCom
             </thead>
             <tbody>
               ${preview.map(row => `
-                <tr style="border-bottom:1px solid var(--border-light);background:${row._errors.length > 0 ? '#FFF5F5' : 'transparent'};">
+                <tr style="border-bottom:1px solid var(--border-light);background:${row._warnings.length > 0 ? '#FFFBEB' : 'transparent'};">
                   <td style="padding:6px 10px;color:var(--text-muted);">${row._rowIndex}</td>
                   ${COLUMNS.filter(c => columnMap[c.key] !== undefined).map(c =>
                     `<td style="padding:6px 10px;color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${row[c.key] || '--'}</td>`
                   ).join('')}
                   <td style="padding:6px 10px;">
-                    ${row._errors.length === 0
+                    ${row._warnings.length === 0
                       ? `<span style="color:var(--success);font-size:11px;font-weight:700;">✓ OK</span>`
-                      : `<span style="color:var(--danger);font-size:11px;" title="${row._errors.join(', ')}">✗ ${row._errors[0]}</span>`
+                      : `<span style="color:#92400E;font-size:11px;" title="${row._warnings.join(', ')}">⚠ ${row._warnings[0]}</span>`
                     }
                   </td>
                 </tr>
@@ -435,15 +434,15 @@ export function renderImportTool(container, { appType, existingData, onImportCom
           </table>
         </div>
 
-        ${invalid.length > 0 ? `
+        ${withWarnings.length > 0 ? `
           <div style="background:var(--warning-bg);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400E;">
-            ⚠️ ${invalid.length} row${invalid.length > 1 ? 's' : ''} with errors will be <strong>skipped</strong>. Only valid rows will be imported.
+            ⚠️ ${withWarnings.length} row${withWarnings.length > 1 ? 's' : ''} have minor warnings but <strong>will still be imported</strong>. You can edit them later.
           </div>
         ` : ''}
 
-        ${valid.length === 0 ? `
+        ${parsedRows.length === 0 ? `
           <div style="background:var(--danger-bg);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:16px;font-size:13px;color:#991B1B;">
-            ❌ No valid rows to import. Please go back and fix the column mapping.
+            ❌ No rows found in the file. Please check and try again.
           </div>
         ` : ''}
 
@@ -451,8 +450,8 @@ export function renderImportTool(container, { appType, existingData, onImportCom
 
         <div style="display:flex;gap:10px;">
           <button class="btn btn-secondary" style="flex:1;" id="back-to-map">← Back</button>
-          <button class="btn btn-primary" style="flex:2;" id="import-btn" ${valid.length === 0 ? 'disabled' : ''}>
-            Import ${valid.length} Record${valid.length !== 1 ? 's' : ''}
+          <button class="btn btn-primary" style="flex:2;" id="import-btn" ${parsedRows.length === 0 ? 'disabled' : ''}>
+            Import All ${parsedRows.length} Record${parsedRows.length !== 1 ? 's' : ''}
           </button>
         </div>
       </div>
@@ -461,19 +460,19 @@ export function renderImportTool(container, { appType, existingData, onImportCom
     container.querySelector('#back-to-map').addEventListener('click', () => { step = 'map'; render(); });
     container.querySelector('#import-btn').addEventListener('click', () => {
       console.info('[import-tool] Import button clicked');
-      doImport(valid);
+      doImport(parsedRows); // Import ALL rows — no filtering
     });
   }
 
   // ── Step 4: Import ─────────────────────────────────────────────────────────
-  async function doImport(validRows) {
+  async function doImport(rows) {
     const btn = container.querySelector('#import-btn');
     const progress = container.querySelector('#import-progress');
     if (!btn || !progress) {
       console.error('[import-tool] Critical UI elements missing in doImport');
       return;
     }
-    console.info('[import-tool] Starting import of', validRows.length, 'rows');
+    console.info('[import-tool] Starting import of', rows.length, 'rows');
     btn.disabled = true;
     btn.textContent = '⏳ Importing…';
     btn.style.opacity = '0.7';
@@ -482,7 +481,7 @@ export function renderImportTool(container, { appType, existingData, onImportCom
     progress.textContent = 'Preparing records…';
 
     try {
-      const records = validRows.map(row => buildRecord(row));
+      const records = rows.map(row => buildRecord(row));
 
       progress.textContent = `Saving ${records.length} records to Drive…`;
 
@@ -524,22 +523,29 @@ export function renderImportTool(container, { appType, existingData, onImportCom
   // ── Build typed record from parsed row ────────────────────────────────────
   function buildRecord(row) {
     if (appType === 'travel') {
+      const daysInQatar = row.dateInQatar && row.dateOutQatar
+        ? (() => {
+            try {
+              return Math.round(Math.abs((new Date(row.dateOutQatar + 'T00:00:00') - new Date(row.dateInQatar + 'T00:00:00')) / 86400000));
+            } catch { return null; }
+          })()
+        : null;
+
       return {
-        id:           uuidv4(),
-        timestamp:    row.timestamp || new Date().toISOString(),
-        personName:      row.personName,   // Temporary, resolved to personId by caller
-        travelWithNames: row.travelWith,   // Temporary, resolved by caller
-        dateOutIndia: row.dateOutIndia,
-        dateInQatar:  row.dateInQatar,
-        dateOutQatar: row.dateOutQatar  || null,
-        dateInIndia:  row.dateInIndia   || null,
-        daysInQatar:  row.dateInQatar && row.dateOutQatar
-          ? Math.round(Math.abs((new Date(row.dateOutQatar + 'T00:00:00') - new Date(row.dateInQatar + 'T00:00:00')) / 86400000))
-          : null,
-        flightInward: row.flightInward  || '',
-        flightOutward:row.flightOutward || '',
-        reason:       row.reason        || '',
-        travelWith:   [], // To be populated by caller
+        id:             uuidv4(),
+        timestamp:      row.timestamp || new Date().toISOString(),
+        personName:     (row.personName || 'Unknown').trim(),    // Store name directly — no linking needed
+        travelWithNames: row.travelWith || '',                   // Store as plain text
+        dateOutIndia:   row.dateOutIndia || null,
+        dateInQatar:    row.dateInQatar  || null,
+        dateOutQatar:   row.dateOutQatar || null,
+        dateInIndia:    row.dateInIndia  || null,
+        daysInQatar:    daysInQatar,
+        flightInward:   row.flightInward  || '',
+        flightOutward:  row.flightOutward || '',
+        reason:         row.reason        || '',
+        travelWith:     [],  // Legacy field — kept for backward compat
+        photos:         [],
       };
     } else {
       return {
@@ -581,7 +587,6 @@ export function renderImportTool(container, { appType, existingData, onImportCom
       render();
     });
     document.getElementById('view-data-btn').addEventListener('click', () => {
-      import('./utils.js'); // trigger navigation via parent
       const event = new CustomEvent('import:complete', { detail: { appType } });
       container.dispatchEvent(event);
     });
