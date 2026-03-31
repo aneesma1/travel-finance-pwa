@@ -1,4 +1,4 @@
-// v3.5.37 — 2026-03-31
+// v3.5.38 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -71,15 +71,9 @@ export async function renderTravelLog(container, params = {}) {
   const uniquePersons = [...personNamesSet].sort().map(n => personInfoMap[n]);
   const availableYears = [...yearsSet].sort((a,b) => b - a);
 
-  // Default year logic: use URL param, or current year IF it has data, otherwise default to latest year with data or 'all'
+  // Default year logic: use URL param, otherwise 'all'
   const urlYear = params.year || getHashParams().year;
-  const cYr = String(currentYear());
-  let filterYear = urlYear;
-  if (!filterYear) {
-    if (yearsSet.has(cYr)) filterYear = cYr;
-    else if (availableYears.length > 0) filterYear = availableYears[0];
-    else filterYear = 'all';
-  }
+  let filterYear = urlYear || 'all';
 
   let filterPerson = params.person || getHashParams().person;
 
@@ -147,6 +141,7 @@ export async function renderTravelLog(container, params = {}) {
     bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(btn => {
       btn.addEventListener('click', () => {
         setHashParams({ year: btn.dataset.value === String(currentYear()) ? null : btn.dataset.value });
+        setHashParams({ year: btn.dataset.value === 'all' ? null : btn.dataset.value });
         renderTravelLog(container);
       });
     });
