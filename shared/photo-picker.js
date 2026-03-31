@@ -21,29 +21,31 @@ function isPC() {
 // ── Compress image file to base64 JPEG ───────────────────────────────────────
 export async function compressImage(file) {
   return new Promise((resolve, reject) => {
-    try {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          if (width > height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
-          else { width = Math.round(width * MAX_DIM / height); height = MAX_DIM; }
-        }
-        canvas.width = width; canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', QUALITY));
+    // Small delay to ensure clipboard stream is ready
+    setTimeout(() => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
+            else { width = Math.round(width * MAX_DIM / height); height = MAX_DIM; }
+          }
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', QUALITY));
+        };
+        img.onerror = () => {
+          console.error('[photo-picker] Image load error. Type:', file.type, 'Size:', file.size);
+          reject(new Error(`Browser could not decode image (${file.type || 'unknown type'})`));
+        };
+        img.src = e.target.result;
       };
-      img.onerror = () => {
-        console.error('[photo-picker] Image load error. Type:', file.type, 'Size:', file.size);
-        reject(new Error(`Browser could not decode image (${file.type || 'unknown type'})`));
-      };
-      img.src = url;
-    } catch (err) {
-      reject(new Error('Failed to create Image object: ' + err.message));
-    }
+      reader.onerror = () => reject(new Error('FileReader failed to read blob'));
+      reader.readAsDataURL(file);
+    }, 50);
   });
 }
 

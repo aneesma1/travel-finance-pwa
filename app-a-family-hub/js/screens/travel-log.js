@@ -1,4 +1,4 @@
-// v3.5.33 — 2026-03-31
+// v3.5.34 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -15,6 +15,14 @@ import {
   getHashParams, setHashParams,
   showToast
 } from '../../../shared/utils.js';
+
+// Helper to extract a 4-digit year from any raw date string (e.g. YYYY-MM-DD or DD/MM/YYYY)
+function extractYear(val) {
+  if (!val) return '';
+  const s = String(val).trim();
+  const match = s.match(/\b(20\d{2})\b/);
+  return match ? match[1] : '';
+}
 
 export async function renderTravelLog(container, params = {}) {
   const data = await getCachedTravelData();
@@ -37,6 +45,7 @@ export async function renderTravelLog(container, params = {}) {
   // ── Extract unique persons by splitting ALL combined name fields ──
   const personNamesSet = new Set();
   const personInfoMap = {};  // name → { name, emoji, color }
+  const yearsSet = new Set();
 
   safeTrips.forEach(t => {
     // Treat the primary personName as a single entry (as it is in the data)
@@ -57,6 +66,9 @@ export async function renderTravelLog(container, params = {}) {
         };
       }
     });
+
+    const yr = extractYear(t.dateOutIndia);
+    if (yr) yearsSet.add(yr);
   });
   const uniquePersons = [...personNamesSet].sort().map(n => personInfoMap[n]);
 
@@ -150,7 +162,7 @@ export async function renderTravelLog(container, params = {}) {
       });
     }
     if (filterYear && filterYear !== 'all') {
-      filtered = filtered.filter(t => (t.dateOutIndia || '').startsWith(filterYear));
+      filtered = filtered.filter(t => extractYear(t.dateOutIndia) === filterYear);
     }
 
     if (!filtered.length) {
