@@ -1,4 +1,4 @@
-// v3.5.31 — 2026-03-31
+// v3.5.32 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -534,15 +534,14 @@ function openImportModal(data, persons) {
             const rawPrimary = (rec.personName || 'Unknown').trim();
             const doi  = (rec.dateOutIndia || '').trim();
 
-            // Split BOTH columns to find every individual mentioned
-            const primarySplit = rawPrimary.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
+            // Split ONLY the companion column to find individuals mentioned there
             const companionNames = (rec.travelWithNames || '')
               .split(/[&,]+/)
               .map(n => n.trim())
               .filter(Boolean);
 
-            // All people in this row (primary + companions)
-            const allNames = [...new Set([...primarySplit, ...companionNames])];
+            // Maintain the primary name exactly as provided in the Excel cell
+            const allNames = [...new Set([rawPrimary, ...companionNames])];
 
             // Create a trip for EACH person mentioned in the row
             allNames.forEach(personName => {

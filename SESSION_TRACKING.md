@@ -322,10 +322,32 @@ git checkout master
 
 ---
 
-## Session End: 2026-03-28
+---
 
-### Project Status (v3.5.25)
-- **State**: Stabilized and polished.
-- **Highlights**:
-    - **Vault**: Image pasting is now interactive with a mandatory review step for better UX.
-    - **Travel**: The 6-step entry wizard is now fully functional; historical and imported data is properly visible in the log.
+## Session Start: 2026-03-31
+
+### Vault & Travel Hub Final Polish (v3.5.30 · 2026-03-31)
+
+- **Vault App: Paste Fix**:
+    - Resolved competing paste event handlers by adding a `_pasteDialogOpen` flag.
+    - Fixed broken toast feedback (was calling non-existent `window._showToast`).
+- **Travel App: Simplified Architecture**:
+    - **Import**: Removed strict validation and person-linking. Trips now store `personName` directly.
+    - **Log**: Renders from `personName` with backward compatibility for `personId` lookups. Filter chips are built dynamically from trip data.
+    - **Export**: PDF export fixed (referenced undefined `member`). Excel/CSV updated to use `personName`.
+- **Commit**: `e4270a7` (master), `e39a8f2` (main) — `v3.5.30: Fix vault paste + simplify travel import`
+
+### Vault Paste Cleanup & Travel Name Splitting (v3.5.31 · 2026-03-31)
+
+- **Vault App: Photo Picker Fix**:
+    - **Root Cause**: The capture-phase paste listener was not being removed correctly in `closeDialog` because the `true` flag was missing from `removeEventListener`.
+    - **Fix**: Corrected `removeEventListener('paste', handlePaste, true)` and added an `overlay.isConnected` safeguard in `handlePaste`.
+- **Travel App: Name Splitting & Filtering**:
+    - **Import**: Updated `settings.js` to split combined names (e.g. "A & B") in the primary "Name" column, ensuring each person gets a separate record.
+    - **Log Rendering**: Refined `travel-log.js` to split combined names when generating filter chips.
+    - **Log Filtering**: Updated the filter logic to use split-aware matching. Clicking a person's chip now correctly shows all trips they are part of, even if the record has a combined name.
+    - **Log Sorting**: Hardened date parsing to prevent `NaN` results during sorting if dates are malformed.
+- **Service Worker**:
+    - Bumped `CACHE_NAME` to `v3.5.31` in both apps to force-bust old cached JS files.
+    - Added `photo-picker.js`, `sync-manager.js`, and `travel-export.js` to `STATIC_ASSETS` for guaranteed offline availability.
+- **Commit**: `9419fb8` (master), `95a2ea9` (main) — `v3.5.31: Fix vault paste cleanup and travel name splitting/filtering`

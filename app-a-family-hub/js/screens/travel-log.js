@@ -1,4 +1,4 @@
-// v3.5.31 — 2026-03-31
+// v3.5.32 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -39,8 +39,10 @@ export async function renderTravelLog(container, params = {}) {
   const personInfoMap = {};  // name → { name, emoji, color }
 
   safeTrips.forEach(t => {
+    // Treat the primary personName as a single entry (as it is in the data)
+    // Only split companion names for chip discovery
     const namesInTrip = [
-      ...(t.personName || '').split(/[&,]+/),
+      t.personName || '',
       ...(t.travelWithNames || '').split(/[&,]+/)
     ].map(n => n.trim()).filter(Boolean);
 
@@ -138,13 +140,13 @@ export async function renderTravelLog(container, params = {}) {
       return (Number.isNaN(db) ? 0 : db) - (Number.isNaN(da) ? 0 : da);
     });
 
-    // Filter by person individual name
+    // Filter by person name
     if (filterPerson) {
       const lowFilter = filterPerson.toLowerCase();
       filtered = filtered.filter(t => {
-        const primaryNames = (t.personName || '').toLowerCase().split(/[&,]+/).map(n => n.trim());
+        const primaryMatch = (t.personName || '').toLowerCase().trim() === lowFilter;
         const travelWithNames = (t.travelWithNames || '').toLowerCase().split(/[&,]+/).map(n => n.trim());
-        return primaryNames.includes(lowFilter) || travelWithNames.includes(lowFilter);
+        return primaryMatch || travelWithNames.includes(lowFilter);
       });
     }
     if (filterYear && filterYear !== 'all') {
