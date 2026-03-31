@@ -1,4 +1,4 @@
-// v3.5.25 — 2026-03-28
+// v3.5.30 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -478,6 +478,7 @@ function showMirrorModal(snapshots) {
 }
 
 // ── Import modal ──────────────────────────────────────────────────────────────
+// SIMPLIFIED: Import trips as-is. Store personName directly. No person-linking.
 function openImportModal(data, persons) {
   const modal = document.getElementById('member-modal');
   modal.classList.remove('hidden');
@@ -516,92 +517,62 @@ function openImportModal(data, persons) {
     existingData: data,
     onImportComplete: async (records, progressCb) => {
       importInProgress = true;
-      setStatus('Matching travel persons…');
-
-      const personMap = {};
-      persons.forEach(m => { personMap[m.name.toLowerCase().trim()] = m.id; });
-
-      const newPersonsToCreate = {};
-      records.forEach(rec => {
-        const names1 = (rec.personName || '').split(/[&,]+/).map(n => n.trim()).filter(Boolean);
-        const names2 = (rec.travelWithNames || '').split(/[&,]+/).map(n => n.trim()).filter(Boolean);
-        [...names1, ...names2].forEach(rawName => {
-          const key = rawName.toLowerCase();
-          if (!personMap[key] && !newPersonsToCreate[key])
-            newPersonsToCreate[key] = { id: uuidv4(), name: rawName };
-        });
-      });
-      Object.values(newPersonsToCreate).forEach(m => { personMap[m.name.toLowerCase()] = m.id; });
-
-      const newPersonList = Object.values(newPersonsToCreate);
-      if (newPersonList.length)
-        setStatus('Creating travel persons: ' + newPersonList.map(m => m.name).join(', '));
+      setStatus(`Importing ${records.length} trips…`);
 
       let imported = 0, skipped = 0;
-      const resolved = records.reduce((acc, rec) => {
-        // Collect all names involved in this trip (Primary persons + Companions)
-        const personPart = (rec.personName || '').split(/[&,]+/).map(n => n.trim()).filter(Boolean);
-        const withPart   = (rec.travelWithNames || '').split(/[&,]+/).map(n => n.trim()).filter(Boolean);
-        
-        const allNames = [...new Set([...personPart, ...withPart])];
-        if (!allNames.length) { skipped++; return acc; }
-        
-        // Create a trip for each unique person in the row
-        const rowTrips = allNames.map((name, idx) => {
-          const pid = personMap[name.toLowerCase()];
-          if (!pid) return null;
-          
-          // Other people in this row become 'travelWith' companions
-          const companions = allNames
-            .filter((_, i) => i !== idx)
-            .map(n => personMap[n.toLowerCase()])
-            .filter(Boolean);
-
-          const finalTrip = { ...rec };
-          delete finalTrip.personName;      // Cleanup temporary field
-          delete finalTrip.travelWithNames; // Cleanup temporary field
-
-          return { 
-            ...finalTrip, 
-            id: uuidv4(), 
-            personId: pid,
-            travelWith: [...new Set([...(rec.travelWith || []), ...companions])]
-          };
-        }).filter(Boolean);
-
-        if (rowTrips.length === 0) { skipped++; return acc; }
-        acc.push(...rowTrips);
-        return acc;
-      }, []);
-
-      setStatus('Saving ' + resolved.length + ' trips…');
 
       try {
         const newData = await localSave('travel', remote => {
-          const travelPersons = [...(remote.travelPersons || [])];
-          const existingIds = new Set(travelPersons.map(m => m.id));
-          newPersonList.forEach(m => {
-            if (!existingIds.has(m.id))
-              travelPersons.push({ id: m.id, name: m.name.trim(), emoji: '👤', color: '#EEF2FF' });
+          const trips = [...(remote.trips || [])];
+
+          // Deduplication key: personName (lowered) + dateOutIndia
+          const existingKeys = new Set(
+            trips.map(t => ((t.personName || '').toLowerCase().trim()) + '|' + ((t.dateOutIndia || '').trim()))
+          );
+
+          records.forEach(rec => {
+            const primaryName = (rec.personName || 'Unknown').trim();
+            const doi  = (rec.dateOutIndia || '').trim();
+
+            // Parse companion names from travelWithNames field
+            const companionNames = (rec.travelWithNames || '')
+              .split(/[&,]+/)
+              .map(n => n.trim())
+              .filter(Boolean);
+
+            // All people in this row (primary + companions)
+            const allNames = [...new Set([primaryName, ...companionNames])];
+
+            // Create a trip for EACH person mentioned in the row
+            allNames.forEach(personName => {
+              const name = personName.trim();
+              if (!name) return;
+
+              // Dedup check (only if both name and date exist)
+              if (name && doi) {
+                const key = name.toLowerCase() + '|' + doi;
+                if (existingKeys.has(key)) { skipped++; return; }
+                existingKeys.add(key);
+              }
+
+              // Others in this row become this person's companions
+              const othersInRow = allNames
+                .filter(n => n.toLowerCase() !== name.toLowerCase())
+                .join(', ');
+
+              trips.push({
+                ...rec,
+                id: uuidv4(),
+                personName: name,
+                travelWithNames: othersInRow,
+              });
+              imported++;
+            });
           });
-          const trips = [...(remote.trips||[])];
-          // Deduplication key: personId | YYYY-MM-DD
-          const existingKeys = new Set(trips.map(t => (t.personId||'').trim() + '|' + (t.dateOutIndia||'').trim()));
-          
-          resolved.forEach(rec => {
-            const pid = (rec.personId || '').trim();
-            const doi = (rec.dateOutIndia || '').trim();
-            if (!pid || !doi) { skipped++; return; }
-            
-            const key = pid + '|' + doi;
-            if (existingKeys.has(key)) { skipped++; return; }
-            
-            trips.push(rec);
-            existingKeys.add(key);
-            imported++;
-          });
-          return { ...remote, travelPersons, trips };
+
+          return { ...remote, trips };
         });
+
         await setCachedTravelData(newData);
         const msg = imported > 0
           ? '✅ ' + imported + ' trips imported!' + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
