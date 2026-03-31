@@ -1,4 +1,4 @@
-// v3.5.30 — 2026-03-31
+// v3.5.31 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -34,21 +34,27 @@ export async function renderTravelLog(container, params = {}) {
     return t;
   }) : [];
 
-  // ── Extract unique persons from trip data itself (self-contained) ──
+  // ── Extract unique persons by splitting ALL combined name fields ──
   const personNamesSet = new Set();
   const personInfoMap = {};  // name → { name, emoji, color }
+
   safeTrips.forEach(t => {
-    const name = (t.personName || 'Unknown').trim();
-    if (!personNamesSet.has(name)) {
-      personNamesSet.add(name);
-      // Try to get emoji/color from travelPersons if a match exists
-      const tp = travelPersons.find(p => p.name?.toLowerCase() === name.toLowerCase());
-      personInfoMap[name] = {
-        name,
-        emoji: tp?.emoji || '👤',
-        color: tp?.color || '#EEF2FF',
-      };
-    }
+    const namesInTrip = [
+      ...(t.personName || '').split(/[&,]+/),
+      ...(t.travelWithNames || '').split(/[&,]+/)
+    ].map(n => n.trim()).filter(Boolean);
+
+    namesInTrip.forEach(name => {
+      if (!personNamesSet.has(name)) {
+        personNamesSet.add(name);
+        const tp = travelPersons.find(p => p.name?.toLowerCase() === name.toLowerCase());
+        personInfoMap[name] = {
+          name,
+          emoji: tp?.emoji || '👤',
+          color: tp?.color || '#EEF2FF',
+        };
+      }
+    });
   });
   const uniquePersons = [...personNamesSet].sort().map(n => personInfoMap[n]);
 
@@ -127,15 +133,22 @@ export async function renderTravelLog(container, params = {}) {
     if (!logContent) return;
 
     let filtered = [...safeTrips].sort((a, b) => {
-      const da = a.dateOutIndia ? new Date(a.dateOutIndia) : 0;
-      const db = b.dateOutIndia ? new Date(b.dateOutIndia) : 0;
-      return db - da;
+      const da = a.dateOutIndia ? new Date(a.dateOutIndia).getTime() : 0;
+      const db = b.dateOutIndia ? new Date(b.dateOutIndia).getTime() : 0;
+      return (Number.isNaN(db) ? 0 : db) - (Number.isNaN(da) ? 0 : da);
     });
 
-    // Filter by person NAME (not id)
-    if (filterPerson) filtered = filtered.filter(t => t.personName === filterPerson);
+    // Filter by person individual name
+    if (filterPerson) {
+      const lowFilter = filterPerson.toLowerCase();
+      filtered = filtered.filter(t => {
+        const primaryNames = (t.personName || '').toLowerCase().split(/[&,]+/).map(n => n.trim());
+        const travelWithNames = (t.travelWithNames || '').toLowerCase().split(/[&,]+/).map(n => n.trim());
+        return primaryNames.includes(lowFilter) || travelWithNames.includes(lowFilter);
+      });
+    }
     if (filterYear && filterYear !== 'all') {
-      filtered = filtered.filter(t => t.dateOutIndia?.startsWith(filterYear));
+      filtered = filtered.filter(t => (t.dateOutIndia || '').startsWith(filterYear));
     }
 
     if (!filtered.length) {
