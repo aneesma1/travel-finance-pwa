@@ -1,11 +1,11 @@
-// v3.5.25 — 2026-03-28
+// v3.5.30 — 2026-03-31
 
 // ─── app-b-private-vault/sw.js ───────────────────────────────────────────────
 // Service Worker for Private Vault PWA
 
 'use strict';
 
-const CACHE_NAME    = 'private-vault-v3.5.25';
+const CACHE_NAME    = 'private-vault-v3.5.30';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -27,6 +27,8 @@ const STATIC_ASSETS = [
   '../shared/smart-input.js',
   '../shared/pill-select.js',
   '../shared/import-tool.js',
+  '../shared/photo-picker.js',
+  '../shared/sync-manager.js',
   '../shared/pwa-install.js',
   '../shared/sync-queue.js',
   'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap',

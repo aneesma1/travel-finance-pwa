@@ -64,7 +64,7 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
   function closeDialog() {
     _pasteDialogOpen = false;
     overlay.remove();
-    document.removeEventListener('paste', handlePaste);
+    document.removeEventListener('paste', handlePaste, true); // Must match addEventListener exactly
   }
 
   function updateContent() {
@@ -140,6 +140,9 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
   }
 
   const handlePaste = async (e) => {
+    // Ignore if overlay was already removed/disconnected
+    if (!overlay.isConnected) return;
+
     const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
     if (item) {
       e.preventDefault();

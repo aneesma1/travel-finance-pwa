@@ -1,4 +1,4 @@
-// v3.5.30 — 2026-03-31
+// v3.5.31 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -216,10 +216,11 @@ export function openTravelExportSheet(persons, trips, documents) {
 
     return trips
       .filter(t => {
-        // People filter — match by personId or personName
+        // People filter — match by personId or personName (split-aware)
         if (!selPeople.has('all')) {
           const matchById = t.personId && selPeople.has(t.personId);
-          const matchByName = t.personName && selPeople.has(t.personName);
+          const primaryNames = (t.personName || '').split(/[&,]+/).map(n => n.trim());
+          const matchByName = primaryNames.some(name => selPeople.has(name));
           if (!matchById && !matchByName) return false;
         }
         // Date range filter
