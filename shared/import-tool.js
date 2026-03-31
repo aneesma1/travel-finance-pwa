@@ -1,4 +1,4 @@
-// v3.5.40 — 2026-03-31
+// v3.5.44 — 2026-03-31
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -9,7 +9,6 @@
 import { uuidv4 } from './utils.js';
 
 export const TRAVEL_COLUMNS = [
-  { key: 'timestamp',     label: 'Timestamp',                 required: false },
   { key: 'personName',    label: 'Name of Person',            required: false },
   { key: 'dateOutIndia',  label: 'Date Out India',            required: false },
   { key: 'dateInQatar',   label: 'Date In Qatar',             required: false },
@@ -35,12 +34,13 @@ export const FINANCE_COLUMNS = [
 ];
 
 export function renderImportTool(container, { appType, existingData, onImportComplete }) {
+  const CACHE_NAME = 'family-hub v3.5.44';
   const COLUMNS = appType === 'travel' ? TRAVEL_COLUMNS : FINANCE_COLUMNS;
   let step = 'pick';
   let rawRows    = [];
   let headers    = [];
-  let columnMap  = {};
   let parsedRows = [];
+  let columnMap  = {};
 
   function render() {
     switch (step) {

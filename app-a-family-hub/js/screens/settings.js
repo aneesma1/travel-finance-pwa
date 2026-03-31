@@ -1,17 +1,17 @@
-// v3.5.42 — 2026-03-31
+// v3.5.44 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
-import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror } from '../../../shared/drive.js';
+import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
-import { uuidv4, formatDisplayDate, showToast, isOnline } from '../../../shared/utils.js';
+import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate } from '../../../shared/utils.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openPersonManage } from './person-manage.js';
 
@@ -315,13 +315,18 @@ function renderDataTab(data, members, container) {
   document.getElementById('reset-db-btn').addEventListener('click', async () => {
     const doubleConfirm = confirm('☢️ NUCLEAR RESET: This will PERMANENTLY DELETE all local travel data AND your Google Drive cloud records.\n\nProceed to wipe everything?');
     if (!doubleConfirm) return;
-    const tripleConfirm = confirm('Are you 100% sure? All travel log history for all persons (including Abdul Rahiman, Anees, etc.) will be lost forever from the cloud.');
+    const tripleConfirm = confirm('Are you 100% sure? All history will be lost forever.');
     if (!tripleConfirm) return;
 
     try {
-      showToast('Wiping database clean…', 'info', 3000);
-      // Wipe remote (send empty set to Drive)
-      await localSave('travel', () => ({ trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.42' } }));
+      showToast('Wiping database clean…', 'info', 5000);
+      const emptySet = { trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.43' } };
+      
+      if (isOnline()) {
+        // FORCE a direct write to Drive first (bypass queue) to ensure cloud is wiped
+        await writeData('travel', emptySet);
+      }
+      
       // Wipe local IndexedDB
       await clearAllCachedData();
       showToast('Database wiped successfully', 'success');
@@ -429,7 +434,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.42 · 2026-03-31</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.44 · 2026-03-31</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
@@ -573,19 +578,18 @@ function openImportModal(data, persons) {
         const newData = await localSave('travel', remote => {
           const trips = [...(remote.trips || [])];
 
-          // Deduplication key: personName (lowered) + dateOutIndia
+          // Deduplication key: personName (lowered) + ISO dateOutIndia
           const existingKeys = new Set(
-            trips.map(t => ((t.personName || '').toLowerCase().trim()) + '|' + ((t.dateOutIndia || '').trim()))
+            trips.map(t => ((t.personName || '').toLowerCase().trim()) + '|' + toISODate(t.dateOutIndia))
           );
 
           records.forEach(rec => {
             const rawPrimary = (rec.personName || 'Unknown').trim();
-            const doi        = (rec.dateOutIndia || '').trim();
+            const doi        = toISODate(rec.dateOutIndia);
 
-            // Split ONLY the companion column ("Travel With") to find individuals
-            // Match the key 'travelWith' from shared/import-tool.js
+            // Split ONLY the companion column ("Travel With") using Comma or Semi-colon
             const companionNames = (rec.travelWith || '')
-              .split(/[&,]+/)
+              .split(/[,;]+/)
               .map(n => n.trim())
               .filter(Boolean);
 
