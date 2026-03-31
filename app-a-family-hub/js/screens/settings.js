@@ -1,4 +1,4 @@
-// v3.5.39 — 2026-03-31
+// v3.5.42 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -313,17 +313,18 @@ function renderDataTab(data, members, container) {
   });
 
   document.getElementById('reset-db-btn').addEventListener('click', async () => {
-    if (!confirm('⚠️ RESET DATABASE?\n\nThis will PERMANENTLY DELETE all your trips, travel persons, and documents.\n\nHave you taken a backup first?')) return;
-    if (!confirm('SECOND CONFIRMATION:\n\nThis action cannot be undone. All your data in the cloud (Google Drive) will also be wiped out. Are you absolutely sure?')) return;
-    if (!confirm('FINAL WARNING:\n\nType OK in your mind and click OK to DESTROY all records.')) return;
+    const doubleConfirm = confirm('☢️ NUCLEAR RESET: This will PERMANENTLY DELETE all local travel data AND your Google Drive cloud records.\n\nProceed to wipe everything?');
+    if (!doubleConfirm) return;
+    const tripleConfirm = confirm('Are you 100% sure? All travel log history for all persons (including Abdul Rahiman, Anees, etc.) will be lost forever from the cloud.');
+    if (!tripleConfirm) return;
 
     try {
-      showToast('Resetting database…', 'info', 3000);
-      // Wipe remote first (empty object)
-      await localSave('travel', () => ({ trips: [], travelPersons: [], members: [], documents: [] }));
-      // Wipe local
+      showToast('Wiping database clean…', 'info', 3000);
+      // Wipe remote (send empty set to Drive)
+      await localSave('travel', () => ({ trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.42' } }));
+      // Wipe local IndexedDB
       await clearAllCachedData();
-      showToast('Database reset successfully', 'success');
+      showToast('Database wiped successfully', 'success');
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       showToast('Reset failed: ' + err.message, 'error');
@@ -428,7 +429,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.39 · 2026-03-31</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.42 · 2026-03-31</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
