@@ -1,4 +1,4 @@
-// v3.5.41 — 2026-03-31
+// v3.5.42 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -50,15 +50,17 @@ export async function renderTravelLog(container, params = {}) {
   safeTrips.forEach(t => {
     const namesInTrip = [
       t.personName || '',
-      ...(t.travelWithNames || '').split(/[&,]+/)
+      ...(t.travelWith || '').split(/[,;]+/)
     ].map(n => n.trim()).filter(Boolean);
 
     namesInTrip.forEach(name => {
-      if (!personNamesSet.has(name)) {
-        personNamesSet.add(name);
-        const tp = travelPersons.find(p => p.name?.toLowerCase() === name.toLowerCase());
-        personInfoMap[name] = {
-          name,
+      // Use clean normalized name for chips
+      const cleanName = name.trim();
+      if (!personNamesSet.has(cleanName)) {
+        personNamesSet.add(cleanName);
+        const tp = travelPersons.find(p => p.name?.toLowerCase() === cleanName.toLowerCase());
+        personInfoMap[cleanName] = {
+          name: cleanName,
           emoji: tp?.emoji || '👤',
           color: tp?.color || '#EEF2FF',
         };
@@ -168,10 +170,12 @@ export async function renderTravelLog(container, params = {}) {
 
     // Filter by person name
     if (filterPerson) {
-      const lowFilter = filterPerson.toLowerCase();
+      const lowFilter = filterPerson.toLowerCase().trim();
       filtered = filtered.filter(t => {
         const primaryMatch = (t.personName || '').toLowerCase().trim() === lowFilter;
-        const travelWithNames = (t.travelWithNames || '').toLowerCase().split(/[&,]+/).map(n => n.trim());
+        // Strictly split by Comma or Semi-colon as requested
+        const travelWithNames = (Array.isArray(t.travelWith) ? t.travelWith : (t.travelWith || '').split(/[,;]+/))
+          .map(n => n.trim().toLowerCase());
         return primaryMatch || travelWithNames.includes(lowFilter);
       });
     }
@@ -213,12 +217,12 @@ export async function renderTravelLog(container, params = {}) {
       const pName = trip.personName || 'Unknown';
       const pInfo = personInfoMap[pName] || { name: pName, emoji: '👤', color: '#EEF2FF' };
 
-      // Travel companions — show from travelWithNames (plain text) or travelWith (IDs)
+      // Travel companions
       let travelWithDisplay = [];
-      if (trip.travelWithNames) {
-        travelWithDisplay = trip.travelWithNames.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
-      } else if (trip.travelWith?.length) {
-        travelWithDisplay = trip.travelWith.map(id => tpMap[id]?.name).filter(Boolean);
+      if (Array.isArray(trip.travelWith)) {
+        travelWithDisplay = trip.travelWith.filter(Boolean);
+      } else if (trip.travelWith) {
+        travelWithDisplay = trip.travelWith.split(/[,;]+/).map(n => n.trim()).filter(Boolean);
       }
 
       const dest = 'Qatar';
