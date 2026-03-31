@@ -1,4 +1,4 @@
-// v3.5.25 — 2026-03-28
+// v3.5.33 — 2026-03-31
 
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
@@ -22,6 +22,7 @@ import { navigate } from '../router.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openCategoryManager } from '../modals/category-manager.js';
 
+const CACHE_NAME = 'v3.5.33';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export async function renderSettings(container, params = {}) {
@@ -577,11 +578,31 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.5.25 · 2026-03-28</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v3.5.33 · 2026-03-31</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
+        
+        <button id="force-update-btn" style="
+          margin-top:16px; width:100%; padding:10px; font-size:12px; font-weight:700;
+          background:rgba(220,38,38,0.1); color:var(--danger); border:1px solid var(--danger);
+          border-radius:var(--radius-md); cursor:pointer;
+        ">⚠️ Emergency Reset & Update App</button>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
+          Use this if the app is stuck or if updates are not showing.
+        </div>
       </div>
     `;
+
+    document.getElementById('force-update-btn')?.addEventListener('click', async () => {
+      if (confirm('This will unregister the Service Worker and hard-reload the app. Continue?')) {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) await reg.unregister();
+        }
+        localStorage.clear();
+        window.location.reload(true);
+      }
+    });
     document.getElementById('safe-exit-btn').addEventListener('click', async () => {
       showToast('Syncing before locking…', 'info', 1500);
       try {

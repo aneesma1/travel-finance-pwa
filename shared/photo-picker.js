@@ -1,4 +1,4 @@
-// v3.5.30 — 2026-03-31
+// v3.5.33 — 2026-03-31
 
 // ─── shared/photo-picker.js ──────────────────────────────────────────────────
 // Shared photo capture component
@@ -21,22 +21,29 @@ function isPC() {
 // ── Compress image file to base64 JPEG ───────────────────────────────────────
 export async function compressImage(file) {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const canvas = document.createElement('canvas');
-      let { width, height } = img;
-      if (width > MAX_DIM || height > MAX_DIM) {
-        if (width > height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
-        else { width = Math.round(width * MAX_DIM / height); height = MAX_DIM; }
-      }
-      canvas.width = width; canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', QUALITY));
-    };
-    img.onerror = reject;
-    img.src = url;
+    try {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
+          else { width = Math.round(width * MAX_DIM / height); height = MAX_DIM; }
+        }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', QUALITY));
+      };
+      img.onerror = () => {
+        console.error('[photo-picker] Image load error. Type:', file.type, 'Size:', file.size);
+        reject(new Error(`Browser could not decode image (${file.type || 'unknown type'})`));
+      };
+      img.src = url;
+    } catch (err) {
+      reject(new Error('Failed to create Image object: ' + err.message));
+    }
   });
 }
 
@@ -146,14 +153,18 @@ async function showPasteDialog(slotIndex, slots, onChange, rerender) {
     const item = Array.from(e.clipboardData?.items || []).find(it => it.type.startsWith('image/'));
     if (item) {
       e.preventDefault();
-      e.stopImmediatePropagation(); // Prevent global handler from also firing
+      e.stopImmediatePropagation();
       const file = item.getAsFile();
       if (file) {
+        console.log('[photo-picker] Clipboard image detected:', file.type, file.size, 'bytes');
         try {
           const compressed = await compressImage(file);
           pastedImage = compressed;
           updateContent();
-        } catch { globalToast('Image processing failed', 'error'); }
+        } catch (err) {
+          console.error('[photo-picker] Paste compression failed:', err);
+          globalToast(`Processing failed: ${err.message}`, 'error');
+        }
       }
     }
   };
