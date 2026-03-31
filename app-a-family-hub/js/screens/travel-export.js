@@ -571,42 +571,52 @@ async function exportCSV(trips, deliver) {
 
 // ── WhatsApp Text Copy ────────────────────────────────────────────────────────
 async function exportWhatsApp(trips, persons) {
-  // Group by person
-  const byPerson = {};
+  // Flatten and group by individual name
+  const byPersonName = {};
   trips.forEach(t => {
-    const pid = t.personId;
-    if (!byPerson[pid]) byPerson[pid] = { person: t._person, trips: [] };
-    byPerson[pid].trips.push(t);
+    const rawName = t.personName || 'Unknown';
+    const splitNames = rawName.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
+    
+    splitNames.forEach(name => {
+      if (!byPersonName[name]) byPersonName[name] = { name, trips: [] };
+      // Avoid duplicate trips for the same person in the report (deduplicate by date)
+      const dKey = `${t.dateOutIndia}|${t.dateInIndia}`;
+      if (!byPersonName[name].trips.some(existing => `${existing.dateOutIndia}|${existing.dateInIndia}` === dKey)) {
+        byPersonName[name].trips.push(t);
+      }
+    });
   });
 
-  const lines = ['✈️ *Travel History Report*', '📅 ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }), ''];
-
-  Object.values(byPerson).forEach(({ person, trips: pTrips }) => {
+  Object.values(byPersonName).sort((a,b) => a.name.localeCompare(b.name)).forEach(({ name, trips: pTrips }) => {
     const totalDays = pTrips.reduce((s, t) => s + (t.daysInQatar || 0), 0);
-    lines.push('👤 *' + person.name + '*  (' + pTrips.length + ' trips · ' + totalDays + 'd total)');
-    lines.push('─────────────────────');
-
-    pTrips.sort((a,b) => new Date(b.dateOutIndia) - new Date(a.dateOutIndia))
-      .forEach((t, i) => {
-        const d = t.destination || 'Qatar';
-        lines.push(
-          (i+1) + '. ' + d + ': ' + fmtDate(t.dateOutIndia) +
-          ' → ' + (t.dateInIndia ? fmtDate(t.dateInIndia) : 'Present')
-        );
-        if (t.daysInQatar != null) lines.push('   🕐 ' + t.daysInQatar + ' days in ' + d);
-        if (t.flightInward)  lines.push('   ✈️ In: ' + t.flightInward);
-        if (t.flightOutward) lines.push('   ✈️ Out: ' + t.flightOutward);
-        if (t.reason)        lines.push('   📝 ' + t.reason);
-      });
-
-    // Yearly totals
+    
+    // Yearly totals breakdown
     const yearly = {};
     pTrips.forEach(t => {
-      const yr = t.dateOutIndia?.slice(0,4) || '?';
+      const yr = t.dateOutIndia?.match(/\b(20\d{2})\b/)?.[1] || '?';
       yearly[yr] = (yearly[yr] || 0) + (t.daysInQatar || 0);
     });
     const yrLine = Object.keys(yearly).sort((a,b)=>b-a)
       .map(yr => yr + ': ' + yearly[yr] + 'd').join(' · ');
+
+    lines.push('👤 *' + name + '*  (' + pTrips.length + ' trips · ' + totalDays + 'd total)');
+    lines.push('─────────────────────');
+
+    pTrips.sort((a,b) => {
+      const d1 = a.dateOutIndia || '';
+      const d2 = b.dateOutIndia || '';
+      return d2.localeCompare(d1); // simple string sort for descending dates
+    }).forEach((t, i) => {
+      const d = t.destination || 'Qatar';
+      lines.push(
+        (i+1) + '. ' + d + ': ' + fmtDate(t.dateOutIndia) +
+        ' → ' + (t.dateInIndia ? fmtDate(t.dateInIndia) : 'Present')
+      );
+      if (t.daysInQatar != null) lines.push('   🕐 ' + t.daysInQatar + ' days in ' + d);
+      if (t.flightInward)  lines.push('   ✈️ In: ' + t.flightInward);
+      if (t.flightOutward) lines.push('   ✈️ Out: ' + t.flightOutward);
+      if (t.reason)        lines.push('   📝 ' + t.reason);
+    });
     if (yrLine) lines.push('📊 ' + yrLine);
     lines.push('');
   });
