@@ -1,4 +1,4 @@
-// v3.5.42 — 2026-03-31
+// v3.5.44 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -48,9 +48,10 @@ export async function renderTravelLog(container, params = {}) {
   const yearsSet = new Set();
 
   safeTrips.forEach(t => {
+    const travelWithArr = Array.isArray(t.travelWith) ? t.travelWith : (t.travelWith || '').split(/[,;]+/);
     const namesInTrip = [
       t.personName || '',
-      ...(t.travelWith || '').split(/[,;]+/)
+      ...travelWithArr
     ].map(n => n.trim()).filter(Boolean);
 
     namesInTrip.forEach(name => {
@@ -226,22 +227,18 @@ export async function renderTravelLog(container, params = {}) {
       }
 
       const dest = 'Qatar';
-      const days = Number(trip.daysInQatar);
-      const hasDays = !isNaN(days) && trip.daysInQatar != null;
-      let daysLabel = '--';
-      if (hasDays) {
-        daysLabel = `${days}d in ${dest}`;
-      } else if (trip.dateInQatar && !trip.dateOutQatar) {
-        const start = new Date(trip.dateInQatar);
-        if (!isNaN(start)) {
-          const diff = Math.floor((new Date() - start) / 86400000);
-          daysLabel = `${diff}d so far`;
+      let days = (trip.daysInQatar != null && trip.daysInQatar !== '') ? Number(trip.daysInQatar) : null;
+      
+      if (days === null || isNaN(days)) {
+        if (trip.dateInQatar && trip.dateOutQatar) {
+          days = daysBetween(trip.dateInQatar, trip.dateOutQatar);
+        } else if (trip.dateInQatar && !trip.dateOutQatar) {
+          days = daysBetween(trip.dateInQatar, today());
         }
       }
-
-      const statusDot = (trip.dateInQatar && !trip.dateOutQatar)
-        ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--success);margin-right:5px;"></span>`
-        : '';
+      
+      const daysLabel = (days !== null && !isNaN(days)) ? `${days}d in ${dest}` : '--';
+      const statusDot = (trip.dateInQatar && !trip.dateOutQatar) ? `<span class="status-dot-active"></span>` : '';
       const row = document.createElement('div');
       row.className = 'swipe-row-container';
       row.innerHTML = `

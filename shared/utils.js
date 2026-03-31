@@ -1,4 +1,4 @@
-// v3.5.25 — 2026-03-28
+// v3.5.43 — 2026-03-31
 
 // ─── shared/utils.js ────────────────────────────────────────────────────────
 // Shared utility functions used by both App A and App B
@@ -14,9 +14,20 @@ export function uuidv4() {
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 export function toISODate(date) {
-  // Returns YYYY-MM-DD from a Date object or string
-  const d = date instanceof Date ? date : new Date(date);
-  return d.toISOString().split('T')[0];
+  if (!date) return '';
+  if (date instanceof Date) return date.toISOString().split('T')[0];
+  const s = String(date).trim();
+  // Handle DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+  const parts = s.split(/[.\-/]/);
+  if (parts.length === 3) {
+    let day = parts[0], month = parts[1], year = parts[2];
+    // If year is the first part (YYYY-MM-DD), reorder
+    if (day.length === 4) return `${day}-${month.padStart(2,'0')}-${year.padStart(2,'0')}`;
+    // Assume DD-MM-YYYY
+    return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`;
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : d.toISOString().split('T')[0];
 }
 
 export function today() {
@@ -24,10 +35,12 @@ export function today() {
 }
 
 export function daysBetween(dateA, dateB) {
-  // Returns positive number of days between two YYYY-MM-DD strings
   if (!dateA || !dateB) return null;
-  const a = new Date(dateA);
-  const b = new Date(dateB);
+  const isoA = toISODate(dateA);
+  const isoB = toISODate(dateB);
+  const a = new Date(isoA + 'T00:00:00');
+  const b = new Date(isoB + 'T00:00:00');
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
   return Math.round(Math.abs((b - a) / 86400000));
 }
 
@@ -41,9 +54,10 @@ export function daysFromToday(dateStr) {
 }
 
 export function formatDisplayDate(dateStr) {
-  // YYYY-MM-DD → "15 Mar 2026"
   if (!dateStr) return '--';
-  const d = new Date(dateStr + 'T00:00:00');
+  const iso = toISODate(dateStr);
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
