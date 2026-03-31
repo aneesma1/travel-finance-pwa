@@ -1,4 +1,4 @@
-// v3.5.45 — 2026-03-31
+// v3.5.46 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -320,21 +320,33 @@ function renderDataTab(data, members, container) {
 
     try {
       showToast('Wiping database clean…', 'info', 5000);
-      const emptySet = { trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.43' } };
+      const emptySet = { trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.46' } };
       
-      if (isOnline()) {
-        // FORCE a direct write to Drive first (bypass queue) to ensure cloud is wiped
-        // writeData EXPECTS a function as second argument: (remote) => newData
-        await writeData('travel', () => emptySet);
-      }
+      // Use localSave (it handles both local and cloud sync correctly)
+      // ENSURE we pass a function wrap: () => emptySet
+      await localSave('travel', () => emptySet);
       
-      // Wipe local IndexedDB
+      // Wipe local IndexedDB entirely for clean slate
       await clearAllCachedData();
       showToast('Database wiped successfully', 'success');
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       showToast('Reset failed: ' + err.message, 'error');
+      console.error('Reset error:', err);
     }
+  });
+
+  document.getElementById('force-update-btn')?.addEventListener('click', async () => {
+    if (!confirm('This will unregister the Service Worker and force the app to reload fresh. Continue?')) return;
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) await reg.unregister();
+      }
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.reload(true);
+    } catch { window.location.reload(true); }
   });
 }
 
@@ -435,7 +447,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.45 · 2026-03-31</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.46 · 2026-03-31</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
