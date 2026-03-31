@@ -1,4 +1,4 @@
-// v3.5.33 — 2026-03-31
+// v3.5.39 — 2026-03-31
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -9,16 +9,18 @@
 import { uuidv4 } from './utils.js';
 
 export const TRAVEL_COLUMNS = [
-  { key: 'timestamp',    label: 'Timestamp',               required: false },
-  { key: 'personName',   label: 'Name of Person',          required: false },
-  { key: 'dateOutIndia', label: 'Date Out India',          required: false },
-  { key: 'dateInQatar',  label: 'Date In Qatar',           required: false },
-  { key: 'dateOutQatar', label: 'Date Out Qatar',          required: false },
-  { key: 'dateInIndia',  label: 'Date In India',           required: false },
-  { key: 'flightInward', label: 'Inward Flight to Qatar',  required: false },
-  { key: 'flightOutward',label: 'Outward Flight to India', required: false },
-  { key: 'reason',       label: 'Reason for Travel',       required: false },
-  { key: 'travelWith',   label: 'Travel With',             required: false },
+  { key: 'timestamp',     label: 'Timestamp',                 required: false },
+  { key: 'personName',    label: 'Name of Person',            required: false },
+  { key: 'dateOutIndia',  label: 'Date Out India',            required: false },
+  { key: 'dateInQatar',   label: 'Date In Qatar',             required: false },
+  { key: 'dateOutQatar',  label: 'Date Out Qatar',            required: false },
+  { key: 'dateInIndia',   label: 'Date In India',             required: false },
+  { key: 'flightInward',  label: 'Inward Flight to Qatar',    required: false },
+  { key: 'flightOutward', label: 'Outward Flight From Qatar', required: false },
+  { key: 'reason',        label: 'Reason for Travel',         required: false },
+  { key: 'travelWith',    label: 'Travel With',               required: false },
+  { key: 'daysInQatar',   label: 'Days outside Qatar',        required: false },
+  { key: 'daysInIndia',   label: 'Days in India',             required: false },
 ];
 
 export const FINANCE_COLUMNS = [

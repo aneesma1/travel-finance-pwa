@@ -1,4 +1,4 @@
-// v3.5.34 — 2026-03-31
+// v3.5.39 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -428,7 +428,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.34 · 2026-03-31</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.39 · 2026-03-31</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
@@ -579,10 +579,11 @@ function openImportModal(data, persons) {
 
           records.forEach(rec => {
             const rawPrimary = (rec.personName || 'Unknown').trim();
-            const doi  = (rec.dateOutIndia || '').trim();
+            const doi        = (rec.dateOutIndia || '').trim();
 
-            // Split ONLY the companion column to find individuals mentioned there
-            const companionNames = (rec.travelWithNames || '')
+            // Split ONLY the companion column ("Travel With") to find individuals
+            // Match the key 'travelWith' from shared/import-tool.js
+            const companionNames = (rec.travelWith || '')
               .split(/[&,]+/)
               .map(n => n.trim())
               .filter(Boolean);
