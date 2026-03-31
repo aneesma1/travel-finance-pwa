@@ -1,4 +1,4 @@
-// v3.5.44 — 2026-03-31
+// v3.5.45 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -324,7 +324,8 @@ function renderDataTab(data, members, container) {
       
       if (isOnline()) {
         // FORCE a direct write to Drive first (bypass queue) to ensure cloud is wiped
-        await writeData('travel', emptySet);
+        // writeData EXPECTS a function as second argument: (remote) => newData
+        await writeData('travel', () => emptySet);
       }
       
       // Wipe local IndexedDB
@@ -434,7 +435,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.44 · 2026-03-31</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.45 · 2026-03-31</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
