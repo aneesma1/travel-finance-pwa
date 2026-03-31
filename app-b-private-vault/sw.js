@@ -5,7 +5,7 @@
 
 'use strict';
 
-const CACHE_NAME    = 'private-vault-v3.5.30';
+const CACHE_NAME    = 'private-vault v3.5.33';
 const STATIC_ASSETS = [
   './',
   './index.html',

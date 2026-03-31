@@ -1,4 +1,4 @@
-// v3.5.32 — 2026-03-31
+// v3.5.33 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
@@ -190,25 +190,28 @@ export async function renderTravelLog(container, params = {}) {
       // Travel companions — show from travelWithNames (plain text) or travelWith (IDs)
       let travelWithDisplay = [];
       if (trip.travelWithNames) {
-        // New format: plain text string
         travelWithDisplay = trip.travelWithNames.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
       } else if (trip.travelWith?.length) {
-        // Legacy format: array of IDs
         travelWithDisplay = trip.travelWith.map(id => tpMap[id]?.name).filter(Boolean);
       }
 
-      const dest = trip.destination || 'Qatar';
-      const days = trip.daysInQatar || 0;
-      const daysLabel = trip.daysInQatar != null
-        ? `${days}d in ${dest}`
-        : trip.dateInQatar && !trip.dateOutQatar
-          ? `${daysBetween(trip.dateInQatar, new Date().toISOString().split('T')[0])}d so far`
-          : '--';
+      const dest = 'Qatar';
+      const days = Number(trip.daysInQatar);
+      const hasDays = !isNaN(days) && trip.daysInQatar != null;
+      let daysLabel = '--';
+      if (hasDays) {
+        daysLabel = `${days}d in ${dest}`;
+      } else if (trip.dateInQatar && !trip.dateOutQatar) {
+        const start = new Date(trip.dateInQatar);
+        if (!isNaN(start)) {
+          const diff = Math.floor((new Date() - start) / 86400000);
+          daysLabel = `${diff}d so far`;
+        }
+      }
 
-      const statusDot = !trip.dateOutQatar
+      const statusDot = (trip.dateInQatar && !trip.dateOutQatar)
         ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--success);margin-right:5px;"></span>`
         : '';
-
       const row = document.createElement('div');
       row.className = 'swipe-row-container';
       row.innerHTML = `

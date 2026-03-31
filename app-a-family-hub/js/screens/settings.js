@@ -428,11 +428,31 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.25 · 2026-03-28</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.33 · 2026-03-31</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
+      
+      <button id="force-update-btn" style="
+        margin-top:16px; width:100%; padding:10px; font-size:12px; font-weight:700;
+        background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger);
+        border-radius:var(--radius-md); cursor:pointer;
+      ">⚠️ Emergency Reset & Update App</button>
+      <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
+        Use this if the app is stuck or if updates are not showing.
+      </div>
     </div>`;
+
+  document.getElementById('force-update-btn')?.addEventListener('click', async () => {
+    if (confirm('This will unregister the Service Worker and hard-reload the app. Continue?')) {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+      }
+      localStorage.clear(); // Safe to clear local UI state
+      window.location.reload(true);
+    }
+  });
 
   document.getElementById('signout-btn').addEventListener('click', () => {
     if (confirm('Sign out?')) { clearAuth(); window.location.reload(); }
