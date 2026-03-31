@@ -1,4 +1,4 @@
-// v3.5.46 — 2026-03-31
+// v3.5.47 — 2026-03-31
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -12,6 +12,7 @@ import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
 import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate } from '../../../shared/utils.js';
+import { authFetch } from '../../../shared/auth.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openPersonManage } from './person-manage.js';
 
@@ -319,12 +320,20 @@ function renderDataTab(data, members, container) {
     if (!tripleConfirm) return;
 
     try {
-      showToast('Wiping database clean…', 'info', 5000);
-      const emptySet = { trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.46' } };
+      showToast('Wiping cloud database clean…', 'info', 5000);
+      const emptySet = { trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.47' } };
       
-      // Use localSave (it handles both local and cloud sync correctly)
-      // ENSURE we pass a function wrap: () => emptySet
-      await localSave('travel', () => emptySet);
+      if (isOnline()) {
+        const fileId = localStorage.getItem('drive_travel_file_id');
+        if (fileId) {
+          // STANDALONE DIRECT DRIVE WIPE - Bypasses all app layers to fix 'mergeFn' errors
+          await authFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emptySet, null, 2)
+          });
+        }
+      }
       
       // Wipe local IndexedDB entirely for clean slate
       await clearAllCachedData();
@@ -447,7 +456,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.46 · 2026-03-31</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.47 · 2026-03-31</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
@@ -629,8 +638,8 @@ function openImportModal(data, persons) {
               trips.push({
                 ...rec,
                 id: uuidv4(),
-                personName: name,
-                travelWithNames: othersInRow,
+                personName: name, // STRICT: Ensure name mapped to personName field
+                travelWith: othersInRow,
               });
               imported++;
             });

@@ -1,4 +1,4 @@
-// v3.5.46 — 2026-03-31
+// v3.5.47 — 2026-03-31
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: scrollable trip list with filters, expand detail, swipe-delete
