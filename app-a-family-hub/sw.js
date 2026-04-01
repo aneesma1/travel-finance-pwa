@@ -6,7 +6,7 @@
 
 'use strict';
 
-const CACHE_NAME    = 'family-hub v3.6.2';
+const CACHE_NAME = 'family-hub v3.5.47';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -46,7 +46,7 @@ self.addEventListener('install', (e) => {
     caches.open(CACHE_NAME).then(cache => {
       // Cache what we can -- ignore failures for external resources
       return Promise.allSettled(
-        STATIC_ASSETS.map(url => cache.add(url).catch(() => {}))
+        STATIC_ASSETS.map(url => cache.add(url).catch(() => { }))
       );
     }).then(() => self.skipWaiting())
   );
