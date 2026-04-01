@@ -357,6 +357,10 @@ export async function renderTransactions(container) {
   function renderFilterBar() {
     const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b)=>b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
+    
+    // Count active filters (excluding search and multi-cats handled separately)
+    const activeCount = [activeAccount, activeMonth !== 0, !!activeYear].filter(Boolean).length;
+
     // Collapsed summary chips + filter icon
     const summaryParts = [];
     if (activeMonth) summaryParts.push(MONTHS[activeMonth-1]);
