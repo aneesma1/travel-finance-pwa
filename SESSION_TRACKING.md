@@ -351,3 +351,24 @@ git checkout master
     - Bumped `CACHE_NAME` to `v3.5.31` in both apps to force-bust old cached JS files.
     - Added `photo-picker.js`, `sync-manager.js`, and `travel-export.js` to `STATIC_ASSETS` for guaranteed offline availability.
 - **Commit**: `9419fb8` (master), `95a2ea9` (main) — `v3.5.31: Fix vault paste cleanup and travel name splitting/filtering`
+354: 
+355: ---
+356: 
+357: ## Session Start: 2026-04-01
+358: 
+359: ### Vault & Travel Hub Enhancements (v3.6.0 · 2026-04-01)
+360: 
+361: - **Shared Components**:
+362:     - **App Utilities**: Created `shared/app-utils.js` for centralized application exit handling (Capacitor/Native vs. PWA).
+363:     - **Photo Picker**: Added a dedicated **Gallery** button for simplified photo selection on mobile devices, alongside the existing Camera and Paste options.
+364: - **Travel App (Family Hub)**:
+365:     - **Data Reset**: Updated "Emergency Reset" to properly clear IndexedDB, ensuring a clean slate for debugging.
+366:     - **Name Resolution**: Implemented UUID-to-name resolution in the Travel Log to handle records where only IDs were stored.
+367:     - **Safe Exit**: Integrated the new "Save & Exit" utility to provide a clean closure for Android users.
+368: - **Private Vault**:
+369:     - **Advanced Search**: Implemented a powerful search bar in the Records screen with real-time filtering and auto-suggest for categories and descriptions.
+370:     - **Multi-Category Filtering**: Added support for selecting multiple categories with interactive chips and an **AND/OR toggle** for flexible searching.
+371:     - **UI Polish**: Fixed the "Save & Exit" button visibility in Settings and improved the scrollable suggestions list to prevent keyboard overlap.
+372: - **Git Workflow**:
+373:     - Synchronized `master` and `main` branches to ensure GitHub Pages reflects the latest v3.6.0 features.
+374: - **Commit**: `55dc2cc` (master), `8f2cb98` (main) — `v3.6.0: Vault Advanced Search, Gallery Picker, and Safe Exit/Reset fixes`
