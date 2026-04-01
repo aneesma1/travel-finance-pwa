@@ -21,9 +21,10 @@ const CURRENCIES = ['QAR','INR','USD'];
 export async function renderTransactions(container) {
   container.innerHTML = `
     <div class="app-header">
-      <span class="app-header-title">📋 Transactions</span>
+      <span class="app-header-title">📋 Records</span>
       <button class="app-header-action" id="export-btn" title="Export">📤</button>
     </div>
+    <div id="search-bar-wrap" style="background:var(--surface);padding:8px 16px;border-bottom:1px solid var(--border-light);"></div>
     <div id="filter-bar-wrap"></div>
     <div id="balance-bar" class="running-balance hidden"></div>
     <div id="txn-list-wrap"></div>
@@ -210,26 +211,157 @@ export async function renderTransactions(container) {
   const activeCurrency = p.currency || 'QAR';
   const activeYear     = p.year   ? Number(p.year)  : null;  // null = all years
   const activeMonth    = p.month  ? Number(p.month) : 0;
-  const activeCategory = p.category || '';
   const activeAccount  = p.account  || '';
+  
+  let searchText = '';
+  let selectedCategories = JSON.parse(sessionStorage.getItem('vault_search_cats') || '[]');
+  let filterLogic = sessionStorage.getItem('vault_search_logic') || 'OR'; // OR by default
+  
+  // Suggestions source
+  const allDescriptions = [...new Set(transactions.map(t => t.description).filter(Boolean))];
 
   let _txnPage = 1;
   const TXN_PAGE_SIZE = 30;
 
+  renderSearchBar();
   renderFilterBar();
   renderList();
+
+  function renderSearchBar() {
+    const wrap = document.getElementById('search-bar-wrap');
+    wrap.innerHTML = `
+      <div style="position:relative;">
+        <input type="text" id="txn-search-input" placeholder="Search categories or description..." 
+          style="width:100%;padding:10px 12px 10px 36px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--surface-2);font-size:14px;font-family:inherit;"
+          value="${searchText}" />
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;opacity:0.5;">🔍</span>
+        <div id="search-suggestions" class="hidden" style="
+          position:absolute;top:100%;left:0;right:0;z-index:1100;
+          background:var(--surface);border:1px solid var(--border);border-radius:0 0 var(--radius-lg) var(--radius-lg);
+          box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:240px;overflow-y:auto;
+        "></div>
+      </div>
+      <div id="filter-chips-wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+    `;
+
+    const input = document.getElementById('txn-search-input');
+    const suggs = document.getElementById('search-suggestions');
+
+    input.addEventListener('input', () => {
+      searchText = input.value.toLowerCase();
+      updateSuggestions();
+      renderList();
+    });
+
+    input.addEventListener('focus', () => updateSuggestions());
+    
+    // Hide suggestions on outside click
+    document.addEventListener('click', (e) => {
+      if (!wrap.contains(e.target)) suggs.classList.add('hidden');
+    });
+
+    renderChips();
+  }
+
+  function updateSuggestions() {
+    const suggs = document.getElementById('search-suggestions');
+    if (!searchText && !document.activeElement.id === 'txn-search-input') {
+      suggs.classList.add('hidden');
+      return;
+    }
+
+    const matches = [];
+    // Category matches
+    allCategories.forEach(c => {
+      if (c.toLowerCase().includes(searchText) && !selectedCategories.includes(c)) {
+        matches.push({ type: 'category', text: c });
+      }
+    });
+    // Description matches
+    allDescriptions.forEach(d => {
+      if (d.toLowerCase().includes(searchText) && searchText.length > 1) {
+        matches.push({ type: 'description', text: d });
+      }
+    });
+
+    if (matches.length === 0) {
+      suggs.classList.add('hidden');
+      return;
+    }
+
+    suggs.classList.remove('hidden');
+    suggs.innerHTML = matches.slice(0, 15).map(m => `
+      <div class="suggestion-item" data-type="${m.type}" data-text="${m.text}" style="padding:10px 16px;border-bottom:1px solid var(--border-light);cursor:pointer;display:flex;align-items:center;gap:8px;">
+        <span>${m.type === 'category' ? '🏷️' : '📝'}</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">${m.text}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${m.type}</div>
+        </div>
+      </div>
+    `).join('');
+
+    suggs.querySelectorAll('.suggestion-item').forEach(el => {
+      el.addEventListener('click', () => {
+        if (el.dataset.type === 'category') {
+          selectedCategories.push(el.dataset.text);
+          sessionStorage.setItem('vault_search_cats', JSON.stringify(selectedCategories));
+          renderChips();
+        } else {
+          document.getElementById('txn-search-input').value = el.dataset.text;
+          searchText = el.dataset.text.toLowerCase();
+        }
+        suggs.classList.add('hidden');
+        renderList();
+      });
+    });
+  }
+
+  function renderChips() {
+    const wrap = document.getElementById('filter-chips-wrap');
+    if (!wrap) return;
+
+    if (selectedCategories.length === 0) {
+      wrap.innerHTML = '';
+      return;
+    }
+
+    wrap.innerHTML = `
+      <div style="display:flex;align-items:center;background:var(--primary-bg);border-radius:16px;padding:2px 4px;margin-right:4px;border:1px solid var(--primary-border);">
+        <button id="logic-toggle" style="background:none;border:none;color:var(--primary);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;">${filterLogic}</button>
+      </div>
+      ${selectedCategories.map(c => `
+        <div class="filter-chip" style="display:flex;align-items:center;gap:6px;background:var(--surface-3);border:1px solid var(--border);padding:4px 10px;border-radius:16px;font-size:12px;font-weight:600;">
+          <span>${c}</span>
+          <button class="remove-chip" data-cat="${c}" style="background:none;border:none;padding:0;cursor:pointer;font-size:16px;line-height:1;margin-top:-2px;">×</button>
+        </div>
+      `).join('')}
+    `;
+
+    document.getElementById('logic-toggle')?.addEventListener('click', () => {
+      filterLogic = filterLogic === 'OR' ? 'AND' : 'OR';
+      sessionStorage.setItem('vault_search_logic', filterLogic);
+      renderChips();
+      renderList();
+    });
+
+    wrap.querySelectorAll('.remove-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedCategories = selectedCategories.filter(c => c !== btn.dataset.cat);
+        sessionStorage.setItem('vault_search_cats', JSON.stringify(selectedCategories));
+        renderChips();
+        renderList();
+      });
+    });
+  }
 
   function renderFilterBar() {
     const years = [...new Set(transactions.map(t => t.date?.slice(0,4)).filter(y => y && Number(y) >= 2000 && Number(y) <= 2100))].sort((a,b)=>b-a);
     if (!years.includes(String(currentYear()))) years.unshift(String(currentYear()));
-    const activeCount = [activeCategory, activeAccount, activeMonth !== 0, !!activeYear].filter(Boolean).length;
-
     // Collapsed summary chips + filter icon
     const summaryParts = [];
     if (activeMonth) summaryParts.push(MONTHS[activeMonth-1]);
-    if (activeCategory) summaryParts.push(activeCategory);
     if (activeAccount) summaryParts.push(activeAccount);
-    const summaryText = summaryParts.length ? summaryParts.join(' · ') : 'All transactions';
+    const summaryText = summaryParts.length ? summaryParts.join(' · ') : 'All accounts';
 
     document.getElementById('filter-bar-wrap').innerHTML = `
       <div style="background:var(--surface);border-bottom:1px solid var(--border);">
@@ -246,7 +378,7 @@ export async function renderTransactions(container) {
           <div style="flex:1;font-size:13px;color:${activeCount > 0 ? 'var(--primary)' : 'var(--text-muted)'};">
             ${activeYear ? activeYear + ' · ' : ''}${summaryText}
           </div>
-          ${activeCount > 0
+          ${(activeCount > 0 || searchText || selectedCategories.length > 0)
             ? `<button id="clear-filters-quick" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">✕ Clear all</button>`
             : ''}
           <button id="open-filter-sheet" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1px solid ${activeCount > 0 ? 'var(--primary)' : 'var(--border)'};background:${activeCount > 0 ? 'var(--primary-bg)' : 'transparent'};color:${activeCount > 0 ? 'var(--primary)' : 'var(--text-secondary)'};font-size:13px;font-weight:500;cursor:pointer;">
@@ -274,6 +406,10 @@ export async function renderTransactions(container) {
           _txnPage = 1;
           // Keep currency, clear everything else
           clearHashParams();
+          sessionStorage.removeItem('vault_search_cats');
+          sessionStorage.removeItem('vault_search_logic');
+          selectedCategories = [];
+          searchText = '';
           if (activeCurrency !== 'QAR') setHashParams({ currency: activeCurrency });
           renderTransactions(container);
         }
@@ -417,12 +553,31 @@ export async function renderTransactions(container) {
       let filtered = transactions.filter(t => {
         if (!t) return false;
         if (t.currency !== activeCurrency) return false;
-      if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
-      if (activeMonth  && Number(t.date?.slice(5,7)) !== activeMonth)    return false;
-      if (activeCategory && t.category1 !== activeCategory)              return false;
-      if (activeAccount  && t.account   !== activeAccount)               return false;
-      return true;
-    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+        if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
+        if (activeMonth  && Number(t.date?.slice(5,7)) !== activeMonth)    return false;
+        if (activeAccount  && t.account   !== activeAccount)               return false;
+        
+        // Multi-category logic
+        if (selectedCategories.length > 0) {
+          if (filterLogic === 'OR') {
+            if (!selectedCategories.includes(t.category1) && !selectedCategories.includes(t.category2)) return false;
+          } else { // AND
+            const tCats = [t.category1, t.category2].filter(Boolean);
+            if (!selectedCategories.every(c => tCats.includes(c))) return false;
+          }
+        }
+
+        // Search text logic
+        if (searchText) {
+          const match = (t.description || '').toLowerCase().includes(searchText) || 
+                        (t.category1 || '').toLowerCase().includes(searchText) ||
+                        (t.category2 || '').toLowerCase().includes(searchText) ||
+                        (t.notes1 || '').toLowerCase().includes(searchText);
+          if (!match) return false;
+        }
+
+        return true;
+      }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const totalFiltered = filtered.length;
     const allFiltered   = filtered; // keep full for balance calc

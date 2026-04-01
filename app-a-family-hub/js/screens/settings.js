@@ -15,6 +15,7 @@ import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate } from '../..
 import { authFetch } from '../../../shared/auth.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openPersonManage } from './person-manage.js';
+import { exitApp } from '../../../shared/app-utils.js';
 
 const MEMBER_EMOJIS = ['👤','👨','👩','🧑','👦','👧','🧔','👱','🧒'];
 const MEMBER_COLORS = ['#EEF2FF','#D1FAE5','#FEF3C7','#FCE7F3','#E0F2FE','#F3E8FF'];
@@ -425,7 +426,7 @@ function renderSecurityTab() {
   document.getElementById('safe-exit-btn').addEventListener('click', async () => {
     showToast('Syncing before exit…', 'info', 2000);
     await new Promise(r => setTimeout(r, 1500));
-    showToast('All synced. You can close the app.', 'success', 3000);
+    await exitApp();
   });
 }
 
@@ -504,7 +505,8 @@ function renderAccountTab(data, members, user, container) {
         const regs = await navigator.serviceWorker.getRegistrations();
         for (const reg of regs) await reg.unregister();
       }
-      localStorage.clear(); // Safe to clear local UI state
+      await clearAllCachedData(); // CRITICAL: Wipe IndexedDB too
+      localStorage.clear();      // Safe to clear local UI state
       window.location.reload(true);
     }
   });

@@ -291,17 +291,17 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
         label.textContent = 'Photo ' + (i + 1);
         slot.appendChild(label);
 
-        // Camera/gallery button
+        // Camera button
         const cameraBtn = document.createElement('button');
         cameraBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;';
         cameraBtn.innerHTML = '📷 Camera';
 
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        fileInput.setAttribute('capture', 'environment');
-        fileInput.style.display = 'none';
-        fileInput.addEventListener('change', async (e) => {
+        const camInput = document.createElement('input');
+        camInput.type = 'file';
+        camInput.accept = 'image/*';
+        camInput.setAttribute('capture', 'environment');
+        camInput.style.display = 'none';
+        camInput.addEventListener('change', async (e) => {
           const file = e.target.files[0];
           if (!file) return;
           try {
@@ -311,11 +311,34 @@ export function renderPhotoSlots(container, photos = [], maxPhotos = 2, onChange
             render();
           } catch { /* ignore */ }
         });
-        cameraBtn.addEventListener('click', () => fileInput.click());
-        slot.appendChild(fileInput);
+        cameraBtn.addEventListener('click', () => camInput.click());
+        slot.appendChild(camInput);
         slot.appendChild(cameraBtn);
 
-        // Paste clipboard button (works on Android Chrome with clipboard permission)
+        // Gallery button (No 'capture' attribute)
+        const galleryBtn = document.createElement('button');
+        galleryBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;';
+        galleryBtn.innerHTML = '🖼️ Gallery';
+
+        const galInput = document.createElement('input');
+        galInput.type = 'file';
+        galInput.accept = 'image/*';
+        galInput.style.display = 'none';
+        galInput.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          try {
+            const compressed = await compressImage(file);
+            slots[i] = compressed;
+            onChange([...slots]);
+            render();
+          } catch { /* ignore */ }
+        });
+        galleryBtn.addEventListener('click', () => galInput.click());
+        slot.appendChild(galInput);
+        slot.appendChild(galleryBtn);
+
+        // Paste clipboard button
         const pasteBtn = document.createElement('button');
         pasteBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 8px;border-radius:var(--radius-md);border:1px solid var(--primary-border);background:var(--primary-bg);color:var(--primary);font-size:12px;cursor:pointer;font-family:inherit;';
         pasteBtn.innerHTML = '📋 Paste';
