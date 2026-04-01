@@ -393,3 +393,10 @@ git checkout master
 - **Travel App**: Forced aggressive name resolution in `travel-log.js` so trips automatically pull the newest contact name from memory if `personId` is available.
 - **Service Worker**: Bumped caches to `v3.6.2` to deploy fixes over stale code.
 - **Commit**: `f3dd6fd` (master), `b8e04e0` (main) — `Fix: Vault Transactions crash and Travel Log Name fallback (v3.6.2)`
+### Feature Completion (v3.6.3 · 2026-04-01)
+- **Vault App**:
+    - **All Currencies View**: Added an 'All' option to the currency filter tabs, allowing cross-currency record searching. The visual balance bar adapts to hide sum calculations when displaying mixed currencies to prevent mathematical errors.
+- **Shared Functionalities**:
+    - **Dual Safe Exit**: The "Save & Exit" button (`shared/app-utils.js`) is now prominently available in the "Account" / "App Info" screens of **both** the Travel Hub and the Private Vault.
+    - **Android Gallery Picker**: The updated `photo-picker.js` provides a native `Gallery` button alongside the Camera, directly hooked into the `<input type="file" accept="image/*">` dialog for Android devices while retaining PC Clipboard functionality.
+- **Commit**: `b794aba` (master), `e81da4f` (main) — `feat: Add All Currencies filter to Vault and universal Save & Exit buttons`
