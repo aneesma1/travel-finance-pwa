@@ -366,9 +366,30 @@ git checkout master
 366:     - **Name Resolution**: Implemented UUID-to-name resolution in the Travel Log to handle records where only IDs were stored.
 367:     - **Safe Exit**: Integrated the new "Save & Exit" utility to provide a clean closure for Android users.
 368: - **Private Vault**:
-369:     - **Advanced Search**: Implemented a powerful search bar in the Records screen with real-time filtering and auto-suggest for categories and descriptions.
-370:     - **Multi-Category Filtering**: Added support for selecting multiple categories with interactive chips and an **AND/OR toggle** for flexible searching.
-371:     - **UI Polish**: Fixed the "Save & Exit" button visibility in Settings and improved the scrollable suggestions list to prevent keyboard overlap.
-372: - **Git Workflow**:
-373:     - Synchronized `master` and `main` branches to ensure GitHub Pages reflects the latest v3.6.0 features.
-374: - **Commit**: `55dc2cc` (master), `8f2cb98` (main) — `v3.6.0: Vault Advanced Search, Gallery Picker, and Safe Exit/Reset fixes`
+
+---
+
+## Session Start: 2026-04-01
+
+### Vault & Travel Hub Enhancements (v3.6.0 · 2026-04-01)
+
+- **Shared Components**:
+    - **App Utilities**: Created `shared/app-utils.js` for centralized application exit handling (Capacitor/Native vs. PWA).
+    - **Photo Picker**: Added a dedicated **Gallery** button for simplified photo selection on mobile devices, alongside the existing Camera and Paste options.
+- **Travel App (Family Hub)**:
+    - **Data Reset**: Updated "Emergency Reset" to properly clear IndexedDB, ensuring a clean slate for debugging.
+    - **Name Resolution**: Implemented UUID-to-name resolution in the Travel Log to handle records where only IDs were stored.
+    - **Safe Exit**: Integrated the new "Save & Exit" utility to provide a clean closure for Android users.
+- **Private Vault**:
+    - **Advanced Search**: Implemented a powerful search bar in the Records screen with real-time filtering and auto-suggest for categories and descriptions.
+    - **Multi-Category Filtering**: Added support for selecting multiple categories with interactive chips and an **AND/OR toggle** for flexible searching.
+    - **UI Polish**: Fixed the "Save & Exit" button visibility in Settings and improved the scrollable suggestions list to prevent keyboard overlap.
+- **Git Workflow**:
+    - Synchronized `master` and `main` branches to ensure GitHub Pages reflects the latest v3.6.0 features.
+- **Commit**: `55dc2cc` (master), `8f2cb98` (main) — `v3.6.0: Vault Advanced Search, Gallery Picker, and Safe Exit/Reset fixes`
+
+### Hotfixes (v3.6.2 · 2026-04-01)
+- **Vault App**: Fixed a JavaScript syntax crash in `transactions.js` preventing the records from rendering initially.
+- **Travel App**: Forced aggressive name resolution in `travel-log.js` so trips automatically pull the newest contact name from memory if `personId` is available.
+- **Service Worker**: Bumped caches to `v3.6.2` to deploy fixes over stale code.
+- **Commit**: `f3dd6fd` (master), `b8e04e0` (main) — `Fix: Vault Transactions crash and Travel Log Name fallback (v3.6.2)`
