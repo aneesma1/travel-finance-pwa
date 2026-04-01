@@ -21,6 +21,7 @@ import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openCategoryManager } from '../modals/category-manager.js';
+import { exitApp } from '../../../shared/app-utils.js';
 
 const CACHE_NAME    = 'family-hub v3.5.34';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -463,16 +464,35 @@ export async function renderSettings(container, params = {}) {
     const tab = document.getElementById('tab-content');
     tab.innerHTML = `
       <div class="section-title">Security Dashboard</div>
-      <div style="margin:0 16px 0;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
-        <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg);">
-          <span style="font-size:20px;">🛡️</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Security & Access</div>
-            <div style="font-size:12px;color:var(--text-muted);">Sessions · Activity log · Revoke access</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
+      <div class="list-row" id="safe-exit-btn" style="border-radius:var(--radius-lg);">
+        <span style="font-size:20px;">🛡️</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Security & Access</div>
+          <div style="font-size:12px;color:var(--text-muted);">Sessions · Activity log · Revoke access</div>
         </div>
+        <span style="color:var(--text-muted);">›</span>
       </div>
+      <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg); border-top:1px solid var(--border-light);">
+        <span style="font-size:20px;">⚙️</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Dashboard View</div>
+          <div style="font-size:12px;color:var(--text-muted);">Detailed logs and session management</div>
+        </div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:16px;">App Session</div>
+    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
+      <div class="list-row" id="safe-exit-btn-alt" style="border-radius:var(--radius-lg);">
+        <span style="font-size:20px;">🚪</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">Save & Exit</div>
+          <div style="font-size:12px;color:var(--text-muted);">Sync to Drive then close app</div>
+        </div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+    </div>
 
       <div class="section-title" style="margin-top:16px;">Auto-lock</div>
       <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:16px;">
@@ -518,6 +538,15 @@ export async function renderSettings(container, params = {}) {
     document.getElementById('security-dashboard-btn')?.addEventListener('click', () => {
       openSecurityDashboard(container);
     });
+
+    const onExit = async () => {
+      showToast('Syncing before exit…', 'info', 2000);
+      await new Promise(r => setTimeout(r, 1500));
+      await exitApp();
+    };
+
+    document.getElementById('safe-exit-btn')?.addEventListener('click', onExit);
+    document.getElementById('safe-exit-btn-alt')?.addEventListener('click', onExit);
 
     document.querySelectorAll('#lock-timeout-pills .pill-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -572,6 +601,7 @@ export async function renderSettings(container, params = {}) {
         </div>
         <div class="divider"></div>
         <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
+          <button class="btn btn-primary btn-full" id="account-exit-btn" style="margin-bottom:10px;">💾 Save & Exit App</button>
           <button class="btn btn-secondary btn-full" id="signout-btn">Sign out of Google</button>
         </div>
       </div>
@@ -603,18 +633,10 @@ export async function renderSettings(container, params = {}) {
         window.location.reload(true);
       }
     });
-    document.getElementById('safe-exit-btn').addEventListener('click', async () => {
-      showToast('Syncing before locking…', 'info', 1500);
-      try {
-        await new Promise(r => setTimeout(r, 800));
-        showToast('Vault locked. Stay safe! 🔒', 'success', 1500);
-        setTimeout(() => {
-          // Fire the lock -- set appUnlocked to false and reload to PIN screen
-          window.location.reload();
-        }, 1600);
-      } catch (err) {
-        showToast('Lock failed: ' + err.message, 'error');
-      }
+    document.getElementById('account-exit-btn')?.addEventListener('click', async () => {
+      showToast('Syncing before exit…', 'info', 2000);
+      await new Promise(r => setTimeout(r, 1500));
+      await exitApp();
     });
 
     document.getElementById('photo-zip-btn')?.addEventListener('click', async () => {

@@ -28,14 +28,16 @@ export async function renderTravelLog(container, params = {}) {
   const data = await getCachedTravelData();
   const { travelPersons = [], trips = [], members = [] } = data || {};
 
-  // ── Backfill personName from travelPersons for legacy trips ──
+  // ── Backfill personName from travelPersons/members for legacy or UUID-only trips ──
+  const isUuid = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
   const tpMap = Object.fromEntries(travelPersons.map(p => [p.id, p]));
+  const memMap = Object.fromEntries(members.map(m => [m.id, m]));
+
   const safeTrips = Array.isArray(trips) ? trips.filter(Boolean).map(t => {
-    // If trip has personId but no personName, look up from travelPersons
-    if (t.personId && !t.personName) {
-      const person = tpMap[t.personId];
-      if (person) t.personName = person.name;
-      else t.personName = 'Unknown';
+    // If trip has personId but no personName (or personName is a UUID), look up
+    if (t.personId && (!t.personName || isUuid(t.personName))) {
+      const p = tpMap[t.personId] || memMap[t.personId];
+      if (p) t.personName = p.name;
     }
     // Ensure every trip has a personName
     if (!t.personName) t.personName = 'Unknown';
