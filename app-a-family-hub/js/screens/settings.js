@@ -452,7 +452,8 @@ function renderAccountTab(data, members, user, container) {
           <span style="font-size:13px;font-weight:600;color:${isOnline()?'var(--success)':'var(--warning)'};">${isOnline()?'● Online':'● Offline'}</span>
         </div>
         ${data?.lastSync?`<div style="font-size:11px;color:var(--text-muted);">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>`:''}
-        <button class="btn btn-secondary btn-full" style="margin-top:12px;" id="signout-btn">Sign out of Google</button>
+        <button class="btn btn-primary btn-full" style="margin-top:16px; margin-bottom:10px;" id="account-exit-btn">💾 Save & Exit App</button>
+        <button class="btn btn-secondary btn-full" id="signout-btn">Sign out of Google</button>
       </div>
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
@@ -509,6 +510,12 @@ function renderAccountTab(data, members, user, container) {
       localStorage.clear();      // Safe to clear local UI state
       window.location.reload(true);
     }
+  });
+
+  document.getElementById('account-exit-btn')?.addEventListener('click', async () => {
+    showToast('Syncing before exit…', 'info', 2000);
+    await new Promise(r => setTimeout(r, 1500));
+    await exitApp();
   });
 
   document.getElementById('signout-btn').addEventListener('click', () => {

@@ -207,8 +207,9 @@ export async function renderTransactions(container) {
   const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
   const allAccounts   = ['Cash','Card','Bank','Other', ...savedAccounts];
 
+  // Read from URL hash or default to All
   const p = getHashParams();
-  const activeCurrency = p.currency || 'QAR';
+  const activeCurrency = p.currency || 'All';
   const activeYear     = p.year   ? Number(p.year)  : null;  // null = all years
   const activeMonth    = p.month  ? Number(p.month) : 0;
   const activeAccount  = p.account  || '';
@@ -372,6 +373,7 @@ export async function renderTransactions(container) {
         <!-- Currency tabs -->
         <div style="padding:10px 16px 0;">
           <div class="currency-tabs">
+            <button class="currency-tab ${activeCurrency === 'All' ? 'active' : ''}" data-currency="All">All</button>
             ${CURRENCIES.map(c => `
               <button class="currency-tab ${activeCurrency === c ? 'active' : ''}" data-currency="${c}">${c}</button>
             `).join('')}
@@ -414,7 +416,7 @@ export async function renderTransactions(container) {
           sessionStorage.removeItem('vault_search_logic');
           selectedCategories = [];
           searchText = '';
-          if (activeCurrency !== 'QAR') setHashParams({ currency: activeCurrency });
+          if (activeCurrency !== 'All') setHashParams({ currency: activeCurrency });
           renderTransactions(container);
         }
       });
@@ -529,7 +531,7 @@ export async function renderTransactions(container) {
       close();
       _txnPage = 1;
       clearHashParams();
-      if (activeCurrency !== 'QAR') setHashParams({ currency: activeCurrency });
+      if (activeCurrency !== 'All') setHashParams({ currency: activeCurrency });
       renderTransactions(container);
     });
 
@@ -556,7 +558,7 @@ export async function renderTransactions(container) {
       // Filter
       let filtered = transactions.filter(t => {
         if (!t) return false;
-        if (t.currency !== activeCurrency) return false;
+        if (activeCurrency !== 'All' && t.currency !== activeCurrency) return false;
         if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
         if (activeMonth  && Number(t.date?.slice(5,7)) !== activeMonth)    return false;
         if (activeAccount  && t.account   !== activeAccount)               return false;
@@ -595,26 +597,36 @@ export async function renderTransactions(container) {
     const balanceBar = document.getElementById('balance-bar');
     if (filtered.length > 0) {
       balanceBar.classList.remove('hidden');
-      balanceBar.innerHTML = `
-        <div class="balance-item">
-          <div class="balance-item-label">In</div>
-          <div class="balance-item-value" style="color:var(--success);">+${formatAmount(totalIncome)}</div>
-        </div>
-        <div class="balance-item">
-          <div class="balance-item-label">Out</div>
-          <div class="balance-item-value" style="color:var(--danger);">-${formatAmount(totalSpend)}</div>
-        </div>
-        <div style="width:1px;background:var(--primary-border);align-self:stretch;margin:0 4px;"></div>
-        <div class="balance-item">
-          <div class="balance-item-label">Net · ${activeCurrency}</div>
-          <div class="balance-item-value" style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'};">
-            ${net >= 0 ? '+' : ''}${formatAmount(net)}
+      if (activeCurrency === 'All') {
+        balanceBar.innerHTML = `
+          <div style="flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--text-muted);padding:8px 0;">
+            Showing ${totalFiltered} total transaction${totalFiltered !== 1 ? 's' : ''} across all currencies
           </div>
-        </div>
-        <div style="margin-left:auto;font-size:12px;color:var(--primary);font-weight:600;align-self:center;">
-          ${totalFiltered} records
-        </div>
-      `;
+        `;
+      } else {
+        balanceBar.innerHTML = `
+          <div class="balance-item">
+            <div class="balance-item-label">In</div>
+            <div class="balance-item-value" style="color:var(--success);">+${formatAmount(totalIncome)}</div>
+          </div>
+          <div class="balance-item">
+            <div class="balance-item-label">Out</div>
+            <div class="balance-item-value" style="color:var(--danger);">-${formatAmount(totalSpend)}</div>
+          </div>
+          <div style="width:1px;background:var(--primary-border);align-self:stretch;margin:0 4px;"></div>
+          <div class="balance-item">
+            <div class="balance-item-label">Net · ${activeCurrency}</div>
+            <div class="balance-item-value" style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'};">
+              ${net >= 0 ? '+' : ''}${formatAmount(net)}
+            </div>
+          </div>
+          <div style="margin-left:auto;font-size:12px;color:var(--primary);font-weight:600;align-self:center;">
+            ${totalFiltered} records
+          </div>
+        `;
+      }
+    } else {
+      balanceBar.classList.add('hidden');
     }
 
     const wrap = document.getElementById('txn-list-wrap');
