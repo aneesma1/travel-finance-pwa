@@ -24,14 +24,25 @@ export async function renderAddTrip(container, params = {}) {
 
   const data = await getCachedTravelData();
   const { travelPersons = [], trips = [] } = data || {};
-  const persons = travelPersons;
+  const persons = [...travelPersons];
+
+  // Auto-discover imported names that aren't in the official persons list to populate the pills
+  const existingNames = new Set(persons.map(p => String(p.name || '').trim().toLowerCase()));
+  trips.forEach(t => {
+    const pName = String(t.personName || '').trim();
+    if (pName && !existingNames.has(pName.toLowerCase())) {
+      // Use the name itself as a pseudo-ID so the PillSelect matches it natively
+      persons.push({ id: pName, name: pName, emoji: '👤' });
+      existingNames.add(pName.toLowerCase());
+    }
+  });
 
   // Load existing trip if editing
   let existingTrip = isExisting ? trips.find(t => t.id === tripId) : null;
 
   // Form state
   const state = {
-    personId:     existingTrip?.personId     || '',
+    personId:     existingTrip?.personId     || existingTrip?.personName || '',
     personName:   existingTrip?.personName   || '',
     dateOutIndia: existingTrip?.dateOutIndia || '',
     dateInQatar:  existingTrip?.dateInQatar  || '',
