@@ -26,17 +26,16 @@ function extractYear(val) {
 
 export async function renderTravelLog(container, params = {}) {
   const data = await getCachedTravelData();
-  const { travelPersons = [], trips = [], members = [] } = data || {};
+  const { travelPersons = [], trips = [] } = data || {};
 
-  // ── Backfill personName from travelPersons/members for legacy or UUID-only trips ──
+  // ── Completely detached from Master People: Use ONLY travelPersons ──
   const isUuid = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
   const tpMap = Object.fromEntries(travelPersons.map(p => [p.id, p]));
-  const memMap = Object.fromEntries(members.map(m => [m.id, m]));
 
   const safeTrips = Array.isArray(trips) ? trips.filter(Boolean).map(t => {
     // Robust name resolution: If we have a personId, always prefer the name from the persons map
     // even if personName exists (in case it's a UUID or stale)
-    const person = tpMap[t.personId] || memMap[t.personId];
+    const person = tpMap[t.personId];
     if (person) {
       t.personName = person.name;
     }
@@ -44,7 +43,7 @@ export async function renderTravelLog(container, params = {}) {
     // Fallback for cases without personId but personName looks like an ID
     if (!t.personId && t.personName && isUuid(String(t.personName))) {
       // Try to find a person whose ID matches the name field
-      const p = tpMap[t.personName] || memMap[t.personName];
+      const p = tpMap[t.personName];
       if (p) t.personName = p.name;
     }
 
