@@ -59,11 +59,11 @@ export async function renderTravelLog(container, params = {}) {
   const yearsSet = new Set();
 
   safeTrips.forEach(t => {
-    const travelWithArr = Array.isArray(t.travelWith) ? t.travelWith : (t.travelWith || '').split(/[,;]+/);
+    const travelWithArr = Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/);
     const namesInTrip = [
-      t.personName || '',
+      String(t.personName || ''),
       ...travelWithArr
-    ].map(n => n.trim()).filter(Boolean);
+    ].map(n => String(n || '').trim()).filter(Boolean);
 
     namesInTrip.forEach(name => {
       // Use clean normalized name for chips
@@ -170,8 +170,8 @@ export async function renderTravelLog(container, params = {}) {
     if (!logContent) return;
 
     let filtered = [...safeTrips].sort((a, b) => {
-      const da = a.dateOutIndia || '';
-      const db = b.dateOutIndia || '';
+      const da = String(a.dateOutIndia || '');
+      const db = String(b.dateOutIndia || '');
       // Try ISO first
       const ta = new Date(da).getTime();
       const tb = new Date(db).getTime();
@@ -184,10 +184,10 @@ export async function renderTravelLog(container, params = {}) {
     if (filterPerson) {
       const lowFilter = filterPerson.toLowerCase().trim();
       filtered = filtered.filter(t => {
-        const primaryMatch = (t.personName || '').toLowerCase().trim() === lowFilter;
+        const primaryMatch = String(t.personName || '').toLowerCase().trim() === lowFilter;
         // Strictly split by Comma or Semi-colon as requested
-        const travelWithNames = (Array.isArray(t.travelWith) ? t.travelWith : (t.travelWith || '').split(/[,;]+/))
-          .map(n => n.trim().toLowerCase());
+        const travelWithNames = (Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/))
+          .map(n => String(n || '').trim().toLowerCase());
         return primaryMatch || travelWithNames.includes(lowFilter);
       });
     }
@@ -234,7 +234,7 @@ export async function renderTravelLog(container, params = {}) {
       if (Array.isArray(trip.travelWith)) {
         travelWithDisplay = trip.travelWith.filter(Boolean);
       } else if (trip.travelWith) {
-        travelWithDisplay = trip.travelWith.split(/[,;]+/).map(n => n.trim()).filter(Boolean);
+        travelWithDisplay = String(trip.travelWith).split(/[,;]+/).map(n => String(n || '').trim()).filter(Boolean);
       }
 
       const dest = 'Qatar';
