@@ -48,11 +48,13 @@ export async function renderAddTrip(container, params = {}) {
   let currentStep = isViewMode ? (STEPS.length - 1) : 0;  // view starts on Review
 
   // Suggestions from history
-  const allFlights = [...new Set(trips.flatMap(t => [t.flightInward, t.flightOutward]).filter(Boolean))];
-  const allReasons = [...new Set(trips.map(t => t.reason).filter(Boolean))];
+  const safeTrips = trips.filter(Boolean);
+  const allFlights = [...new Set(safeTrips.flatMap(t => [t?.flightInward, t?.flightOutward]).filter(Boolean))];
+  const allReasons = [...new Set(safeTrips.map(t => t?.reason).filter(Boolean))];
 
   function render() {
-    container.innerHTML = `
+    try {
+      container.innerHTML = `
       <div class="app-header">
         <button class="app-header-action" id="back-btn">←</button>
         <span class="app-header-title">${isEdit ? 'Edit Trip' : 'Add Trip'}</span>
@@ -91,6 +93,10 @@ export async function renderAddTrip(container, params = {}) {
     document.getElementById('next-btn').addEventListener('click', () => handleNext());
 
     renderStep();
+    } catch (err) {
+      console.error('[add-trip] render error:', err);
+      container.innerHTML = `<div style="padding:20px;color:red;"><b>Add Trip Crashed:</b><br>${err.stack || err.message || err}</div>`;
+    }
   }
 
   async function shareTripText() {
@@ -106,7 +112,7 @@ export async function renderAddTrip(container, params = {}) {
       state.flightInward ? `✈️ Inward: ${state.flightInward}` : '',
       state.flightOutward? `✈️ Outward: ${state.flightOutward}` : '',
       state.reason       ? `📝 Reason: ${state.reason}` : '',
-      state.travelWith.length ? `👥 With: ${state.travelWith.map(id => persons.find(m => m.id === id)?.name).join(', ')}` : '',
+      (state.travelWith && state.travelWith.length) ? `👥 With: ${Array.isArray(state.travelWith) ? state.travelWith.map(id => persons.find(m => m.id === id)?.name).filter(Boolean).join(', ') : state.travelWith}` : '',
       `━━━━━━━━━━━━━━━━━━━━`,
       `_Shared from Family Hub PWA_`
     ].filter(Boolean).join('\n');
@@ -339,8 +345,12 @@ export async function renderAddTrip(container, params = {}) {
     const daysSoFar = state.dateInQatar && !state.dateOutQatar
       ? daysBetween(state.dateInQatar, today()) : null;
       
-    const travelWithNames = (state.travelWith || [])
-      .map(id => persons.find(m => m.id === id)?.name).filter(Boolean);
+    let travelWithNames = [];
+    if (Array.isArray(state.travelWith)) {
+      travelWithNames = state.travelWith.map(id => persons.find(m => m.id === id)?.name).filter(Boolean);
+    } else if (state.travelWith) {
+      travelWithNames = String(state.travelWith).split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+    }
 
     const row = (label, value) => value
       ? `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-light);">
@@ -445,7 +455,7 @@ export async function renderAddTrip(container, params = {}) {
       flightOutward:state.flightOutward,
       reason:       state.reason,
       travelWith:   state.travelWith,
-      travelWithNames: state.travelWith.map(id => persons.find(m => m.id === id)?.name).filter(Boolean).join(', '),
+      travelWithNames: Array.isArray(state.travelWith) ? state.travelWith.map(id => persons.find(m => m.id === id)?.name).filter(Boolean).join(', ') : String(state.travelWith || ''),
       photos:       state.photos || [],
     };
 
