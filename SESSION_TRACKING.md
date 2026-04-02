@@ -400,3 +400,12 @@ git checkout master
     - **Dual Safe Exit**: The "Save & Exit" button (`shared/app-utils.js`) is now prominently available in the "Account" / "App Info" screens of **both** the Travel Hub and the Private Vault.
     - **Android Gallery Picker**: The updated `photo-picker.js` provides a native `Gallery` button alongside the Camera, directly hooked into the `<input type="file" accept="image/*">` dialog for Android devices while retaining PC Clipboard functionality.
 - **Commit**: `b794aba` (master), `e81da4f` (main) — `feat: Add All Currencies filter to Vault and universal Save & Exit buttons`
+
+---
+
+## Session Start: 2026-04-02
+
+### Type Crashes Fixed (v3.6.4 · 2026-04-02)
+- **Vault App**: Fixed `activeCategory is not defined` crash in `transactions.js` caused by leftover variable references when migrating to `selectedCategories` array logic.
+- **Travel App**: Resolved a silent crash in `travel-log.js` where numeric or null values (often from Excel imports) triggering `.localeCompare()` or `.split()` would abort the render loop before trips were displayed, leaving a blank interface. Added strict `String()` typecasting.
+- **Commit**: `[TBD]`

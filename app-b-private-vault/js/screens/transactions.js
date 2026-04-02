@@ -52,7 +52,7 @@ export async function renderTransactions(container) {
       activeCurrency,
       activeYear,
       activeMonth ? MONTHS[activeMonth-1] : null,
-      activeCategory || null,
+      selectedCategories.length ? selectedCategories.join(', ') : null,
       activeAccount || null,
     ].filter(Boolean).join(' · ');
 
@@ -121,8 +121,16 @@ export async function renderTransactions(container) {
             if (t.currency !== activeCurrency) return false;
             if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
             if (activeMonth && Number(t.date?.slice(5,7)) !== activeMonth) return false;
-            if (activeCategory && t.category1 !== activeCategory) return false;
             if (activeAccount && t.account !== activeAccount) return false;
+            
+            if (selectedCategories.length > 0) {
+              if (filterLogic === 'OR') {
+                if (!selectedCategories.includes(t.category1) && !selectedCategories.includes(t.category2)) return false;
+              } else {
+                const tCats = [t.category1, t.category2].filter(Boolean);
+                if (!selectedCategories.every(c => tCats.includes(c))) return false;
+              }
+            }
             return true;
           })
         : allTxns;
@@ -216,6 +224,10 @@ export async function renderTransactions(container) {
   
   let searchText = '';
   let selectedCategories = JSON.parse(sessionStorage.getItem('vault_search_cats') || '[]');
+  if (p.category && !selectedCategories.includes(p.category)) {
+    selectedCategories.push(p.category);
+    sessionStorage.setItem('vault_search_cats', JSON.stringify(selectedCategories));
+  }
   let filterLogic = sessionStorage.getItem('vault_search_logic') || 'OR'; // OR by default
   
   // Suggestions source
@@ -439,7 +451,7 @@ export async function renderTransactions(container) {
     // Working copies
     let wYear     = activeYear;
     let wMonth    = activeMonth;
-    let wCats     = activeCategory ? [activeCategory] : [];
+    let wCats     = [...selectedCategories];
     let wAccount  = activeAccount;
 
     sheet.innerHTML = `
@@ -541,12 +553,11 @@ export async function renderTransactions(container) {
       setHashParams({
         year:     wYear !== currentYear() ? wYear : null,
         month:    wMonth || null,
-        category: wCats.length === 1 ? wCats[0] : null, // single for URL
+        category: null, // clear from URL to avoid confusion
         account:  wAccount || null,
       });
-      // Store multi-cat in sessionStorage for this session
-      if (wCats.length > 1) sessionStorage.setItem('txn_multi_cats', JSON.stringify(wCats));
-      else sessionStorage.removeItem('txn_multi_cats');
+      sessionStorage.setItem('vault_search_cats', JSON.stringify(wCats));
+      selectedCategories = wCats;
       renderTransactions(container);
     });
   }
@@ -637,7 +648,7 @@ export async function renderTransactions(container) {
       // Smart fallback: ONLY when a year filter is explicitly set AND
       // it's the sole cause of empty results (no other filters active)
       const hasDataAllTime = transactions.some(t => t.currency === activeCurrency);
-      const onlyYearFiltering = !!activeYear && !activeMonth && !activeCategory && !activeAccount;
+      const onlyYearFiltering = !!activeYear && !activeMonth && selectedCategories.length === 0 && !activeAccount && !searchText;
       if (hasDataAllTime && onlyYearFiltering) {
         // Year filter produced no results - clear it and show all
         clearHashParams();
@@ -650,7 +661,7 @@ export async function renderTransactions(container) {
         '<div style="font-size:48px;">💳</div>' +
         '<div style="font-size:16px;font-weight:600;color:var(--text);">No ' + activeCurrency + ' transactions</div>' +
         '<div style="font-size:13px;color:var(--text-muted);text-align:center;line-height:1.6;">' +
-          (activeMonth || activeCategory || activeAccount
+          (activeMonth || selectedCategories.length > 0 || activeAccount || searchText
             ? 'No records match the active filters. <button id="clear-filters-empty" style="color:var(--primary);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline;">Clear filters</button>'
             : 'Tap ＋ to add your first ' + activeCurrency + ' transaction.') +
         '</div></div>';
