@@ -415,4 +415,9 @@ git checkout master
 ### Temporal Dead Zone Crash Fix (v3.6.6 · 2026-04-02)
 - **Root Cause Identified**: The newly added `try/catch` wrapper successfully caught the elusive crash: a `ReferenceError: Cannot access '_tripPage' before initialization`. 
 - **Fix**: Moved the scoped `let _tripPage = 1` variable declaration to *before* the initial synchronous synchronous `renderTrips()` invocation inside `travel-log.js`. With standard ES6 block scoping inside an async function, invoking a hoisted function that depended on an uninitialized `let` variable triggered a TDZ violation, abruptly halting the script and creating the "endless white page" symptom.
+
+### View Trip Crashing Fix (v3.6.7 · 2026-04-02)
+- **Bug**: Clicking an imported trip caused the "View Trip" screen (`add-trip.js`) to render poorly and fail silently.
+- **Root Cause**: `add-trip.js` anticipated that the `travelWith` variable was an Array of specific UUIDs. However, when importing Excel data, the import tool preserves the original string grouping (e.g. `"Alice, Bob"`). When `add-trip.js` tried to run `.map()` on the raw string, it crashed with a TypeError, resulting in a blank `add-trip` view.
+- **Fix**: Implemented strict validation checks allowing string variables in `travelWith`. Additionally, added the same defensive `try/catch` and missing `null` filters across `add-trip.js` for `trips.flatMap()`.
 - **Commit**: `[TBD]`
