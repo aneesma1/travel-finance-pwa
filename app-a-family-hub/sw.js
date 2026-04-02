@@ -6,7 +6,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'hub-cache-v3.6.10';
+const CACHE_NAME = 'hub-cache-v3.6.11';
 const STATIC_ASSETS = [
   './',
   './index.html',

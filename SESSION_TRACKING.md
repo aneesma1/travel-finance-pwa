@@ -434,4 +434,9 @@ git checkout master
 - **Bug**: Clicking "Edit" on an imported trip stranded the user on Step 1 ("Who is travelling?"). The name pill was not selected, forcing them to input it manually every time.
 - **Root Cause**: The Excel import deliberately populates `personName` instead of bridging to formal UUIDs in `travelPersons`. The `PillSelect` menu inside `add-trip.js` strictly iterates over `travelPersons`. Therefore, it had no option for the imported raw `personName`.
 - **Fix**: Implemented synthetic hydration. When loading `add-trip.js`, it now scans all stored trips, fishes out unique `personName` strings that don't belong to any member UUID, and dynamically injects them as pseudo-member IDs into the PillSelect list. Also routed the default internal `state.personId` to fallback strictly to `state.personName` if the UUID evaluates as falsy.
+
+### Complete Detachment of Travel Persons from Master People (v3.6.11 · 2026-04-02)
+- **Feature**: The user requested that the `People` tab content be entirely segregated from the `Travel` tab content to prevent accidental merging or reliance on Master People (documents/emergency data). 
+- **Root Cause**: The Excel Import script was bypassing the creation of `travelPersons`, inadvertently causing `travel-log.js` to rely on `financeData.members` as a secondary fallback to resolve missing UUID IDs, effectively leaking Master People into the Travel DB scope.
+- **Fix**: Re-wrote the `excelToTravel` logic. During import, the script now actively creates unique UUID profiles and persistently saves them into the `travelPersons` database if the person doesn't natively exist there, bridging the trip directly to a true UUID isolated within the scoped database. Spliced completely severed any fallback loops or lookups referencing `members` inside `travel-log.js`. 
 - **Commit**: `[TBD]`

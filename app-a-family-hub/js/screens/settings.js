@@ -608,6 +608,19 @@ function openImportModal(data, persons) {
       try {
         const newData = await localSave('travel', remote => {
           const trips = [...(remote.trips || [])];
+          const travelPersons = [...(remote.travelPersons || [])];
+
+          // Helper to decouple explicitly: auto-create travelPerson
+          const getOrAddPerson = (nameStr) => {
+            const n = (nameStr || '').trim();
+            if (!n) return null;
+            let p = travelPersons.find(x => x.name?.toLowerCase() === n.toLowerCase());
+            if (!p) {
+              p = { id: uuidv4(), name: n, emoji: '👤' };
+              travelPersons.push(p);
+            }
+            return p;
+          };
 
           // Deduplication key: personName (lowered) + ISO dateOutIndia
           const existingKeys = new Set(
@@ -644,9 +657,12 @@ function openImportModal(data, persons) {
                 .filter(n => n.toLowerCase() !== name.toLowerCase())
                 .join(', ');
 
+              const personData = getOrAddPerson(name);
+
               trips.push({
                 ...rec,
                 id: uuidv4(),
+                personId: personData ? personData.id : '',
                 personName: name, // STRICT: Ensure name mapped to personName field
                 travelWith: othersInRow,
               });
@@ -654,7 +670,7 @@ function openImportModal(data, persons) {
             });
           });
 
-          return { ...remote, trips };
+          return { ...remote, trips, travelPersons };
         });
 
         await setCachedTravelData(newData);
