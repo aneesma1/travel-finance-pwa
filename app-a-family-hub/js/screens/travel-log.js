@@ -116,6 +116,9 @@ export async function renderTravelLog(container, params = {}) {
     openTravelExportSheet(uniquePersons, safeTrips, data.documents || []);
   });
 
+  let _tripPage = 1;
+  const PAGE_SIZE = 25;
+
   renderFilters(filterPerson, filterYear);
   renderTrips(filterPerson, filterYear);
 
@@ -161,8 +164,6 @@ export async function renderTravelLog(container, params = {}) {
     });
   }
 
-  let _tripPage = 1;
-  const PAGE_SIZE = 25;
 
   function renderTrips(filterPerson, filterYear, resetPage = true) {
     const logContent = container.querySelector('#log-content');

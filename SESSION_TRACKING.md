@@ -411,4 +411,8 @@ git checkout master
 ### Service Worker Cache Invalidation (v3.6.5 · 2026-04-02)
 - **Deployment Issue**: The user was unable to test the Travel Log `String()` typecasting crash fixes because their device OS cached the older version of `travel-log.js`. 
 - **Fix**: Bumped the `CACHE_NAME` strings in both Service Workers (`app-a-family-hub/sw.js` and `app-b-private-vault/sw.js`) to `v3.6.5`. Added defensive scoping `.querySelector` and a global try/catch in `renderTrips` to gracefully display any further errors on screen rather than silently rendering a blank page.
+
+### Temporal Dead Zone Crash Fix (v3.6.6 · 2026-04-02)
+- **Root Cause Identified**: The newly added `try/catch` wrapper successfully caught the elusive crash: a `ReferenceError: Cannot access '_tripPage' before initialization`. 
+- **Fix**: Moved the scoped `let _tripPage = 1` variable declaration to *before* the initial synchronous synchronous `renderTrips()` invocation inside `travel-log.js`. With standard ES6 block scoping inside an async function, invoking a hoisted function that depended on an uninitialized `let` variable triggered a TDZ violation, abruptly halting the script and creating the "endless white page" symptom.
 - **Commit**: `[TBD]`
