@@ -57,7 +57,7 @@ export async function renderAddTrip(container, params = {}) {
       container.innerHTML = `
       <div class="app-header">
         <button class="app-header-action" id="back-btn">←</button>
-        <span class="app-header-title">${isEdit ? 'Edit Trip' : 'Add Trip'}</span>
+        <span class="app-header-title">${isViewMode ? 'Trip Details' : (isEdit ? 'Edit Trip' : 'Add Trip')}</span>
         <span style="width:32px;"></span>
       </div>
       <div class="step-indicator">
@@ -68,7 +68,7 @@ export async function renderAddTrip(container, params = {}) {
       <div style="padding:0 20px 4px 20px;font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">
         Step ${currentStep + 1} of ${STEPS.length} -- ${STEPS[currentStep]}
       </div>
-      <div id="step-content" style="padding:20px;"></div>
+      <div id="step-content" style="padding:20px 20px 80px 20px;"></div>
       ${isViewMode ? '' : `
       <div style="padding:16px 20px 32px;display:flex;gap:10px;">
         ${currentStep > 0 ? '<button class="btn btn-secondary" style="flex:1;" id="prev-btn">← Back</button>' : ''}
@@ -81,6 +81,8 @@ export async function renderAddTrip(container, params = {}) {
 
     document.getElementById('back-btn').addEventListener('click', () => navigate('travel-log'));
 
+    renderStep();
+
     if (isViewMode) {
       document.getElementById('edit-trip-btn')?.addEventListener('click', () => {
         isViewMode = false;
@@ -91,8 +93,6 @@ export async function renderAddTrip(container, params = {}) {
     }
     document.getElementById('prev-btn')?.addEventListener('click', () => { currentStep--; render(); });
     document.getElementById('next-btn')?.addEventListener('click', () => handleNext());
-
-    renderStep();
     } catch (err) {
       console.error('[add-trip] render error:', err);
       container.innerHTML = `<div style="padding:20px;color:red;"><b>Add Trip Crashed:</b><br>${err.stack || err.message || err}</div>`;
@@ -339,7 +339,10 @@ export async function renderAddTrip(container, params = {}) {
 
   // ── Step 4: Review ──────────────────────────────────────────────────
   function renderReviewStep(el, persons) {
-    const person = persons.find(m => m.id === state.personId) || { name: 'Unknown', emoji: '👤' };
+    let person = persons.find(m => m.id === state.personId);
+    if (!person && state.personName) person = { name: state.personName, emoji: '👤' };
+    if (!person) person = { name: 'Unknown', emoji: '👤' };
+
     const daysInDest = state.dateInQatar && state.dateOutQatar
       ? daysBetween(state.dateInQatar, state.dateOutQatar) : null;
     const daysSoFar = state.dateInQatar && !state.dateOutQatar
