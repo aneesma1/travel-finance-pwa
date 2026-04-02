@@ -408,4 +408,7 @@ git checkout master
 ### Type Crashes Fixed (v3.6.4 · 2026-04-02)
 - **Vault App**: Fixed `activeCategory is not defined` crash in `transactions.js` caused by leftover variable references when migrating to `selectedCategories` array logic.
 - **Travel App**: Resolved a silent crash in `travel-log.js` where numeric or null values (often from Excel imports) triggering `.localeCompare()` or `.split()` would abort the render loop before trips were displayed, leaving a blank interface. Added strict `String()` typecasting.
+### Service Worker Cache Invalidation (v3.6.5 · 2026-04-02)
+- **Deployment Issue**: The user was unable to test the Travel Log `String()` typecasting crash fixes because their device OS cached the older version of `travel-log.js`. 
+- **Fix**: Bumped the `CACHE_NAME` strings in both Service Workers (`app-a-family-hub/sw.js` and `app-b-private-vault/sw.js`) to `v3.6.5`. Added defensive scoping `.querySelector` and a global try/catch in `renderTrips` to gracefully display any further errors on screen rather than silently rendering a blank page.
 - **Commit**: `[TBD]`

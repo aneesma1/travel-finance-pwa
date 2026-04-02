@@ -42,7 +42,7 @@ export async function renderTravelLog(container, params = {}) {
     }
     
     // Fallback for cases without personId but personName looks like an ID
-    if (!t.personId && isUuid(t.personName)) {
+    if (!t.personId && t.personName && isUuid(String(t.personName))) {
       // Try to find a person whose ID matches the name field
       const p = tpMap[t.personName] || memMap[t.personName];
       if (p) t.personName = p.name;
@@ -101,7 +101,7 @@ export async function renderTravelLog(container, params = {}) {
     <button class="fab" id="add-trip-fab">＋</button>
   `;
 
-  if (!data) { showEmpty(document.getElementById('log-content'), 'No data available'); return; }
+  if (!data) { showEmpty(container.querySelector('#log-content'), 'No data available'); return; }
 
   document.getElementById('add-trip-fab').addEventListener('click', () => navigate('add-trip'));
 
@@ -120,7 +120,7 @@ export async function renderTravelLog(container, params = {}) {
   renderTrips(filterPerson, filterYear);
 
   function renderFilters(filterPerson, filterYear) {
-    const bar = document.getElementById('filter-bar-container');
+    const bar = container.querySelector('#filter-bar-container');
     const yearsDisplay = [...availableYears];
     if (!yearsDisplay.includes(String(currentYear()))) {
       yearsDisplay.unshift(String(currentYear()));
@@ -165,11 +165,13 @@ export async function renderTravelLog(container, params = {}) {
   const PAGE_SIZE = 25;
 
   function renderTrips(filterPerson, filterYear, resetPage = true) {
-    if (resetPage) _tripPage = 1;
-    const logContent = document.getElementById('log-content');
+    const logContent = container.querySelector('#log-content');
     if (!logContent) return;
 
-    let filtered = [...safeTrips].sort((a, b) => {
+    try {
+      if (resetPage) _tripPage = 1;
+
+      let filtered = [...safeTrips].sort((a, b) => {
       const da = String(a.dateOutIndia || '');
       const db = String(b.dateOutIndia || '');
       // Try ISO first
@@ -311,6 +313,11 @@ export async function renderTravelLog(container, params = {}) {
 
       list.appendChild(row);
     });
+    
+    } catch (err) {
+      console.error('[travel-log] renderTrips error:', err);
+      logContent.innerHTML = `<div style="padding:20px;color:red;font-size:12px;background:#fee2e2;border:1px solid #ef4444;border-radius:8px;margin:16px;"><b>Render crashed:</b><br>${err.stack || err.message || err}</div>`;
+    }
   }
 
   async function deleteTrip(tripId) {
