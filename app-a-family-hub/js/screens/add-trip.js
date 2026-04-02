@@ -90,7 +90,7 @@ export async function renderAddTrip(container, params = {}) {
       document.getElementById('share-trip-btn')?.addEventListener('click', () => shareTripText());
     }
     document.getElementById('prev-btn')?.addEventListener('click', () => { currentStep--; render(); });
-    document.getElementById('next-btn').addEventListener('click', () => handleNext());
+    document.getElementById('next-btn')?.addEventListener('click', () => handleNext());
 
     renderStep();
     } catch (err) {

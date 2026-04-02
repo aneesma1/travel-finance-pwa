@@ -420,4 +420,9 @@ git checkout master
 - **Bug**: Clicking an imported trip caused the "View Trip" screen (`add-trip.js`) to render poorly and fail silently.
 - **Root Cause**: `add-trip.js` anticipated that the `travelWith` variable was an Array of specific UUIDs. However, when importing Excel data, the import tool preserves the original string grouping (e.g. `"Alice, Bob"`). When `add-trip.js` tried to run `.map()` on the raw string, it crashed with a TypeError, resulting in a blank `add-trip` view.
 - **Fix**: Implemented strict validation checks allowing string variables in `travelWith`. Additionally, added the same defensive `try/catch` and missing `null` filters across `add-trip.js` for `trips.flatMap()`.
+
+### Missing Node Crash in View Mode (v3.6.8 · 2026-04-02)
+- **Bug**: Viewing a trip threw `Cannot read properties of null (reading 'addEventListener')` in `add-trip.js`.
+- **Root Cause**: In "View Mode", the `Next` button element is intentionally omitted from the generated HTML to prevent edits. However, the event listener assignment was unconditional, meaning it blindly queried for `next-btn`, found `null`, and threw a TypeError, aborting the rest of the render.
+- **Fix**: Replaced `document.getElementById('next-btn').addEventListener(...)` with optional chaining `document.getElementById('next-btn')?.addEventListener(...)` to gracefully handle omitted elements.
 - **Commit**: `[TBD]`
