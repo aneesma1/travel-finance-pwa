@@ -425,4 +425,8 @@ git checkout master
 - **Bug**: Viewing a trip threw `Cannot read properties of null (reading 'addEventListener')` in `add-trip.js`.
 - **Root Cause**: In "View Mode", the `Next` button element is intentionally omitted from the generated HTML to prevent edits. However, the event listener assignment was unconditional, meaning it blindly queried for `next-btn`, found `null`, and threw a TypeError, aborting the rest of the render.
 - **Fix**: Replaced `document.getElementById('next-btn').addEventListener(...)` with optional chaining `document.getElementById('next-btn')?.addEventListener(...)` to gracefully handle omitted elements.
+### View Mode Rendering Bug (v3.6.9 · 2026-04-02)
+- **Bug**: In `add-trip.js`, the View Mode screen showed "Unknown" in the header instead of the correct person name when viewing imported trips, and the "Edit" and "Share" buttons were silently ignored because their event listeners were hooked up before the elements were rendered to the DOM. Also, the view container couldn't be scrolled far enough to reveal the buttons because of the global bottom navigation bar overlap.
+- **Root Cause**: The JS sequence assigned listeners to dynamically injected buttons before `renderStep()` actually wrote those buttons to `innerHTML`. The `isViewMode` logic also lacked a padding-bottom CSS rule, trapping the footer behind the global navbar. The header failed because imported trips use `personName` instead of `personId`.
+- **Fix**: Re-sequenced the `renderStep()` invocation above the event listener bindings. Re-implemented the `state.personName` fallback logic into the View Trip header exactly like the Travel Log. Added `padding-bottom: 80px` to the `step-content` viewport exclusively to bypass the navigation bar. 
 - **Commit**: `[TBD]`
