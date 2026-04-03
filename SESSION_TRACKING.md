@@ -470,3 +470,15 @@ git checkout master
   - Added a toggle allowing users to Pivot days specifically by "Year" or by "Country".
   - Refactored calculation engine to bind all travel days strictly to their specific *entry date* per the latest operational requirement.
 - **Commit**: `[TBD]`
+
+### Travel Log Native Dual-Tab Architecture (v3.7.0 · 2026-04-03)
+- **UI Architecture Refactor**:
+  - Restructured `travel-log.js` completely. It now houses two native tabs: `Trip Log` and `Passenger Summary`.
+  - Replaced the floating `export-sheet` popup with a fully integrated dashboard view, completely isolating it from the awkward clipping issues.
+- **Lifetime Highlights Engine**:
+  - Engineered an aggregate metric engine into `travel-log.js`. The dashboard now immediately exposes `Total Trips`, `Total Days`, `Top Destination`, and `Max Stay` in an attractive stat block directly below the passenger name.
+  - Spliced these new stats cleanly into the text generation (WhatsApp/Clipboard text blob).
+- **Mobile Export Constraints**:
+  - Wrapped the pivot output generator into an explicit `<div style="max-width: 450px;">` box. When clicking "Save Image", the PWA forces the photograph into an absolute portrait mobile ratio rather than bleeding out infinitely across desktop viewports.
+- **Cache Invalidated**: Bumped SW to `v3.7.0`.
+- **Commit**: `[TBD]`
