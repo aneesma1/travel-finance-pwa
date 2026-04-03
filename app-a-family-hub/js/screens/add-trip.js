@@ -81,7 +81,8 @@ export async function renderAddTrip(container, params = {}) {
       </div>
       <div id="step-content" style="padding:20px 20px 80px 20px;"></div>
       ${isViewMode ? '' : `
-      <div style="padding:16px 20px 32px;display:flex;gap:10px;">
+      <div style="padding:16px 20px 32px;display:flex;gap:8px;">
+        <button class="btn btn-secondary" style="flex:1;color:var(--danger);background-color:#fee2e2;border:none;" id="cancel-btn">✕ Cancel</button>
         ${currentStep > 0 ? '<button class="btn btn-secondary" style="flex:1;" id="prev-btn">← Back</button>' : ''}
         <button class="btn btn-primary" style="flex:2;" id="next-btn">
           ${currentStep === STEPS.length - 1 ? (isEdit ? '💾 Save Changes' : '✅ Save Trip') : 'Next →'}
@@ -101,7 +102,18 @@ export async function renderAddTrip(container, params = {}) {
         render();
       });
       document.getElementById('share-trip-btn')?.addEventListener('click', () => shareTripText());
+    } else {
+      document.getElementById('cancel-btn')?.addEventListener('click', () => {
+        if (confirm('Discard changes and exit?')) {
+          if (isExisting) {
+            navigate('add-trip', { tripId: existingTrip.id, mode: 'view' });
+          } else {
+            navigate('travel-log');
+          }
+        }
+      });
     }
+    
     document.getElementById('prev-btn')?.addEventListener('click', () => { currentStep--; render(); });
     document.getElementById('next-btn')?.addEventListener('click', () => handleNext());
     } catch (err) {
