@@ -83,7 +83,46 @@ async function dbGetAll(storeName) {
 
 // ── Travel data cache ──────────────────────────────────────────────────────────
 export async function getCachedTravelData() {
-  return dbGet(STORES.travel, 'data');
+  let data = await dbGet(STORES.travel, 'data');
+  if (data) {
+    let migrated = false;
+
+    // Phase 1 Migration: travelPersons to passengers
+    if (data.travelPersons && !data.passengers) {
+      data.passengers = data.travelPersons;
+      migrated = true;
+    } else if (data.travelPersons && data.passengers) {
+      // both exist? merge uniquely by id
+      const pMap = new Map();
+      [...data.passengers, ...data.travelPersons].forEach(p => { if (p.id) pMap.set(p.id, p); });
+      data.passengers = Array.from(pMap.values());
+      migrated = true;
+    }
+
+    if (data.trips && Array.isArray(data.trips)) {
+      data.trips.forEach(t => {
+        if (t.personId !== undefined) { t.passengerId = t.personId; delete t.personId; migrated = true; }
+        if (t.personName !== undefined) { t.passengerName = t.personName; delete t.personName; migrated = true; }
+        if (t.dateOutIndia !== undefined) { t.dateLeftOrigin = t.dateOutIndia; delete t.dateOutIndia; migrated = true; }
+        if (t.dateInQatar !== undefined) { t.dateArrivedDest = t.dateInQatar; delete t.dateInQatar; migrated = true; }
+        if (t.dateOutQatar !== undefined) { t.dateLeftDest = t.dateOutQatar; delete t.dateOutQatar; migrated = true; }
+        if (t.dateInIndia !== undefined) { t.dateReturnedOrigin = t.dateInIndia; delete t.dateInIndia; migrated = true; }
+        if (t.daysInQatar !== undefined) { t.daysInDest = t.daysInQatar; delete t.daysInQatar; migrated = true; }
+
+        // Give defaults if they didn't exist
+        if (!t.originCountry) { t.originCountry = 'India'; migrated = true; }
+        if (!t.destinationCountry) { t.destinationCountry = t.destination || 'Qatar'; migrated = true; }
+      });
+    }
+
+    if (migrated) {
+      delete data.travelPersons;
+      // Note: we just silently upgrade memory, and let the next localSave persist it to Drive.
+      // But we should write it locally so subsequent reads are fast
+      await dbSet(STORES.travel, 'data', data);
+    }
+  }
+  return data;
 }
 
 export async function setCachedTravelData(data) {

@@ -14,7 +14,7 @@ import {
 } from '../../../shared/utils.js';
 import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
 
-const STEPS = ['Person', 'Dates', 'Flights', 'Reason', 'Photos', 'Review'];
+const STEPS = ['Passenger', 'Dates', 'Flights', 'Reason', 'Photos', 'Review'];
 
 export async function renderAddTrip(container, params = {}) {
   const { tripId, mode } = params;
@@ -23,13 +23,13 @@ export async function renderAddTrip(container, params = {}) {
   let isViewMode = isExisting && mode !== 'edit';  // view by default, edit when explicit
 
   const data = await getCachedTravelData();
-  const { travelPersons = [], trips = [] } = data || {};
-  const persons = [...travelPersons];
+  const { passengers = [], trips = [] } = data || {};
+  const persons = [...passengers];
 
   // Auto-discover imported names that aren't in the official persons list to populate the pills
   const existingNames = new Set(persons.map(p => String(p.name || '').trim().toLowerCase()));
   trips.forEach(t => {
-    const pName = String(t.personName || '').trim();
+    const pName = String(t.passengerName || '').trim();
     if (pName && !existingNames.has(pName.toLowerCase())) {
       // Use the name itself as a pseudo-ID so the PillSelect matches it natively
       persons.push({ id: pName, name: pName, emoji: '👤' });
@@ -42,17 +42,17 @@ export async function renderAddTrip(container, params = {}) {
 
   // Form state
   const state = {
-    personId:     existingTrip?.personId     || existingTrip?.personName || '',
-    personName:   existingTrip?.personName   || '',
-    dateOutIndia: existingTrip?.dateOutIndia || '',
-    dateInQatar:  existingTrip?.dateInQatar  || '',
-    dateOutQatar: existingTrip?.dateOutQatar || '',
-    dateInIndia:  existingTrip?.dateInIndia  || '',
+    passengerId:     existingTrip?.passengerId     || existingTrip?.passengerName || '',
+    passengerName:   existingTrip?.passengerName   || '',
+    dateLeftOrigin: existingTrip?.dateLeftOrigin || '',
+    dateArrivedDest:  existingTrip?.dateArrivedDest  || '',
+    dateLeftDest: existingTrip?.dateLeftDest || '',
+    dateReturnedOrigin:  existingTrip?.dateReturnedOrigin  || '',
     flightInward: existingTrip?.flightInward || '',
     flightOutward:existingTrip?.flightOutward|| '',
     reason:       existingTrip?.reason       || '',
     travelWith:   existingTrip?.travelWith   || [],
-    destination:  existingTrip?.destination  || 'Qatar',
+    destinationCountry:  existingTrip?.destinationCountry  || 'Qatar',
     photos:       existingTrip?.photos       || [],
   };
 
@@ -111,15 +111,15 @@ export async function renderAddTrip(container, params = {}) {
   }
 
   async function shareTripText() {
-    const member = members.find(m => m.id === state.personId);
+    const member = members.find(m => m.id === state.passengerId);
     const text = [
       `✈️ *Travel Details: ${member?.name || 'Unknown'}*`,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `🇮🇳 Departed India: ${formatDisplayDate(state.dateOutIndia)}`,
-      `🇶🇦 Arrived Qatar: ${formatDisplayDate(state.dateInQatar)}`,
-      state.dateOutQatar ? `🇶🇦 Left Qatar: ${formatDisplayDate(state.dateOutQatar)}` : `🇶🇦 Status: Still in Qatar`,
-      state.dateInIndia  ? `🇮🇳 Back in India: ${formatDisplayDate(state.dateInIndia)}` : '',
-      `⏱️ Duration: ${state.dateInQatar && state.dateOutQatar ? daysBetween(state.dateInQatar, state.dateOutQatar) + ' days' : daysBetween(state.dateInQatar, today()) + ' days so far'}`,
+      `🛫 Departed Origin: ${formatDisplayDate(state.dateLeftOrigin)}`,
+      `🛬 Arrived Destination: ${formatDisplayDate(state.dateArrivedDest)}`,
+      state.dateLeftDest ? `🛫 Left Destination: ${formatDisplayDate(state.dateLeftDest)}` : `📍 Status: Still in Destination`,
+      state.dateReturnedOrigin  ? `🇮🇳 Back in Origin: ${formatDisplayDate(state.dateReturnedOrigin)}` : '',
+      `⏱️ Duration: ${state.dateArrivedDest && state.dateLeftDest ? daysBetween(state.dateArrivedDest, state.dateLeftDest) + ' days' : daysBetween(state.dateArrivedDest, today()) + ' days so far'}`,
       state.flightInward ? `✈️ Inward: ${state.flightInward}` : '',
       state.flightOutward? `✈️ Outward: ${state.flightOutward}` : '',
       state.reason       ? `📝 Reason: ${state.reason}` : '',
@@ -154,22 +154,22 @@ export async function renderAddTrip(container, params = {}) {
   function renderPersonStep(el, persons) {
     el.innerHTML = `
       <div class="form-group">
-        <label class="form-label">Who is travelling?</label>
+        <label class="form-label">Who is the Passenger?</label>
         <div id="person-pills"></div>
       </div>
       <div style="margin-top:12px;text-align:center;">
-        <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px;" id="add-new-person-btn">+ Add New Travel Person</button>
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px;" id="add-new-person-btn">+ Add New Passenger</button>
       </div>
     `;
     new PillSelect(document.getElementById('person-pills'), {
       options: persons.map(m => ({ value: m.id, label: m.name, emoji: m.emoji || '👤' })),
-      selected: state.personId,
+      selected: state.passengerId,
       multi: false,
       color: 'indigo',
       onSelect: (val) => {
-        state.personId = val || '';
+        state.passengerId = val || '';
         const selected = persons.find(m => m.id === val);
-        state.personName = selected?.name || '';
+        state.passengerName = selected?.name || '';
       }
     });
 
@@ -184,13 +184,13 @@ export async function renderAddTrip(container, params = {}) {
   async function saveNewPerson(person) {
     try {
       const newData = await localSave('travel', (remote) => {
-        const travelPersons = remote.travelPersons || [];
-        travelPersons.push(person);
-        return { ...remote, travelPersons };
+        const passengers = remote.passengers || [];
+        passengers.push(person);
+        return { ...remote, passengers };
       });
       await setCachedTravelData(newData);
       persons.push(person);
-      state.personId = person.id;
+      state.passengerId = person.id;
       navigate('add-trip', params); // refresh with new person list
     } catch { showToast('Failed to add person', 'error'); }
   }
@@ -198,38 +198,52 @@ export async function renderAddTrip(container, params = {}) {
   // ── Step 1: Dates ───────────────────────────────────────────────────
   function renderDatesStep(el) {
     el.innerHTML = `
-      <div class="form-group">
-        <label class="form-label">Destination Country</label>
-        <div id="dest-input"></div>
+      <div style="display:flex;gap:12px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Origin Country</label>
+          <div id="origin-input"></div>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Destination Country</label>
+          <div id="dest-input"></div>
+        </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Date Out of India</label>
-        <input type="date" class="form-input" id="dateOutIndia" value="${state.dateOutIndia}" />
+        <label class="form-label">Date Out of ${state.originCountry}</label>
+        <input type="date" class="form-input" id="dateLeftOrigin" value="${state.dateLeftOrigin}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Date Arrived in ${state.destination}</label>
-        <input type="date" class="form-input" id="dateInQatar" value="${state.dateInQatar}" />
+        <label class="form-label">Date Arrived in ${state.destinationCountry}</label>
+        <input type="date" class="form-input" id="dateArrivedDest" value="${state.dateArrivedDest}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Date Out of ${state.destination} <span style="color:var(--text-muted);font-weight:400;">(leave blank if still there)</span></label>
-        <input type="date" class="form-input" id="dateOutQatar" value="${state.dateOutQatar}" />
+        <label class="form-label">Date Out of ${state.destinationCountry} <span style="color:var(--text-muted);font-weight:400;">(leave blank if still there)</span></label>
+        <input type="date" class="form-input" id="dateLeftDest" value="${state.dateLeftDest}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Date Back in India <span style="color:var(--text-muted);font-weight:400;">(leave blank if not returned)</span></label>
-        <input type="date" class="date-input" id="dateInIndia" value="${state.dateInIndia}" />
+        <label class="form-label">Date Back in ${state.originCountry} <span style="color:var(--text-muted);font-weight:400;">(leave blank if not returned)</span></label>
+        <input type="date" class="date-input" id="dateReturnedOrigin" value="${state.dateReturnedOrigin}" />
       </div>
       <div id="days-computed" style="background:var(--primary-bg);border-radius:var(--radius-md);padding:12px 16px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;"></div>
     `;
 
-    new SmartInput(document.getElementById('dest-input'), {
-      suggestions: ['Qatar', 'UAE', 'Saudi Arabia', 'Oman', 'Bahrain', 'Kuwait', 'USA', 'UK', 'Canada'],
-      value: state.destination,
-      placeholder: 'e.g. Qatar',
-      onInput: (v) => { state.destination = v; renderDatesStep(el); },
-      onSelect: (v) => { state.destination = v; renderDatesStep(el); }
+    new SmartInput(document.getElementById('origin-input'), {
+      suggestions: ['India', 'Qatar', 'UAE', 'USA', 'UK', 'Canada'],
+      value: state.originCountry,
+      placeholder: 'e.g. India',
+      onInput: (v) => { state.originCountry = v; renderDatesStep(el); },
+      onSelect: (v) => { state.originCountry = v; renderDatesStep(el); }
     });
 
-    ['dateOutIndia','dateInQatar','dateOutQatar','dateInIndia'].forEach(field => {
+    new SmartInput(document.getElementById('dest-input'), {
+      suggestions: ['Qatar', 'UAE', 'Saudi Arabia', 'Oman', 'Bahrain', 'Kuwait', 'USA', 'UK', 'Canada'],
+      value: state.destinationCountry,
+      placeholder: 'e.g. Qatar',
+      onInput: (v) => { state.destinationCountry = v; renderDatesStep(el); },
+      onSelect: (v) => { state.destinationCountry = v; renderDatesStep(el); }
+    });
+
+    ['dateLeftOrigin','dateArrivedDest','dateLeftDest','dateReturnedOrigin'].forEach(field => {
       const input = document.getElementById(field);
       input.addEventListener('change', () => {
         state[field] = input.value;
@@ -244,16 +258,16 @@ export async function renderAddTrip(container, params = {}) {
     if (!el) return;
     const parts = [];
 
-    if (state.dateInQatar && state.dateOutQatar) {
-      const days = daysBetween(state.dateInQatar, state.dateOutQatar);
-      parts.push(`<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--primary);">${days}</div><div style="font-size:11px;color:var(--text-muted);font-weight:500;">Days in ${state.destination}</div></div>`);
-    } else if (state.dateInQatar) {
-      const days = daysBetween(state.dateInQatar, today());
+    if (state.dateArrivedDest && state.dateLeftDest) {
+      const days = daysBetween(state.dateArrivedDest, state.dateLeftDest);
+      parts.push(`<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--primary);">${days}</div><div style="font-size:11px;color:var(--text-muted);font-weight:500;">Days in ${state.destinationCountry}</div></div>`);
+    } else if (state.dateArrivedDest) {
+      const days = daysBetween(state.dateArrivedDest, today());
       parts.push(`<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--success);">${days}</div><div style="font-size:11px;color:var(--text-muted);font-weight:500;">Days so far</div></div>`);
     }
 
-    if (state.dateOutIndia && state.dateInIndia) {
-      const days = daysBetween(state.dateOutIndia, state.dateInIndia);
+    if (state.dateLeftOrigin && state.dateReturnedOrigin) {
+      const days = daysBetween(state.dateLeftOrigin, state.dateReturnedOrigin);
       parts.push(`<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--text);">${days}</div><div style="font-size:11px;color:var(--text-muted);font-weight:500;">Total trip days</div></div>`);
     }
 
@@ -264,11 +278,11 @@ export async function renderAddTrip(container, params = {}) {
   function renderFlightsStep(el) {
     el.innerHTML = `
       <div class="form-group">
-        <label class="form-label">Inward Flight to Qatar</label>
+        <label class="form-label">Inward Flight to Destination</label>
         <div id="flight-inward-input"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Outward Flight back to India</label>
+        <label class="form-label">Outward Flight back to Origin</label>
         <div id="flight-outward-input"></div>
       </div>
       <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">e.g. QR512, AI351 -- tap a suggestion or type new</p>
@@ -293,7 +307,7 @@ export async function renderAddTrip(container, params = {}) {
 
   // ── Step 3: Reason + Travel With ────────────────────────────────────
   function renderReasonStep(el, persons) {
-    const otherPersons = persons.filter(m => m.id !== state.personId);
+    const otherPersons = persons.filter(m => m.id !== state.passengerId);
 
     el.innerHTML = `
       <div class="form-group">
@@ -350,14 +364,14 @@ export async function renderAddTrip(container, params = {}) {
 
   // ── Step 4: Review ──────────────────────────────────────────────────
   function renderReviewStep(el, persons) {
-    let person = persons.find(m => m.id === state.personId);
-    if (!person && state.personName) person = { name: state.personName, emoji: '👤' };
+    let person = persons.find(m => m.id === state.passengerId);
+    if (!person && state.passengerName) person = { name: state.passengerName, emoji: '👤' };
     if (!person) person = { name: 'Unknown', emoji: '👤' };
 
-    const daysInDest = state.dateInQatar && state.dateOutQatar
-      ? daysBetween(state.dateInQatar, state.dateOutQatar) : null;
-    const daysSoFar = state.dateInQatar && !state.dateOutQatar
-      ? daysBetween(state.dateInQatar, today()) : null;
+    const daysInDest = state.dateArrivedDest && state.dateLeftDest
+      ? daysBetween(state.dateArrivedDest, state.dateLeftDest) : null;
+    const daysSoFar = state.dateArrivedDest && !state.dateLeftDest
+      ? daysBetween(state.dateArrivedDest, today()) : null;
       
     let travelWithNames = [];
     if (Array.isArray(state.travelWith)) {
@@ -379,16 +393,16 @@ export async function renderAddTrip(container, params = {}) {
           <div style="font-size:28px;">${person?.emoji || '👤'}</div>
           <div>
             <div style="font-size:16px;font-weight:700;color:#fff;">${person?.name || 'Unknown'}</div>
-            ${daysInDest !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysInDest} days in ${state.destination}</div>` : ''}
+            ${daysInDest !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysInDest} days in ${state.destinationCountry}</div>` : ''}
             ${daysSoFar !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysSoFar} days so far</div>` : ''}
           </div>
         </div>
         <div style="padding:0 16px 8px;">
-          ${row('Destination', state.destination)}
-          ${row('Out of India', formatDisplayDate(state.dateOutIndia))}
-          ${row('Arrived ' + state.destination, formatDisplayDate(state.dateInQatar))}
-          ${row('Left ' + state.destination, state.dateOutQatar ? formatDisplayDate(state.dateOutQatar) : 'Still there')}
-          ${row('Back in India', state.dateInIndia ? formatDisplayDate(state.dateInIndia) : 'Not yet')}
+          ${row('Destination', state.destinationCountry)}
+          ${row('Out of Origin', formatDisplayDate(state.dateLeftOrigin))}
+          ${row('Arrived ' + state.destinationCountry, formatDisplayDate(state.dateArrivedDest))}
+          ${row('Left ' + state.destinationCountry, state.dateLeftDest ? formatDisplayDate(state.dateLeftDest) : 'Still there')}
+          ${row('Back in Origin', state.dateReturnedOrigin ? formatDisplayDate(state.dateReturnedOrigin) : 'Not yet')}
           ${row('Inward Flight', state.flightInward)}
           ${row('Outward Flight', state.flightOutward)}
           ${row('Reason', state.reason)}
@@ -422,22 +436,22 @@ export async function renderAddTrip(container, params = {}) {
 
   // ── Validation ──────────────────────────────────────────────────────
   function validate() {
-    if (currentStep === 0 && !state.personId) {
+    if (currentStep === 0 && !state.passengerId) {
       showToast('Please select a person', 'warning');
       return false;
     }
     if (currentStep === 1) {
-      if (!state.dateOutIndia) { showToast('Please enter Date Out of India', 'warning'); return false; }
-      if (!state.dateInQatar)  { showToast('Please enter Date Arrived in Qatar', 'warning'); return false; }
-      if (state.dateInQatar < state.dateOutIndia) {
+      if (!state.dateLeftOrigin) { showToast('Please enter Date Out of Origin', 'warning'); return false; }
+      if (!state.dateArrivedDest)  { showToast('Please enter Date Arrived in Qatar', 'warning'); return false; }
+      if (state.dateArrivedDest < state.dateLeftOrigin) {
         showToast('Arrival in Qatar must be after departure from India', 'error');
         return false;
       }
-      if (state.dateOutQatar && state.dateOutQatar < state.dateInQatar) {
+      if (state.dateLeftDest && state.dateLeftDest < state.dateArrivedDest) {
         showToast('Date Out Qatar must be after Date In Qatar', 'error');
         return false;
       }
-      if (state.dateInIndia && state.dateOutQatar && state.dateInIndia < state.dateOutQatar) {
+      if (state.dateReturnedOrigin && state.dateLeftDest && state.dateReturnedOrigin < state.dateLeftDest) {
         showToast('Return to India must be after leaving Qatar', 'error');
         return false;
       }
@@ -447,24 +461,24 @@ export async function renderAddTrip(container, params = {}) {
 
   // ── Save ────────────────────────────────────────────────────────────
   async function saveTrip() {
-    const daysInQatar = state.dateInQatar && state.dateOutQatar
-      ? daysBetween(state.dateInQatar, state.dateOutQatar) : null;
+    const daysInDest = state.dateArrivedDest && state.dateLeftDest
+      ? daysBetween(state.dateArrivedDest, state.dateLeftDest) : null;
 
-    // Resolve personName from the selected person
-    const selectedPerson = persons.find(m => m.id === state.personId);
-    const personName = state.personName || selectedPerson?.name || 'Unknown';
+    // Resolve passengerName from the selected person
+    const selectedPerson = persons.find(m => m.id === state.passengerId);
+    const passengerName = state.passengerName || selectedPerson?.name || 'Unknown';
 
     const tripData = {
       id:           isEdit ? existingTrip.id : uuidv4(),
       timestamp:    isEdit ? existingTrip.timestamp : new Date().toISOString(),
-      personId:     state.personId,
-      personName:   personName,
-      destination:  state.destination,
-      dateOutIndia: state.dateOutIndia,
-      dateInQatar:  state.dateInQatar,
-      dateOutQatar: state.dateOutQatar || null,
-      dateInIndia:  state.dateInIndia  || null,
-      daysInQatar:  daysInQatar,
+      passengerId:     state.passengerId,
+      passengerName:   passengerName,
+      destinationCountry:  state.destinationCountry,
+      dateLeftOrigin: state.dateLeftOrigin,
+      dateArrivedDest:  state.dateArrivedDest,
+      dateLeftDest: state.dateLeftDest || null,
+      dateReturnedOrigin:  state.dateReturnedOrigin  || null,
+      daysInDest:  daysInDest,
       flightInward: state.flightInward,
       flightOutward:state.flightOutward,
       reason:       state.reason,
@@ -476,10 +490,10 @@ export async function renderAddTrip(container, params = {}) {
     // Duplicate check for new trips
     if (!isEdit) {
       const duplicate = (data?.trips || []).find(
-        t => t.personId === state.personId && t.dateOutIndia === state.dateOutIndia
+        t => t.passengerId === state.passengerId && t.dateLeftOrigin === state.dateLeftOrigin
       );
       if (duplicate) {
-        const ok = confirm(`A trip for this person starting on ${formatDisplayDate(state.dateOutIndia)} already exists. Save anyway?`);
+        const ok = confirm(`A trip for this person starting on ${formatDisplayDate(state.dateLeftOrigin)} already exists. Save anyway?`);
         if (!ok) return;
       }
     }
@@ -501,10 +515,10 @@ export async function renderAddTrip(container, params = {}) {
               const companionTrip = {
                 ...tripData,
                 id: uuidv4(),
-                personId: companionId,
-                // Replace companionId in travelWith with the main personId
+                passengerId: companionId,
+                // Replace companionId in travelWith with the main passengerId
                 travelWith: [
-                  state.personId,
+                  state.passengerId,
                   ...state.travelWith.filter(bid => bid !== companionId)
                 ]
               };

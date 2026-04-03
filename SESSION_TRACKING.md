@@ -440,3 +440,20 @@ git checkout master
 - **Root Cause**: The Excel Import script was bypassing the creation of `travelPersons`, inadvertently causing `travel-log.js` to rely on `financeData.members` as a secondary fallback to resolve missing UUID IDs, effectively leaking Master People into the Travel DB scope.
 - **Fix**: Re-wrote the `excelToTravel` logic. During import, the script now actively creates unique UUID profiles and persistently saves them into the `travelPersons` database if the person doesn't natively exist there, bridging the trip directly to a true UUID isolated within the scoped database. Spliced completely severed any fallback loops or lookups referencing `members` inside `travel-log.js`. 
 - **Commit**: `[TBD]`
+
+### Travel Data Modernization & Summary Generator (v3.6.15 · 2026-04-03)
+- **Database Modernization**:
+  - Decoupled `travelPersons` into explicit `passengers` model. Added implicit schema migration in `shared/db.js` `getCachedTravelData()` to upgrade old keys dynamically upon booting so no data is lost.
+  - Generalized "Qatar" into dynamic "Destination" and "Origin" country tracking inside the main `trips` schema.
+- **Add Trip Wizard**:
+  - Overhauled inputs from hardcoded "India/Qatar" to dynamic selectable Origins and Destinations. Computes mathematically correct relative stay values based on precise Origin and Destination values selected.
+- **Settings & Excel Import**:
+  - Re-mapped the Excel import tool engine in `settings.js` to correctly route incoming arrays into the modern `passengers` collection and extract generic Date values into explicit trip properties without locking them to "Qatar" labels.
+- **Travel Summary Module**:
+  - Built `travel-summary.js`. A new powerful standalone analytical dashboard generator accessible inside `travel-log.js`.
+  - Added "Strict Data Slicing" algorithm. If User Filters by Year (e.g. 2025) but trip started Dec 24, 2024 and ended Jan 6, 2025, the algorithm mathematically derives correctly that only 6 days belong inside the target window. 
+  - Allows bulk Passenger filtering (single, group, or all).
+  - Integrated 3 dedicated Export Engines to process the computed UI variables into: (1) CSV File Download, (2) WhatsApp Emoji Formatted Clipboard String, and (3) Native Canvas-to-Blob Image Generation for downloading the HTML chart graphics out of the DOM.
+- **Service Worker Updates**:
+  - Imposed dynamic cache invalidation by injecting the new module into `STATIC_ASSETS` arrays.
+- **Commit**: `[TBD]`
