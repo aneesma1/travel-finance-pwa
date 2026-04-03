@@ -480,5 +480,23 @@ git checkout master
   - Spliced these new stats cleanly into the text generation (WhatsApp/Clipboard text blob).
 - **Mobile Export Constraints**:
   - Wrapped the pivot output generator into an explicit `<div style="max-width: 450px;">` box. When clicking "Save Image", the PWA forces the photograph into an absolute portrait mobile ratio rather than bleeding out infinitely across desktop viewports.
-- **Cache Invalidated**: Bumped SW to `v3.7.0`.
 - **Commit**: `[TBD]`
+
+---
+
+## Session Start: 2026-04-03
+
+### Smart Travel Analysis & Navigation Fixes (v3.7.5 · 2026-04-03)
+
+- **Travel Hub (Family Hub)**:
+  - **Smart Origin/Destination**: Implemented automatic deduction of travel direction (A -> B) based on entry/exit date existence in Excel imports. (e.g. "Out Qatar" + "In India" -> Origin: Qatar).
+  - **Manual Override**: Added explicit `originCountry` and `destinationCountry` fields to the trip entry wizard.
+  - **Swap Button**: Added a `⇄` button to quickly flip Origin and Destination countries in the UI.
+  - **Navigation Fix**: Fixed the non-functional "Back" arrow (←) by correctly importing `navigate` in `add-trip.js`.
+  - **Chronological Validation**: Added strict date ordering checks (Departure < Arrival < Exit < Return) to prevent nonsensical data entry.
+  - **Dynamic Header**: Updated the trip summary header to show "Returned to [Origin]" once a return date is set.
+  - **Data Normalization**: Updated `travel-log.js` to ensure the new `originCountry` field is handled consistently.
+- **Shared Components**:
+  - **Import Tool**: Added `originCountry` and `destinationCountry` as optional columns to `TRAVEL_COLUMNS` for manual mapping.
+- **Service Worker**: Bumped all apps and shared utilities to **v3.7.5**.
+- **Commit**: `f70e71a` (master), `116bbe8` (main) — `v3.7.5: Smart Travel Analysis and Navigation Fixes`
