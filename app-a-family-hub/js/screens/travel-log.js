@@ -110,22 +110,20 @@ export async function renderTravelLog(container, params = {}) {
   // ── 3. Base Layout Renderer ──
   function renderLayout() {
     container.innerHTML = `
-      <!-- App Header -->
-      <div class="app-header" style="padding-bottom: 0; display:flex; flex-direction:column; align-items:stretch;">
-        <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:0 16px 12px 0;">
-           <span class="app-header-title" style="padding:0;">✈️ Travel</span>
-           <button class="app-header-action" id="header-export-btn" title="Export History">📤</button>
-        </div>
-        
-        <!-- Tab Bar -->
-        <div style="display:flex; margin-top:-4px;">
-           <button id="tab-btn-trips" style="flex:1; padding:12px; font-size:14px; font-weight:700; text-align:center; border-bottom:3px solid ${activeTab === 'trips' ? 'var(--primary)' : 'transparent'}; color:${activeTab === 'trips' ? 'var(--primary)' : 'var(--text-muted)'}; background:none; border-top:none; border-left:none; border-right:none; transition:all 0.2s; cursor:pointer;">Trip Log</button>
-           <button id="tab-btn-summary" style="flex:1; padding:12px; font-size:14px; font-weight:700; text-align:center; border-bottom:3px solid ${activeTab === 'summary' ? 'var(--primary)' : 'transparent'}; color:${activeTab === 'summary' ? 'var(--primary)' : 'var(--text-muted)'}; background:none; border-top:none; border-left:none; border-right:none; transition:all 0.2s; cursor:pointer;">Passenger Summary</button>
-        </div>
+      <!-- App Header (strict 60px) -->
+      <div class="app-header">
+        <span class="app-header-title">✈️ Travel</span>
+        <button class="app-header-action" id="header-export-btn" title="Export History">📤</button>
+      </div>
+      
+      <!-- Tab Bar (separate, below header) -->
+      <div style="display:flex; background:var(--surface); border-bottom:2px solid var(--border); position:sticky; top:60px; z-index:40;">
+         <button id="tab-btn-trips" style="flex:1; padding:12px; font-size:14px; font-weight:700; text-align:center; border-bottom:3px solid ${activeTab === 'trips' ? 'var(--primary)' : 'transparent'}; color:${activeTab === 'trips' ? 'var(--primary)' : 'var(--text-muted)'}; background:none; border-top:none; border-left:none; border-right:none; transition:all 0.2s; cursor:pointer;">Trip Log</button>
+         <button id="tab-btn-summary" style="flex:1; padding:12px; font-size:14px; font-weight:700; text-align:center; border-bottom:3px solid ${activeTab === 'summary' ? 'var(--primary)' : 'transparent'}; color:${activeTab === 'summary' ? 'var(--primary)' : 'var(--text-muted)'}; background:none; border-top:none; border-left:none; border-right:none; transition:all 0.2s; cursor:pointer;">Passenger Summary</button>
       </div>
       
       <!-- Content Viewport -->
-      <div id="tab-content" style="flex:1; overflow-y:auto; position:relative; background:var(--page-bg); padding-bottom:env(safe-area-inset-bottom);"></div>
+      <div id="tab-content" style="background:var(--page-bg);"></div>
     `;
 
     document.getElementById('header-export-btn')?.addEventListener('click', () => {
@@ -433,7 +431,12 @@ export async function renderTravelLog(container, params = {}) {
       
       if (days > 0) {
         const country = t.destinationCountry || 'Qatar';
-        records.push({ year, country, days });
+        records.push({
+          year, country, days,
+          dateIn: t.dateArrivedDest || t.dateLeftOrigin || '',
+          dateOut: t.dateLeftDest || '',
+          reason: t.reason || '',
+        });
         
         lifetimeDays += days;
         if (days > longestStay) longestStay = days;
@@ -450,13 +453,19 @@ export async function renderTravelLog(container, params = {}) {
       }
     });
 
-    const pivotYear = {}; 
-    const pivotCountry = {};
+    // Build pivot structures that also store individual trip records
+    const pivotYear = {};   // { '2025': { 'Qatar': { total: 58, trips: [...] } } }
+    const pivotCountry = {}; // { 'Qatar': { '2025': { total: 58, trips: [...] } } }
     records.forEach(r => {
       if (!pivotYear[r.year]) pivotYear[r.year] = {};
-      pivotYear[r.year][r.country] = (pivotYear[r.year][r.country] || 0) + r.days;
+      if (!pivotYear[r.year][r.country]) pivotYear[r.year][r.country] = { total: 0, trips: [] };
+      pivotYear[r.year][r.country].total += r.days;
+      pivotYear[r.year][r.country].trips.push(r);
+
       if (!pivotCountry[r.country]) pivotCountry[r.country] = {};
-      pivotCountry[r.country][r.year] = (pivotCountry[r.country][r.year] || 0) + r.days;
+      if (!pivotCountry[r.country][r.year]) pivotCountry[r.country][r.year] = { total: 0, trips: [] };
+      pivotCountry[r.country][r.year].total += r.days;
+      pivotCountry[r.country][r.year].trips.push(r);
     });
 
     return { totalTrips: pTrips.length, lifetimeDays, topDest, longestStay, pivotYear, pivotCountry };
@@ -466,18 +475,40 @@ export async function renderTravelLog(container, params = {}) {
     if (Object.keys(data.pivotYear).length === 0) {
       return '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px;">No travel recorded for this passenger.</div>';
     }
+
+    function tripRows(tripsArr) {
+      if (!tripsArr || tripsArr.length === 0) return '';
+      return tripsArr.sort((a,b) => a.dateIn.localeCompare(b.dateIn)).map(r => {
+        const dateInFmt = r.dateIn ? formatDisplayDate(r.dateIn) : '--';
+        const dateOutFmt = r.dateOut ? formatDisplayDate(r.dateOut) : 'Present';
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0 5px 8px;border-left:2px solid var(--primary-border);margin:4px 0;">
+            <div>
+              <div style="font-size:12px;color:var(--text-secondary);">${dateInFmt} → ${dateOutFmt}</div>
+              ${r.reason ? `<div style="font-size:11px;color:var(--text-muted);">${r.reason}</div>` : ''}
+            </div>
+            <span style="font-size:13px;font-weight:700;color:var(--primary);flex-shrink:0;margin-left:8px;">${r.days}d</span>
+          </div>
+        `;
+      }).join('');
+    }
+
     let html = '';
     if (summaryState.pivotMode === 'year') {
       const years = Object.keys(data.pivotYear).sort((a,b) => b - a);
       years.forEach(y => {
-        html += `<div style="margin-bottom:16px;">`;
-        html += `<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;border-bottom:1px solid var(--border-light);padding-bottom:4px;">Year ${y}</div>`;
-        const countries = Object.keys(data.pivotYear[y]).sort((a,b) => data.pivotYear[y][b] - data.pivotYear[y][a]);
+        html += `<div style="margin-bottom:20px;">`;
+        html += `<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;border-bottom:2px solid var(--primary-border);padding-bottom:6px;">📅 ${y}</div>`;
+        const countries = Object.keys(data.pivotYear[y]).sort((a,b) => data.pivotYear[y][b].total - data.pivotYear[y][a].total);
         countries.forEach(c => {
+          const entry = data.pivotYear[y][c];
           html += `
-            <div style="display:flex;justify-content:space-between;padding:6px 0;">
-              <span style="font-size:14px;color:var(--text-secondary);">${c}</span>
-              <span style="font-size:14px;font-weight:700;color:var(--primary);">${data.pivotYear[y][c]} <span style="font-size:11px;font-weight:500;">days</span></span>
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
+                <span style="font-size:14px;font-weight:600;color:var(--text-secondary);">📍 ${c}</span>
+                <span style="font-size:14px;font-weight:700;color:var(--primary);">${entry.total} <span style="font-size:11px;font-weight:500;">days</span></span>
+              </div>
+              ${tripRows(entry.trips)}
             </div>
           `;
         });
@@ -486,14 +517,18 @@ export async function renderTravelLog(container, params = {}) {
     } else {
       const countries = Object.keys(data.pivotCountry).sort();
       countries.forEach(c => {
-        html += `<div style="margin-bottom:16px;">`;
-        html += `<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;border-bottom:1px solid var(--border-light);padding-bottom:4px;">${c}</div>`;
+        html += `<div style="margin-bottom:20px;">`;
+        html += `<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;border-bottom:2px solid var(--primary-border);padding-bottom:6px;">📍 ${c}</div>`;
         const years = Object.keys(data.pivotCountry[c]).sort((a,b) => b - a);
         years.forEach(y => {
+          const entry = data.pivotCountry[c][y];
           html += `
-            <div style="display:flex;justify-content:space-between;padding:6px 0;">
-              <span style="font-size:14px;color:var(--text-secondary);">Year ${y}</span>
-              <span style="font-size:14px;font-weight:700;color:var(--primary);">${data.pivotCountry[c][y]} <span style="font-size:11px;font-weight:500;">days</span></span>
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
+                <span style="font-size:14px;font-weight:600;color:var(--text-secondary);">📅 ${y}</span>
+                <span style="font-size:14px;font-weight:700;color:var(--primary);">${entry.total} <span style="font-size:11px;font-weight:500;">days</span></span>
+              </div>
+              ${tripRows(entry.trips)}
             </div>
           `;
         });
@@ -645,8 +680,14 @@ export async function renderTravelLog(container, params = {}) {
        const years = Object.keys(data.pivotYear).sort((a,b) => b - a);
        years.forEach(y => {
          text += `\n📅 *Year ${y}*\n`;
-         Object.keys(data.pivotYear[y]).sort((a,b) => data.pivotYear[y][b] - data.pivotYear[y][a]).forEach(c => {
-           text += `   📍 ${c}: ${data.pivotYear[y][c]} days\n`;
+         Object.keys(data.pivotYear[y]).sort((a,b) => data.pivotYear[y][b].total - data.pivotYear[y][a].total).forEach(c => {
+           const entry = data.pivotYear[y][c];
+           text += `   📍 ${c}: ${entry.total} days\n`;
+           entry.trips.sort((a,b) => a.dateIn.localeCompare(b.dateIn)).forEach(r => {
+             const dIn = r.dateIn ? formatDisplayDate(r.dateIn) : '--';
+             const dOut = r.dateOut ? formatDisplayDate(r.dateOut) : 'Present';
+             text += `      • ${dIn} → ${dOut} (${r.days}d)${r.reason ? ' ' + r.reason : ''}\n`;
+           });
          });
        });
      } else {
@@ -654,7 +695,13 @@ export async function renderTravelLog(container, params = {}) {
        countries.forEach(c => {
          text += `\n📍 *${c}*\n`;
          Object.keys(data.pivotCountry[c]).sort((a,b) => b - a).forEach(y => {
-           text += `   📅 Year ${y}: ${data.pivotCountry[c][y]} days\n`;
+           const entry = data.pivotCountry[c][y];
+           text += `   📅 ${y}: ${entry.total} days\n`;
+           entry.trips.sort((a,b) => a.dateIn.localeCompare(b.dateIn)).forEach(r => {
+             const dIn = r.dateIn ? formatDisplayDate(r.dateIn) : '--';
+             const dOut = r.dateOut ? formatDisplayDate(r.dateOut) : 'Present';
+             text += `      • ${dIn} → ${dOut} (${r.days}d)${r.reason ? ' ' + r.reason : ''}\n`;
+           });
          });
        });
      }

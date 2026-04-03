@@ -104,12 +104,11 @@ export async function renderAddTrip(container, params = {}) {
       document.getElementById('share-trip-btn')?.addEventListener('click', () => shareTripText());
     } else {
       document.getElementById('cancel-btn')?.addEventListener('click', () => {
-        if (confirm('Discard changes and exit?')) {
-          if (isExisting) {
-            navigate('add-trip', { tripId: existingTrip.id, mode: 'view' });
-          } else {
-            navigate('travel-log');
-          }
+        // Navigate away immediately — tapping Cancel is explicit intent
+        if (isExisting) {
+          navigate('add-trip', { tripId: existingTrip.id, mode: 'view' });
+        } else {
+          navigate('travel-log');
         }
       });
     }
@@ -123,7 +122,7 @@ export async function renderAddTrip(container, params = {}) {
   }
 
   async function shareTripText() {
-    const member = members.find(m => m.id === state.passengerId);
+    const member = persons.find(m => m.id === state.passengerId);
     const text = [
       `✈️ *Travel Details: ${member?.name || 'Unknown'}*`,
       `━━━━━━━━━━━━━━━━━━━━`,
