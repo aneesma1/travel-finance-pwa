@@ -10,6 +10,7 @@ import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js'
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { openTravelExportSheet } from './travel-export.js';
+import { renderTravelSummarySheet } from './travel-summary.js';
 import {
   formatDisplayDate, daysBetween, today, currentYear,
   getHashParams, setHashParams,
@@ -26,51 +27,57 @@ function extractYear(val) {
 
 export async function renderTravelLog(container, params = {}) {
   const data = await getCachedTravelData();
-  const { travelPersons = [], trips = [] } = data || {};
+  const { passengers = [], trips = [] } = data || {};
 
-  // ── Completely detached from Master People: Use ONLY travelPersons ──
+  // ── Completely detached from Master People: Use ONLY passengers ──
   const isUuid = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-  const tpMap = Object.fromEntries(travelPersons.map(p => [p.id, p]));
+  const tpMap = Object.fromEntries(passengers.map(p => [p.id, p]));
 
   const safeTrips = Array.isArray(trips) ? trips.filter(Boolean).map(t => {
-    // Robust name resolution: If we have a personId, always prefer the name from the persons map
-    // even if personName exists (in case it's a UUID or stale)
-    const person = tpMap[t.personId];
+    // Robust name resolution
+    const person = tpMap[t.passengerId || t.personId];
     if (person) {
-      t.personName = person.name;
+      t.passengerName = person.name;
     }
     
-    // Fallback for cases without personId but personName looks like an ID
-    if (!t.personId && t.personName && isUuid(String(t.personName))) {
-      // Try to find a person whose ID matches the name field
-      const p = tpMap[t.personName];
-      if (p) t.personName = p.name;
+    // Fallback for cases without passengerId but passengerName looks like an ID
+    const rawName = t.passengerName || t.personName || '';
+    if (!t.passengerId && !t.personId && rawName && isUuid(String(rawName))) {
+      const p = tpMap[rawName];
+      if (p) t.passengerName = p.name;
     }
 
-    // Ensure every trip has a personName
-    if (!t.personName) t.personName = 'Unknown';
+    if (!t.passengerName) t.passengerName = 'Unknown';
+    
+    // Ensure dates are mapped correctly
+    t.dateLeftOrigin = t.dateLeftOrigin || t.dateOutIndia;
+    t.dateReturnedOrigin = t.dateReturnedOrigin || t.dateInIndia;
+    t.dateArrivedDest = t.dateArrivedDest || t.dateInQatar;
+    t.dateLeftDest = t.dateLeftDest || t.dateOutQatar;
+    t.daysInDest = t.daysInDest || t.daysInQatar;
+    t.destinationCountry = t.destinationCountry || t.destination || 'Qatar';
+    
     return t;
   }) : [];
 
-  // ── Extract unique persons and years ──
-  const personNamesSet = new Set();
-  const personInfoMap = {};
+  // ── Extract unique passengers and years ──
+  const passengerNamesSet = new Set();
+  const passengerInfoMap = {};
   const yearsSet = new Set();
 
   safeTrips.forEach(t => {
     const travelWithArr = Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/);
     const namesInTrip = [
-      String(t.personName || ''),
+      String(t.passengerName || ''),
       ...travelWithArr
     ].map(n => String(n || '').trim()).filter(Boolean);
 
     namesInTrip.forEach(name => {
-      // Use clean normalized name for chips
       const cleanName = name.trim();
-      if (!personNamesSet.has(cleanName)) {
-        personNamesSet.add(cleanName);
-        const tp = travelPersons.find(p => p.name?.toLowerCase() === cleanName.toLowerCase());
-        personInfoMap[cleanName] = {
+      if (!passengerNamesSet.has(cleanName)) {
+        passengerNamesSet.add(cleanName);
+        const tp = passengers.find(p => p.name?.toLowerCase() === cleanName.toLowerCase());
+        passengerInfoMap[cleanName] = {
           name: cleanName,
           emoji: tp?.emoji || '👤',
           color: tp?.color || '#EEF2FF',
@@ -78,22 +85,27 @@ export async function renderTravelLog(container, params = {}) {
       }
     });
 
-    const yr = extractYear(t.dateOutIndia);
+    const yr = extractYear(t.dateLeftOrigin);
     if (yr) yearsSet.add(yr);
   });
-  const uniquePersons = [...personNamesSet].sort().map(n => personInfoMap[n]);
+  const uniquePassengers = [...passengerNamesSet].sort().map(n => passengerInfoMap[n]);
   const availableYears = [...yearsSet].sort((a,b) => b - a);
 
   // Default year logic: use URL param, otherwise 'all'
   const urlYear = params.year || getHashParams().year;
   let filterYear = urlYear || 'all';
 
-  let filterPerson = params.person || getHashParams().person;
+  let filterPassenger = params.passenger || getHashParams().passenger;
 
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">✈️ Travel Log</span>
       <button class="app-header-action" id="header-export-btn" title="Export History">📤</button>
+    </div>
+    <div style="padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);">
+      <button id="travel-summary-btn" class="btn btn-secondary btn-full" style="padding:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;">
+        <span>📊</span> Travel Summary Report
+      </button>
     </div>
     <div id="filter-bar-container"></div>
     <div id="log-content"></div>
@@ -103,25 +115,28 @@ export async function renderTravelLog(container, params = {}) {
   if (!data) { showEmpty(container.querySelector('#log-content'), 'No data available'); return; }
 
   document.getElementById('add-trip-fab').addEventListener('click', () => navigate('add-trip'));
+  document.getElementById('travel-summary-btn')?.addEventListener('click', () => {
+    renderTravelSummarySheet(uniquePassengers, safeTrips, filterYear, filterPassenger);
+  });
 
   // Merge any incoming params with URL hash
-  if (params.personId) setHashParams({ person: params.personId });
+  if (params.passengerId) setHashParams({ passenger: params.passengerId });
   const hashParams = getHashParams();
-  filterPerson = hashParams.person || '';
+  filterPassenger = hashParams.passenger || '';
   // If no year in hash, we already calculated a smart default in 'filterYear' above
   if (hashParams.year) filterYear = hashParams.year;
 
   document.getElementById('header-export-btn')?.addEventListener('click', () => {
-    openTravelExportSheet(uniquePersons, safeTrips, data.documents || []);
+    openTravelExportSheet(uniquePassengers, safeTrips, data.documents || []);
   });
 
   let _tripPage = 1;
   const PAGE_SIZE = 25;
 
-  renderFilters(filterPerson, filterYear);
-  renderTrips(filterPerson, filterYear);
+  renderFilters(filterPassenger, filterYear);
+  renderTrips(filterPassenger, filterYear);
 
-  function renderFilters(filterPerson, filterYear) {
+  function renderFilters(filterPassenger, filterYear) {
     const bar = container.querySelector('#filter-bar-container');
     const yearsDisplay = [...availableYears];
     if (!yearsDisplay.includes(String(currentYear()))) {
@@ -131,10 +146,10 @@ export async function renderTravelLog(container, params = {}) {
     bar.innerHTML = `
       <div class="filter-bar">
         <div class="filter-chips">
-          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Person</span>
-          <button class="filter-chip ${!filterPerson ? 'active' : ''}" data-filter="person" data-value="">All</button>
-          ${uniquePersons.map(p => `
-            <button class="filter-chip ${filterPerson === p.name ? 'active' : ''}" data-filter="person" data-value="${p.name}">
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Passenger</span>
+          <button class="filter-chip ${!filterPassenger ? 'active' : ''}" data-filter="passenger" data-value="">All</button>
+          ${uniquePassengers.map(p => `
+            <button class="filter-chip ${filterPassenger === p.name ? 'active' : ''}" data-filter="passenger" data-value="${p.name}">
               ${p.emoji || '👤'} ${p.name}
             </button>
           `).join('')}
@@ -148,9 +163,9 @@ export async function renderTravelLog(container, params = {}) {
       </div>
     `;
 
-    bar.querySelectorAll('.filter-chip[data-filter="person"]').forEach(btn => {
+    bar.querySelectorAll('.filter-chip[data-filter="passenger"]').forEach(btn => {
       btn.addEventListener('click', () => {
-        setHashParams({ person: btn.dataset.value || null });
+        setHashParams({ passenger: btn.dataset.value || null });
         renderTravelLog(container);
       });
     });
@@ -163,8 +178,7 @@ export async function renderTravelLog(container, params = {}) {
     });
   }
 
-
-  function renderTrips(filterPerson, filterYear, resetPage = true) {
+  function renderTrips(filterPassenger, filterYear, resetPage = true) {
     const logContent = container.querySelector('#log-content');
     if (!logContent) return;
 
@@ -172,8 +186,8 @@ export async function renderTravelLog(container, params = {}) {
       if (resetPage) _tripPage = 1;
 
       let filtered = [...safeTrips].sort((a, b) => {
-      const da = String(a.dateOutIndia || '');
-      const db = String(b.dateOutIndia || '');
+      const da = String(a.dateLeftOrigin || '');
+      const db = String(b.dateLeftOrigin || '');
       // Try ISO first
       const ta = new Date(da).getTime();
       const tb = new Date(db).getTime();
@@ -182,11 +196,11 @@ export async function renderTravelLog(container, params = {}) {
       return db.localeCompare(da);
     });
 
-    // Filter by person name
-    if (filterPerson) {
-      const lowFilter = filterPerson.toLowerCase().trim();
+    // Filter by passenger name
+    if (filterPassenger) {
+      const lowFilter = filterPassenger.toLowerCase().trim();
       filtered = filtered.filter(t => {
-        const primaryMatch = String(t.personName || '').toLowerCase().trim() === lowFilter;
+        const primaryMatch = String(t.passengerName || '').toLowerCase().trim() === lowFilter;
         // Strictly split by Comma or Semi-colon as requested
         const travelWithNames = (Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/))
           .map(n => String(n || '').trim().toLowerCase());
@@ -194,7 +208,7 @@ export async function renderTravelLog(container, params = {}) {
       });
     }
     if (filterYear && filterYear !== 'all') {
-      filtered = filtered.filter(t => extractYear(t.dateOutIndia) === filterYear);
+      filtered = filtered.filter(t => extractYear(t.dateLeftOrigin) === filterYear);
     }
 
     if (!filtered.length) {
@@ -205,22 +219,17 @@ export async function renderTravelLog(container, params = {}) {
     const totalCount = filtered.length;
     filtered = filtered.slice(0, _tripPage * PAGE_SIZE);
 
-    // Year totals per person
+    // Year totals per passenger (only used locally for quick preview)
     const yearlyTotals = {};
     filtered.forEach(t => {
-      const name = t.personName || 'Unknown';
+      const name = t.passengerName || 'Unknown';
       if (!yearlyTotals[name]) yearlyTotals[name] = 0;
-      yearlyTotals[name] += (t.daysInQatar || 0);
+      yearlyTotals[name] += (t.daysInDest || 0);
     });
 
     logContent.innerHTML = `
       <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
         <span style="font-size:13px;color:var(--text-muted);">${filtered.length} trip${filtered.length !== 1 ? 's' : ''}${totalCount > filtered.length ? ` of ${totalCount}` : ''}</span>
-        ${Object.keys(yearlyTotals).length === 1
-          ? `<span style="font-size:13px;font-weight:600;color:var(--primary);">
-               Total Qatar days: ${Object.values(yearlyTotals)[0]}
-             </span>`
-          : ''}
       </div>
       <div id="trips-list"></div>
     `;
@@ -228,8 +237,8 @@ export async function renderTravelLog(container, params = {}) {
     const list = document.getElementById('trips-list');
 
     filtered.forEach((trip) => {
-      const pName = trip.personName || 'Unknown';
-      const pInfo = personInfoMap[pName] || { name: pName, emoji: '👤', color: '#EEF2FF' };
+      const pName = trip.passengerName || 'Unknown';
+      const pInfo = passengerInfoMap[pName] || { name: pName, emoji: '👤', color: '#EEF2FF' };
 
       // Travel companions
       let travelWithDisplay = [];
@@ -239,19 +248,19 @@ export async function renderTravelLog(container, params = {}) {
         travelWithDisplay = String(trip.travelWith).split(/[,;]+/).map(n => String(n || '').trim()).filter(Boolean);
       }
 
-      const dest = 'Qatar';
-      let days = (trip.daysInQatar != null && trip.daysInQatar !== '') ? Number(trip.daysInQatar) : null;
+      const dest = trip.destinationCountry || 'Destination';
+      let days = (trip.daysInDest != null && trip.daysInDest !== '') ? Number(trip.daysInDest) : null;
       
       if (days === null || isNaN(days)) {
-        if (trip.dateInQatar && trip.dateOutQatar) {
-          days = daysBetween(trip.dateInQatar, trip.dateOutQatar);
-        } else if (trip.dateInQatar && !trip.dateOutQatar) {
-          days = daysBetween(trip.dateInQatar, today());
+        if (trip.dateArrivedDest && trip.dateLeftDest) {
+          days = daysBetween(trip.dateArrivedDest, trip.dateLeftDest);
+        } else if (trip.dateArrivedDest && !trip.dateLeftDest) {
+          days = daysBetween(trip.dateArrivedDest, today());
         }
       }
       
       const daysLabel = (days !== null && !isNaN(days)) ? `${days}d in ${dest}` : '--';
-      const statusDot = (trip.dateInQatar && !trip.dateOutQatar) ? `<span class="status-dot-active"></span>` : '';
+      const statusDot = (trip.dateArrivedDest && !trip.dateLeftDest) ? `<span class="status-dot-active"></span>` : '';
       const row = document.createElement('div');
       row.className = 'swipe-row-container';
       row.innerHTML = `
@@ -266,7 +275,7 @@ export async function renderTravelLog(container, params = {}) {
               <span style="font-size:12px;color:var(--text-muted);">${trip.reason || ''}</span>
             </div>
             <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
-              ${trip.dateOutIndia ? formatDisplayDate(trip.dateOutIndia) : 'No date'} → ${trip.dateInIndia ? formatDisplayDate(trip.dateInIndia) : 'Present'}
+              ${trip.dateLeftOrigin ? formatDisplayDate(trip.dateLeftOrigin) : 'No date'} → ${trip.dateReturnedOrigin ? formatDisplayDate(trip.dateReturnedOrigin) : 'Present'}
             </div>
             ${travelWithDisplay.length ? `
               <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">

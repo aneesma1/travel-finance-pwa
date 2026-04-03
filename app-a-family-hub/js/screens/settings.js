@@ -76,12 +76,12 @@ function renderPeopleTab(container, data, members, user) {
     </div>
     <div id="members-list" style="padding:0 16px;display:flex;flex-direction:column;gap:8px;"></div>
     ${isAdmin() ? `
-    <div class="section-title" style="margin-top:16px;">Person Management</div>
+    <div class="section-title" style="margin-top:16px;">Passenger Management</div>
     <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
       <div class="list-row" id="manage-people-btn" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
         <span style="font-size:20px;">🔀</span>
         <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;">Rename &amp; Merge People</div>
+          <div style="font-size:14px;font-weight:600;">Rename &amp; Merge Passengers</div>
           <div style="font-size:12px;color:var(--text-muted);">Fix misspellings, merge duplicate entries</div>
         </div>
         <span style="color:var(--text-muted);">›</span>
@@ -322,7 +322,7 @@ function renderDataTab(data, members, container) {
 
     try {
       showToast('Wiping cloud database clean…', 'info', 5000);
-      const emptySet = { trips: [], travelPersons: [], members: [], documents: [], appInfo: { version: 'v3.5.47' } };
+      const emptySet = { trips: [], passengers: [], members: [], documents: [], appInfo: { version: 'v3.5.47' } };
       
       if (isOnline()) {
         const fileId = localStorage.getItem('drive_travel_file_id');
@@ -486,7 +486,7 @@ function renderAccountTab(data, members, user, container) {
         const seen = new Set();
         const kept = [];
         trips.forEach(t => {
-          const key = `${t.personName}|${t.dateOutIndia}|${t.dateInIndia}`;
+          const key = `${t.passengerName || t.personName}|${t.dateLeftOrigin || t.dateOutIndia}|${t.dateReturnedOrigin || t.dateInIndia}`;
           if (!seen.has(key)) {
             seen.add(key);
             kept.push(t);
@@ -608,28 +608,28 @@ function openImportModal(data, persons) {
       try {
         const newData = await localSave('travel', remote => {
           const trips = [...(remote.trips || [])];
-          const travelPersons = [...(remote.travelPersons || [])];
+          const passengers = [...(remote.passengers || remote.travelPersons || [])];
 
-          // Helper to decouple explicitly: auto-create travelPerson
-          const getOrAddPerson = (nameStr) => {
+          // Helper to decouple explicitly: auto-create passenger
+          const getOrAddPassenger = (nameStr) => {
             const n = (nameStr || '').trim();
             if (!n) return null;
-            let p = travelPersons.find(x => x.name?.toLowerCase() === n.toLowerCase());
+            let p = passengers.find(x => x.name?.toLowerCase() === n.toLowerCase());
             if (!p) {
               p = { id: uuidv4(), name: n, emoji: '👤' };
-              travelPersons.push(p);
+              passengers.push(p);
             }
             return p;
           };
 
-          // Deduplication key: personName (lowered) + ISO dateOutIndia
+          // Deduplication key: passengerName (lowered) + ISO dateLeftOrigin
           const existingKeys = new Set(
-            trips.map(t => ((t.personName || '').toLowerCase().trim()) + '|' + toISODate(t.dateOutIndia))
+            trips.map(t => ((t.passengerName || t.personName || '').toLowerCase().trim()) + '|' + toISODate(t.dateLeftOrigin || t.dateOutIndia))
           );
 
           records.forEach(rec => {
-            const rawPrimary = (rec.personName || 'Unknown').trim();
-            const doi        = toISODate(rec.dateOutIndia);
+            const rawPrimary = (rec.passengerName || rec.personName || 'Unknown').trim();
+            const doi        = toISODate(rec.dateLeftOrigin || rec.dateOutIndia);
 
             // Split ONLY the companion column ("Travel With") using Comma or Semi-colon
             const companionNames = (rec.travelWith || '')
@@ -641,8 +641,8 @@ function openImportModal(data, persons) {
             const allNames = [...new Set([rawPrimary, ...companionNames])];
 
             // Create a trip for EACH person mentioned in the row
-            allNames.forEach(personName => {
-              const name = personName.trim();
+            allNames.forEach(passengerNameStr => {
+              const name = passengerNameStr.trim();
               if (!name) return;
 
               // Dedup check (only if both name and date exist)
@@ -657,20 +657,28 @@ function openImportModal(data, persons) {
                 .filter(n => n.toLowerCase() !== name.toLowerCase())
                 .join(', ');
 
-              const personData = getOrAddPerson(name);
+              const passData = getOrAddPassenger(name);
 
               trips.push({
                 ...rec,
                 id: uuidv4(),
-                personId: personData ? personData.id : '',
-                personName: name, // STRICT: Ensure name mapped to personName field
+                passengerId: passData ? passData.id : '',
+                passengerName: name, // STRICT: Ensure name mapped to passengerName field
                 travelWith: othersInRow,
+                // Assign generalized date keys
+                dateLeftOrigin: rec.dateLeftOrigin || rec.dateOutIndia,
+                dateArrivedDest: rec.dateArrivedDest || rec.dateInQatar,
+                dateLeftDest: rec.dateLeftDest || rec.dateOutQatar,
+                dateReturnedOrigin: rec.dateReturnedOrigin || rec.dateInIndia,
+                daysInDest: rec.daysInDest || rec.daysInQatar,
+                originCountry: rec.originCountry || 'India',
+                destinationCountry: rec.destinationCountry || rec.destination || 'Qatar'
               });
               imported++;
             });
           });
 
-          return { ...remote, trips, travelPersons };
+          return { ...remote, trips, passengers };
         });
 
         await setCachedTravelData(newData);
