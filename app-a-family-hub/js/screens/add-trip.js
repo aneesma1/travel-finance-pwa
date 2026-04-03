@@ -222,11 +222,11 @@ export async function renderAddTrip(container, params = {}) {
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Date Out of ${state.originCountry}</label>
+        <label class="form-label">Departure Date</label>
         <input type="date" class="form-input" id="dateLeftOrigin" value="${state.dateLeftOrigin}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Date In ${state.destinationCountry}</label>
+        <label class="form-label">Arrival Date</label>
         <input type="date" class="form-input" id="dateArrivedDest" value="${state.dateArrivedDest}" />
       </div>
       <div id="days-computed" style="background:var(--primary-bg);border-radius:var(--radius-md);padding:12px 16px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;"></div>
@@ -389,8 +389,8 @@ export async function renderAddTrip(container, params = {}) {
         <div style="padding:0 16px 8px;">
           ${row('Origin', state.originCountry)}
           ${row('Destination', state.destinationCountry)}
-          ${row('Date Out ' + state.originCountry, formatDisplayDate(state.dateLeftOrigin))}
-          ${row('Date In ' + state.destinationCountry, formatDisplayDate(state.dateArrivedDest))}
+          ${row('Departure Date', formatDisplayDate(state.dateLeftOrigin))}
+          ${row('Arrival Date', formatDisplayDate(state.dateArrivedDest))}
           ${row('Flight Number', state.flightNumber)}
           ${row('Reason', state.reason)}
           ${travelWithNames.length ? `
@@ -428,11 +428,11 @@ export async function renderAddTrip(container, params = {}) {
       return false;
     }
     if (currentStep === 1) {
-      if (!state.dateLeftOrigin) { showToast(`Please enter Date Out of ${state.originCountry}`, 'warning'); return false; }
-      if (!state.dateArrivedDest)  { showToast(`Please enter Date In ${state.destinationCountry}`, 'warning'); return false; }
+      if (!state.dateLeftOrigin) { showToast(`Please enter Departure Date`, 'warning'); return false; }
+      if (!state.dateArrivedDest)  { showToast(`Please enter Arrival Date`, 'warning'); return false; }
       
       if (state.dateArrivedDest < state.dateLeftOrigin) {
-        showToast(`Arrival in ${state.destinationCountry} must be on or after departure from ${state.originCountry}`, 'error');
+        showToast(`Arrival must be on or after departure date`, 'error');
         return false;
       }
     }
