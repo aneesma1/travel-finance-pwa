@@ -457,3 +457,16 @@ git checkout master
 - **Service Worker Updates**:
   - Imposed dynamic cache invalidation by injecting the new module into `STATIC_ASSETS` arrays.
 - **Commit**: `[TBD]`
+
+### Travel Log Modernization & Summary Pivot Pivot (v3.6.16 · 2026-04-03)
+- **Trip Editor Cancel Button**:
+  - Added a distinct "Cancel" button to the Edit Trip view that safely aborts the flow without saving edits, functioning independently from the existing step-by-step "Back" button.
+- **Log Filter Dropdown**:
+  - Replaced the horizontal `Passengers` filter chips on the Travel Log with a dynamic, multi-select dropdown button mapped identically to the user's mockup.
+  - Allowed for an unlimited vertical list while keeping the max-height constrained so it avoids eclipsing the keyboard on mobile devices.
+- **Single Passenger Summary Pivot**:
+  - Entirely restructured the `Travel Summary Report` inside `travel-summary.js`.
+  - Shifted from generic date-slicing logic to focus strictly on a *single passenger*.
+  - Added a toggle allowing users to Pivot days specifically by "Year" or by "Country".
+  - Refactored calculation engine to bind all travel days strictly to their specific *entry date* per the latest operational requirement.
+- **Commit**: `[TBD]`

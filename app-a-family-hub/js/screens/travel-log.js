@@ -143,16 +143,37 @@ export async function renderTravelLog(container, params = {}) {
       yearsDisplay.unshift(String(currentYear()));
     }
 
+    const selectedPasses = filterPassenger ? filterPassenger.split(',').map(s => s.trim()).filter(Boolean) : [];
+
     bar.innerHTML = `
       <div class="filter-bar">
         <div class="filter-chips">
-          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Passenger</span>
-          <button class="filter-chip ${!filterPassenger ? 'active' : ''}" data-filter="passenger" data-value="">All</button>
-          ${uniquePassengers.map(p => `
-            <button class="filter-chip ${filterPassenger === p.name ? 'active' : ''}" data-filter="passenger" data-value="${p.name}">
-              ${p.emoji || '👤'} ${p.name}
-            </button>
-          `).join('')}
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Passengers</span>
+          
+          <div style="position:relative; display:inline-block;" id="passenger-dropdown-container">
+             <button class="btn btn-secondary" style="padding:6px 12px; font-size:13px; border-radius:99px;" id="passenger-dropdown-btn">
+               ${selectedPasses.length === 0 ? 'All' : selectedPasses.length === 1 ? selectedPasses[0] : `${selectedPasses.length} selected`} ▾
+             </button>
+             
+             <div id="passenger-dropdown-menu" style="display:none; position:absolute; top:100%; left:0; width:220px; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-top:8px; z-index:100; max-height:50vh; overflow-y:auto; padding:8px;">
+               
+               <label style="display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer; border-radius:6px;">
+                 <input type="checkbox" value="" ${selectedPasses.length === 0 ? 'checked' : ''} class="pass-checkbox pass-all-cb" />
+                 <span style="font-size:13px; font-weight:600;">All Passengers</span>
+               </label>
+               <div style="height:1px; background:var(--border-light); margin:4px 0;"></div>
+               ${uniquePassengers.map(p => `
+                 <label style="display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer;" class="pass-label">
+                    <input type="checkbox" value="${p.name}" ${selectedPasses.includes(p.name) ? 'checked' : ''} class="pass-checkbox pass-item-cb" />
+                    <span style="font-size:13px;">${p.emoji || '👤'} ${p.name}</span>
+                 </label>
+               `).join('')}
+               <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                 <button class="btn btn-primary" style="padding:4px 12px; font-size:12px;" id="pass-apply-btn">Apply</button>
+               </div>
+             </div>
+          </div>
+
           <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 4px;"></div>
           <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Year</span>
           <button class="filter-chip ${filterYear === 'all' ? 'active' : ''}" data-filter="year" data-value="all">All</button>
@@ -163,12 +184,47 @@ export async function renderTravelLog(container, params = {}) {
       </div>
     `;
 
-    bar.querySelectorAll('.filter-chip[data-filter="passenger"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        setHashParams({ passenger: btn.dataset.value || null });
-        renderTravelLog(container);
+    // Dropdown toggle logic
+    const dropBtn = bar.querySelector('#passenger-dropdown-btn');
+    const dropMenu = bar.querySelector('#passenger-dropdown-menu');
+    
+    dropBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropMenu.style.display = dropMenu.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    // Close dropdown on outside click
+    document.addEventListener('click', (e) => {
+      if (!bar.querySelector('#passenger-dropdown-container').contains(e.target)) {
+        dropMenu.style.display = 'none';
+      }
+    });
+
+    const allCb = bar.querySelector('.pass-all-cb');
+    const itemCbs = bar.querySelectorAll('.pass-item-cb');
+    
+    allCb.addEventListener('change', () => {
+      if (allCb.checked) {
+        itemCbs.forEach(cb => cb.checked = false);
+      } else {
+        allCb.checked = true; // prevent unchecking if no others are checked
+      }
+    });
+
+    itemCbs.forEach(cb => {
+      cb.addEventListener('change', () => {
+        const anyChecked = Array.from(itemCbs).some(c => c.checked);
+        allCb.checked = !anyChecked;
       });
     });
+
+    bar.querySelector('#pass-apply-btn').addEventListener('click', () => {
+      const checked = Array.from(itemCbs).filter(c => c.checked).map(c => c.value);
+      setHashParams({ passenger: checked.length > 0 ? checked.join(',') : null });
+      renderTravelLog(container);
+    });
+
+    // Year filters
     bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(btn => {
       btn.addEventListener('click', () => {
         setHashParams({ year: btn.dataset.value === String(currentYear()) ? null : btn.dataset.value });
@@ -196,15 +252,15 @@ export async function renderTravelLog(container, params = {}) {
       return db.localeCompare(da);
     });
 
-    // Filter by passenger name
+    // Filter by passenger name (supports comma-separated list)
     if (filterPassenger) {
-      const lowFilter = filterPassenger.toLowerCase().trim();
+      const selectedArr = filterPassenger.split(',').map(s => s.toLowerCase().trim()).filter(Boolean);
       filtered = filtered.filter(t => {
-        const primaryMatch = String(t.passengerName || '').toLowerCase().trim() === lowFilter;
-        // Strictly split by Comma or Semi-colon as requested
+        const primaryMatch = String(t.passengerName || '').toLowerCase().trim();
         const travelWithNames = (Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/))
           .map(n => String(n || '').trim().toLowerCase());
-        return primaryMatch || travelWithNames.includes(lowFilter);
+        
+        return selectedArr.some(sel => primaryMatch === sel || travelWithNames.includes(sel));
       });
     }
     if (filterYear && filterYear !== 'all') {
