@@ -12,6 +12,7 @@ import { SmartInput }  from '../../../shared/smart-input.js';
 import {
   uuidv4, today, toISODate, daysBetween, formatDisplayDate, showToast
 } from '../../../shared/utils.js';
+import { navigate } from '../router.js';
 import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
 
 const STEPS = ['Passenger', 'Dates', 'Flights', 'Reason', 'Photos', 'Review'];
@@ -52,6 +53,7 @@ export async function renderAddTrip(container, params = {}) {
     flightOutward:existingTrip?.flightOutward|| '',
     reason:       existingTrip?.reason       || '',
     travelWith:   existingTrip?.travelWith   || [],
+    originCountry:       existingTrip?.originCountry       || 'India',
     destinationCountry:  existingTrip?.destinationCountry  || 'Qatar',
     photos:       existingTrip?.photos       || [],
   };
@@ -209,10 +211,13 @@ export async function renderAddTrip(container, params = {}) {
   // ── Step 1: Dates ───────────────────────────────────────────────────
   function renderDatesStep(el) {
     el.innerHTML = `
-      <div style="display:flex;gap:12px;">
+      <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;">
         <div class="form-group" style="flex:1;">
           <label class="form-label">Origin Country</label>
           <div id="origin-input"></div>
+        </div>
+        <div style="padding-bottom:10px;">
+          <button class="btn btn-secondary" id="swap-countries-btn" style="padding:6px 10px;font-size:16px;" title="Swap Countries">⇄</button>
         </div>
         <div class="form-group" style="flex:1;">
           <label class="form-label">Destination Country</label>
@@ -233,7 +238,7 @@ export async function renderAddTrip(container, params = {}) {
       </div>
       <div class="form-group">
         <label class="form-label">Date Back in ${state.originCountry} <span style="color:var(--text-muted);font-weight:400;">(leave blank if not returned)</span></label>
-        <input type="date" class="date-input" id="dateReturnedOrigin" value="${state.dateReturnedOrigin}" />
+        <input type="date" class="form-input" id="dateReturnedOrigin" value="${state.dateReturnedOrigin}" />
       </div>
       <div id="days-computed" style="background:var(--primary-bg);border-radius:var(--radius-md);padding:12px 16px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;"></div>
     `;
@@ -242,7 +247,7 @@ export async function renderAddTrip(container, params = {}) {
       suggestions: ['India', 'Qatar', 'UAE', 'USA', 'UK', 'Canada'],
       value: state.originCountry,
       placeholder: 'e.g. India',
-      onInput: (v) => { state.originCountry = v; renderDatesStep(el); },
+      onInput: (v) => { state.originCountry = v; },
       onSelect: (v) => { state.originCountry = v; renderDatesStep(el); }
     });
 
@@ -250,9 +255,16 @@ export async function renderAddTrip(container, params = {}) {
       suggestions: ['Qatar', 'UAE', 'Saudi Arabia', 'Oman', 'Bahrain', 'Kuwait', 'USA', 'UK', 'Canada'],
       value: state.destinationCountry,
       placeholder: 'e.g. Qatar',
-      onInput: (v) => { state.destinationCountry = v; renderDatesStep(el); },
+      onInput: (v) => { state.destinationCountry = v; },
       onSelect: (v) => { state.destinationCountry = v; renderDatesStep(el); }
     });
+
+    document.getElementById('swap-countries-btn').onclick = () => {
+      const temp = state.originCountry;
+      state.originCountry = state.destinationCountry;
+      state.destinationCountry = temp;
+      renderDatesStep(el);
+    };
 
     ['dateLeftOrigin','dateArrivedDest','dateLeftDest','dateReturnedOrigin'].forEach(field => {
       const input = document.getElementById(field);
@@ -404,16 +416,18 @@ export async function renderAddTrip(container, params = {}) {
           <div style="font-size:28px;">${person?.emoji || '👤'}</div>
           <div>
             <div style="font-size:16px;font-weight:700;color:#fff;">${person?.name || 'Unknown'}</div>
-            ${daysInDest !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysInDest} days in ${state.destinationCountry}</div>` : ''}
-            ${daysSoFar !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysSoFar} days so far</div>` : ''}
+            ${state.dateReturnedOrigin ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">Returned to ${state.originCountry}</div>` : 
+              (daysInDest !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysInDest} days in ${state.destinationCountry}</div>` : 
+              (daysSoFar !== null ? `<div style="font-size:13px;color:rgba(255,255,255,0.75);">${daysSoFar} days so far in ${state.destinationCountry}</div>` : ''))}
           </div>
         </div>
         <div style="padding:0 16px 8px;">
+          ${row('Origin', state.originCountry)}
           ${row('Destination', state.destinationCountry)}
-          ${row('Out of Origin', formatDisplayDate(state.dateLeftOrigin))}
+          ${row('Out of ' + state.originCountry, formatDisplayDate(state.dateLeftOrigin))}
           ${row('Arrived ' + state.destinationCountry, formatDisplayDate(state.dateArrivedDest))}
           ${row('Left ' + state.destinationCountry, state.dateLeftDest ? formatDisplayDate(state.dateLeftDest) : 'Still there')}
-          ${row('Back in Origin', state.dateReturnedOrigin ? formatDisplayDate(state.dateReturnedOrigin) : 'Not yet')}
+          ${row('Back in ' + state.originCountry, state.dateReturnedOrigin ? formatDisplayDate(state.dateReturnedOrigin) : 'Not yet')}
           ${row('Inward Flight', state.flightInward)}
           ${row('Outward Flight', state.flightOutward)}
           ${row('Reason', state.reason)}
@@ -453,17 +467,23 @@ export async function renderAddTrip(container, params = {}) {
     }
     if (currentStep === 1) {
       if (!state.dateLeftOrigin) { showToast('Please enter Date Out of Origin', 'warning'); return false; }
-      if (!state.dateArrivedDest)  { showToast('Please enter Date Arrived in Qatar', 'warning'); return false; }
+      if (!state.dateArrivedDest)  { showToast('Please enter Date Arrived in ' + state.destinationCountry, 'warning'); return false; }
+      
+      // Sequence validation
       if (state.dateArrivedDest < state.dateLeftOrigin) {
-        showToast('Arrival in Qatar must be after departure from India', 'error');
+        showToast(`Arrival in ${state.destinationCountry} must be after departure from ${state.originCountry}`, 'error');
         return false;
       }
       if (state.dateLeftDest && state.dateLeftDest < state.dateArrivedDest) {
-        showToast('Date Out Qatar must be after Date In Qatar', 'error');
+        showToast(`Date Out ${state.destinationCountry} must be after Date In ${state.destinationCountry}`, 'error');
         return false;
       }
       if (state.dateReturnedOrigin && state.dateLeftDest && state.dateReturnedOrigin < state.dateLeftDest) {
-        showToast('Return to India must be after leaving Qatar', 'error');
+        showToast(`Return to ${state.originCountry} must be after leaving ${state.destinationCountry}`, 'error');
+        return false;
+      }
+      if (state.dateReturnedOrigin && !state.dateLeftDest && state.dateReturnedOrigin < state.dateArrivedDest) {
+        showToast(`Return to ${state.originCountry} must be after arriving in ${state.destinationCountry}`, 'error');
         return false;
       }
     }
@@ -484,6 +504,7 @@ export async function renderAddTrip(container, params = {}) {
       timestamp:    isEdit ? existingTrip.timestamp : new Date().toISOString(),
       passengerId:     state.passengerId,
       passengerName:   passengerName,
+      originCountry:       state.originCountry,
       destinationCountry:  state.destinationCountry,
       dateLeftOrigin: state.dateLeftOrigin,
       dateArrivedDest:  state.dateArrivedDest,

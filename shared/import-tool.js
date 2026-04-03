@@ -18,6 +18,8 @@ export const TRAVEL_COLUMNS = [
   { key: 'flightOutward', label: 'Outward Flight From Qatar', required: false },
   { key: 'reason',        label: 'Reason for Travel',         required: false },
   { key: 'travelWith',    label: 'Travel With',               required: false },
+  { key: 'originCountry', label: 'Origin Country',            required: false },
+  { key: 'destinationCountry', label: 'Destination Country',  required: false },
 ];
 
 export const FINANCE_COLUMNS = [
