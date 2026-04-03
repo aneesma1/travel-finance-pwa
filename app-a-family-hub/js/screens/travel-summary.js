@@ -126,41 +126,35 @@ export function renderTravelSummarySheet(uniquePassengers, trips, defaultYear, d
   function computeSummaryData() {
     if (!state.selectedPassenger) return { pivotYear: {}, pivotCountry: {} };
 
-    // Find trips involving this passenger
     const pNameLower = state.selectedPassenger.toLowerCase();
-    const pTrips = trips.filter(t => {
-      const prim = String(t.passengerName || '').toLowerCase() === pNameLower;
-      const travelWithNames = (Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/))
-        .map(n => String(n || '').trim().toLowerCase());
-      return prim || travelWithNames.includes(pNameLower);
-    });
+    
+    // 1. Get all trips for this passenger and sort chronologically (Earliest First)
+    const pTrips = trips
+      .filter(t => {
+        const prim = String(t.passengerName || '').toLowerCase() === pNameLower;
+        const companions = (Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/))
+          .map(n => String(n || '').trim().toLowerCase());
+        return prim || companions.includes(pNameLower);
+      })
+      .sort((a, b) => new Date(a.dateLeftOrigin).getTime() - new Date(b.dateLeftOrigin).getTime());
 
     const records = [];
 
-    pTrips.forEach(t => {
-      // Grouping by entry dates. E.g. dateArrivedDest
+    // 2. Loop through trips and calculate stays by bridging to the NEXT trip
+    pTrips.forEach((t, index) => {
       const entryDt = t.dateArrivedDest || t.dateLeftOrigin;
       if (!entryDt) return;
       
       const year = entryDt.substring(0, 4);
-      let days = t.daysInDest !== undefined && t.daysInDest !== null && t.daysInDest !== '' ? Number(t.daysInDest) : null;
-      
-      if (days === null || isNaN(days)) {
-        let leftMs;
-        if (t.dateLeftDest) leftMs = new Date(t.dateLeftDest).getTime();
-        else leftMs = new Date(today()).getTime();
-        
-        const arrMs = new Date(entryDt).getTime();
-        if (!isNaN(arrMs) && !isNaN(leftMs) && leftMs >= arrMs) {
-          // +1 to count inclusive days (e.g., entered on 1st, left on 2nd = 2 days)
-          days = Math.floor((leftMs - arrMs) / (1000 * 60 * 60 * 24)) + 1;
-        } else {
-          days = 0;
-        }
-      }
+      const country = t.destinationCountry || 'Qatar';
+
+      // The "Exit" date is the "Departure" of the next trip
+      const nextTrip = pTrips[index + 1];
+      const exitDt = nextTrip ? nextTrip.dateLeftOrigin : today();
+
+      const days = daysBetween(entryDt, exitDt);
       
       if (days > 0) {
-        const country = t.destinationCountry || 'Qatar';
         records.push({ year, country, days });
       }
     });

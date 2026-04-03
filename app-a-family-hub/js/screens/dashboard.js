@@ -29,9 +29,10 @@ function getCurrentLocationFromTrips(passengerName, trips) {
       return prim || companions.includes(nameLower);
     })
     .sort((a, b) => {
-      const da = new Date(a.dateArrivedDest || a.dateLeftOrigin || 0).getTime();
-      const db = new Date(b.dateArrivedDest || b.dateLeftOrigin || 0).getTime();
-      return db - da; // most recent first
+      // Sort by arrival date (latest first)
+      const da = new Date(a.dateArrivedDest || 0).getTime();
+      const db = new Date(b.dateArrivedDest || 0).getTime();
+      return db - da; 
     });
 
   if (!personTrips.length) return { location: 'Unknown', country: '', days: null };
@@ -39,35 +40,15 @@ function getCurrentLocationFromTrips(passengerName, trips) {
   const latest = personTrips[0];
   const todayStr = today();
   const destCountry = latest.destinationCountry || 'Qatar';
-  const originCountry = latest.originCountry || 'India';
 
-  // Still in destination: arrived but not left
-  if (latest.dateArrivedDest && !latest.dateLeftDest) {
-    const days = daysBetween(latest.dateArrivedDest, todayStr);
-    return { location: destCountry, country: destCountry, days, tripId: latest.id };
-  }
-
-  // Left destination: now back in origin, or in transit
-  if (latest.dateLeftDest) {
-    if (latest.dateReturnedOrigin) {
-      const days = daysBetween(latest.dateReturnedOrigin, todayStr);
-      return { location: originCountry, country: originCountry, days, tripId: latest.id };
-    }
-    return { location: 'In transit', country: '', days: null, tripId: latest.id };
-  }
-
-  // Left origin but not arrived yet at destination
-  if (latest.dateLeftOrigin && !latest.dateArrivedDest) {
-    return { location: 'In transit', country: '', days: null, tripId: latest.id };
-  }
-
-  // Returned to origin
-  if (latest.dateReturnedOrigin) {
-    const days = daysBetween(latest.dateReturnedOrigin, todayStr);
-    return { location: originCountry, country: originCountry, days, tripId: latest.id };
-  }
-
-  return { location: originCountry, country: originCountry, days: null };
+  // In the One-Way model, you are always in the destination of your latest trip
+  const days = daysBetween(latest.dateArrivedDest, todayStr);
+  return { 
+    location: destCountry, 
+    country: destCountry, 
+    days: days, 
+    tripId: latest.id 
+  };
 }
 
 function getCurrentLocation(person, trips) {

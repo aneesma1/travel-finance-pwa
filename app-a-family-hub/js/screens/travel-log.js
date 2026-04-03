@@ -42,13 +42,12 @@ export async function renderTravelLog(container, params = {}) {
     }
     if (!t.passengerName) t.passengerName = 'Unknown';
     
-    t.dateLeftOrigin = t.dateLeftOrigin || t.dateOutIndia;
-    t.dateReturnedOrigin = t.dateReturnedOrigin || t.dateInIndia;
-    t.dateArrivedDest = t.dateArrivedDest || t.dateInQatar;
-    t.dateLeftDest = t.dateLeftDest || t.dateOutQatar;
-    t.daysInDest = t.daysInDest || t.daysInQatar;
+    // One-Way Model Normalization
+    t.dateLeftOrigin = t.dateLeftOrigin || t.dateOutIndia || t.dateOutQatar;
+    t.dateArrivedDest = t.dateArrivedDest || t.dateInQatar || t.dateInIndia;
     t.originCountry = t.originCountry || 'India';
     t.destinationCountry = t.destinationCountry || t.destination || 'Qatar';
+    t.flightNumber = t.flightNumber || t.flightInward || t.flightOutward || '';
     
     return t;
   }) : [];
@@ -254,14 +253,19 @@ export async function renderTravelLog(container, params = {}) {
     try {
       if (resetPage) _tripPage = 1;
 
-      let filtered = [...safeTrips].sort((a, b) => {
+      const sorted = [...safeTrips].sort((a, b) => {
         const da = String(a.dateLeftOrigin || '');
         const db = String(b.dateLeftOrigin || '');
         const ta = new Date(da).getTime();
         const tb = new Date(db).getTime();
-        if (!isNaN(ta) && !isNaN(tb)) return tb - ta;
-        return db.localeCompare(da);
+        if (!isNaN(ta) && !isNaN(tb) && ta !== tb) return tb - ta;
+        // If same day, use arrival to further sort
+        const aa = new Date(a.dateArrivedDest || 0).getTime();
+        const ab = new Date(b.dateArrivedDest || 0).getTime();
+        return ab - aa;
       });
+
+      let filtered = sorted;
 
       if (fPass) {
         const selectedArr = fPass.split(',').map(s => s.toLowerCase().trim()).filter(Boolean);
@@ -299,24 +303,29 @@ export async function renderTravelLog(container, params = {}) {
 
       const list = logContent.querySelector('#trips-list');
 
-      filtered.forEach((trip) => {
+      filtered.forEach((trip, index) => {
         const pName = trip.passengerName || 'Unknown';
         const pInfo = passengerInfoMap[pName] || { name: pName, emoji: '👤', color: '#EEF2FF' };
 
-        let travelWithDisplay = [];
-        if (Array.isArray(trip.travelWith)) travelWithDisplay = trip.travelWith.filter(Boolean);
-        else if (trip.travelWith) travelWithDisplay = String(trip.travelWith).split(/[,;]+/).map(n => String(n || '').trim()).filter(Boolean);
+        // ── Stay Duration Logic (Look Ahead) ──
+        // Find the next trip for this specific passenger (chronologically after this one)
+        const nextTripForPerson = sorted.find(t => 
+           t.passengerName === pName && 
+           new Date(t.dateLeftOrigin).getTime() > new Date(trip.dateArrivedDest).getTime()
+        );
 
-        const dest = trip.destinationCountry || 'Destination';
-        let days = (trip.daysInDest != null && trip.daysInDest !== '') ? Number(trip.daysInDest) : null;
-        
-        if (days === null || isNaN(days)) {
-          if (trip.dateArrivedDest && trip.dateLeftDest) days = daysBetween(trip.dateArrivedDest, trip.dateLeftDest);
-          else if (trip.dateArrivedDest && !trip.dateLeftDest) days = daysBetween(trip.dateArrivedDest, today());
+        let days = null;
+        if (nextTripForPerson) {
+          days = daysBetween(trip.dateArrivedDest, nextTripForPerson.dateLeftOrigin);
+        } else {
+          // Still in destination
+          days = daysBetween(trip.dateArrivedDest, today());
         }
-        
-        const daysLabel = (days !== null && !isNaN(days)) ? `${days}d in ${dest}` : '--';
-        const statusDot = (trip.dateArrivedDest && !trip.dateLeftDest) ? `<span class="status-dot-active"></span>` : '';
+
+        const daysLabel = days !== null ? `${days}d in ${trip.destinationCountry}` : '--';
+        const isCurrent = !nextTripForPerson; 
+        const statusDot = isCurrent ? `<span class="status-dot-active"></span>` : '';
+
         const row = document.createElement('div');
         row.className = 'swipe-row-container';
         row.innerHTML = `
@@ -330,21 +339,18 @@ export async function renderTravelLog(container, params = {}) {
                 ${statusDot}
                 <span style="font-size:12px;color:var(--text-muted);">${trip.reason || ''}</span>
               </div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
-                ${trip.dateLeftOrigin ? formatDisplayDate(trip.dateLeftOrigin) : 'No date'} → ${trip.dateReturnedOrigin ? formatDisplayDate(trip.dateReturnedOrigin) : 'Present'}
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;font-weight:500;">
+                <span style="color:var(--text-secondary);">${trip.originCountry}</span> 
+                <span style="margin:0 4px;opacity:0.5;">→</span> 
+                <span style="color:var(--primary);">${trip.destinationCountry}</span>
               </div>
-              ${travelWithDisplay.length ? `
-                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
-                  <span style="font-size:10px;color:var(--text-muted);margin-right:2px;align-self:center;">with</span>
-                  ${travelWithDisplay.map(name => `
-                    <span style="font-size:10px;background:var(--primary-bg);color:var(--primary);padding:1px 6px;border-radius:99px;font-weight:600;">${name}</span>
-                  `).join('')}
-                </div>
-              ` : ''}
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+                ${formatDisplayDate(trip.dateLeftOrigin)} to ${formatDisplayDate(trip.dateArrivedDest)}
+              </div>
             </div>
-            <div style="text-align:right;flex-shrink:0;min-width:70px;">
-              <div style="font-size:12px;font-weight:700;background:var(--primary-bg);color:var(--primary);padding:2px 8px;border-radius:6px;display:inline-block;">${daysLabel}</div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:500;">${trip.flightInward || '--'}</div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:12px;font-weight:700;background:${isCurrent ? 'var(--success-bg)' : 'var(--primary-bg)'};color:${isCurrent ? 'var(--success)' : 'var(--primary)'};padding:2px 8px;border-radius:6px;display:inline-block;">${daysLabel}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:600;">${trip.flightNumber || '--'}</div>
             </div>
             <span style="color:var(--text-muted);font-size:16px;margin-left:4px;">›</span>
           </div>

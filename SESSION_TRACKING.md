@@ -500,3 +500,19 @@ git checkout master
   - **Import Tool**: Added `originCountry` and `destinationCountry` as optional columns to `TRAVEL_COLUMNS` for manual mapping.
 - **Service Worker**: Bumped all apps and shared utilities to **v3.7.5**.
 - **Commit**: `f70e71a` (master), `116bbe8` (main) — `v3.7.5: Smart Travel Analysis and Navigation Fixes`
+
+### One-Way Event Model Transition (v3.8.0 · 2026-04-03)
+
+- **Major Architecture Pivot**: Shifted from "Round Trip" model to individual "One-Way Event" records to eliminate date overlaps and user confusion.
+- **`app-a-family-hub` (Travel Hub)**:
+    - **Add Trip Wizard**: Re-engineered `add-trip.js` into a streamlined one-way flow. Removed redundant return-date fields and split flight inputs.
+    - **Dashboard Logic**: Simplified "Current Location" tracking in `dashboard.js`. Now uses the destination of the latest sequential arrival.
+    - **Excel Import Logic**: Updated `settings.js` to automatically detect and **split** round-trip rows into two distinct one-way trip records.
+    - **Sequential Analysis**: 
+        - Refactored `travel-log.js` to calculate stay duration by "looking ahead" to a passenger's next trip departure.
+        - Updated `travel-summary.js` calculation engine to use inter-trip sequence bridging for year/country stay reports.
+    - **Robust Nuclear Reset**: 
+        - Implemented `clearDriveQueue` in `shared/sync-manager.js` to purge persistent cloud sync buffers.
+        - Enhanced reset logic in `settings.js` to perform a total wipe of cloud queues, local cache, and metadata, while **preserving** historical snapshots in the Mirror folder.
+- **Service Worker**: Bumped all cache versions to **v3.8.0** to ensure deployment of the new logic.
+- **Commit**: `[TBD]`

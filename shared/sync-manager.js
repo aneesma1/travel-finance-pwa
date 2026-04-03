@@ -57,7 +57,7 @@ const QUEUE_KEY = 'drive_pending_queue_id';
 async function writeDriveQueue(queueData) {
   if (!isOnline()) return;
   const fileId = localStorage.getItem(QUEUE_KEY);
-  if (!fileId) return; // Will be created on next initDriveFolders call
+  if (!fileId) return;
   try {
     const token = (await import('./auth.js')).getToken();
     if (!token) return;
@@ -69,6 +69,26 @@ async function writeDriveQueue(queueData) {
         body: JSON.stringify({ queue: queueData, updatedAt: new Date().toISOString() })
       }
     );
+  } catch { /* non-blocking */ }
+}
+
+export async function clearDriveQueue() {
+  if (!isOnline()) return;
+  const fileId = localStorage.getItem(QUEUE_KEY);
+  if (!fileId) return;
+  try {
+    const token = (await import('./auth.js')).getToken();
+    if (!token) return;
+    await fetch(
+       `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+       {
+         method: 'PATCH',
+         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+         body: JSON.stringify({ queue: [], updatedAt: new Date().toISOString() })
+       }
+    );
+    _queue = [];
+    await setAppState('syncQueue', []);
   } catch { /* non-blocking */ }
 }
 
