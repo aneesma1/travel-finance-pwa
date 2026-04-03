@@ -47,6 +47,7 @@ export async function renderTravelLog(container, params = {}) {
     t.dateArrivedDest = t.dateArrivedDest || t.dateInQatar;
     t.dateLeftDest = t.dateLeftDest || t.dateOutQatar;
     t.daysInDest = t.daysInDest || t.daysInQatar;
+    t.originCountry = t.originCountry || 'India';
     t.destinationCountry = t.destinationCountry || t.destination || 'Qatar';
     
     return t;

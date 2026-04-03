@@ -659,6 +659,22 @@ function openImportModal(data, persons) {
 
               const passData = getOrAddPassenger(name);
 
+              // Smart Origin/Destination Deduction
+              let deducedOrigin = rec.originCountry || 'India';
+              let deducedDest   = rec.destinationCountry || rec.destination || 'Qatar';
+
+              // If specific "Out Qatar" field is used, it's likely Qatar -> India
+              if (rec.dateOutQatar && rec.dateInIndia) {
+                deducedOrigin = 'Qatar';
+                deducedDest   = 'India';
+              } else if (rec.dateOutIndia && rec.dateInQatar) {
+                deducedOrigin = 'India';
+                deducedDest   = 'Qatar';
+              } else if (rec.dateOutQatar && !rec.dateOutIndia) {
+                deducedOrigin = 'Qatar';
+                deducedDest   = 'India';
+              }
+
               trips.push({
                 ...rec,
                 id: uuidv4(),
@@ -666,13 +682,13 @@ function openImportModal(data, persons) {
                 passengerName: name, // STRICT: Ensure name mapped to passengerName field
                 travelWith: othersInRow,
                 // Assign generalized date keys
-                dateLeftOrigin: rec.dateLeftOrigin || rec.dateOutIndia,
-                dateArrivedDest: rec.dateArrivedDest || rec.dateInQatar,
-                dateLeftDest: rec.dateLeftDest || rec.dateOutQatar,
-                dateReturnedOrigin: rec.dateReturnedOrigin || rec.dateInIndia,
+                dateLeftOrigin: rec.dateLeftOrigin || rec.dateOutIndia || rec.dateOutQatar,
+                dateArrivedDest: rec.dateArrivedDest || rec.dateInQatar || rec.dateInIndia,
+                dateLeftDest: rec.dateLeftDest || rec.dateOutQatar || rec.dateOutIndia,
+                dateReturnedOrigin: rec.dateReturnedOrigin || rec.dateInIndia || rec.dateInQatar,
                 daysInDest: rec.daysInDest || rec.daysInQatar,
-                originCountry: rec.originCountry || 'India',
-                destinationCountry: rec.destinationCountry || rec.destination || 'Qatar'
+                originCountry: deducedOrigin,
+                destinationCountry: deducedDest
               });
               imported++;
             });
