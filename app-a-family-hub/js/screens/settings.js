@@ -6,7 +6,7 @@
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
 import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData } from '../../../shared/drive.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { localSave, clearDriveQueue } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
@@ -322,24 +322,48 @@ function renderDataTab(data, members, container) {
 
     try {
       showToast('Wiping cloud database clean…', 'info', 5000);
-      const emptySet = { trips: [], passengers: [], members: [], documents: [], appInfo: { version: 'v3.5.47' } };
+      const emptySet = { 
+        schemaVersion: 1,
+        trips: [], 
+        passengers: [], 
+        members: [], 
+        documents: [], 
+        familyDefaults: {},
+        familyRelations: [],
+        customDocTypes: [],
+        appInfo: { version: 'v3.8.0', lastReset: new Date().toISOString() } 
+      };
       
-      if (isOnline()) {
-        const fileId = localStorage.getItem('drive_travel_file_id');
-        if (fileId) {
-          // STANDALONE DIRECT DRIVE WIPE - Bypasses all app layers to fix 'mergeFn' errors
-          await authFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(emptySet, null, 2)
-          });
-        }
+      const fileId = localStorage.getItem('drive_travel_file_id');
+      if (isOnline() && fileId) {
+        // 1. Wipe Cloud Sync Queue (the primary cause of data reappearing)
+        await clearDriveQueue();
+
+        // 2. Wipe main Drive data file
+        await authFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(emptySet, null, 2)
+        });
       }
       
-      // Wipe local IndexedDB entirely for clean slate
+      // 3. Wipe local IndexedDB entirely
       await clearAllCachedData();
-      showToast('Database wiped successfully', 'success');
-      setTimeout(() => window.location.reload(), 1500);
+
+      // 4. Wipe Service Worker & Cache
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) await reg.unregister();
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+
+      // 5. Final Clear-All of LocalStorage (removes file IDs, forcing re-init)
+      localStorage.clear();
+      sessionStorage.clear();
+
+      showToast('☢️ TOTAL WIPE COMPLETE', 'success');
+      setTimeout(() => window.location.href = './', 1500);
     } catch (err) {
       showToast('Reset failed: ' + err.message, 'error');
       console.error('Reset error:', err);
@@ -659,38 +683,59 @@ function openImportModal(data, persons) {
 
               const passData = getOrAddPassenger(name);
 
-              // Smart Origin/Destination Deduction
-              let deducedOrigin = rec.originCountry || 'India';
-              let deducedDest   = rec.destinationCountry || rec.destination || 'Qatar';
-
-              // If specific "Out Qatar" field is used, it's likely Qatar -> India
-              if (rec.dateOutQatar && rec.dateInIndia) {
-                deducedOrigin = 'Qatar';
-                deducedDest   = 'India';
-              } else if (rec.dateOutIndia && rec.dateInQatar) {
-                deducedOrigin = 'India';
-                deducedDest   = 'Qatar';
-              } else if (rec.dateOutQatar && !rec.dateOutIndia) {
-                deducedOrigin = 'Qatar';
-                deducedDest   = 'India';
+              // Pair A: Out of Origin (Going)
+              // We look for "Date Out India" or "Date Left Origin"
+              const dateA_Out = rec.dateOutIndia || rec.dateLeftOrigin;
+              const dateA_In  = rec.dateInQatar || rec.dateArrivedDest;
+              if (dateA_Out || dateA_In) {
+                const doi = dateA_Out || dateA_In;
+                const keyA = name.toLowerCase() + '|' + doi + '|' + (rec.destinationCountry || 'Qatar').toLowerCase();
+                if (!existingKeys.has(keyA)) {
+                  existingKeys.add(keyA);
+                  trips.push({
+                    ...rec,
+                    id: uuidv4(),
+                    passengerId: passData ? passData.id : '',
+                    passengerName: name,
+                    originCountry: rec.originCountry || 'India',
+                    destinationCountry: rec.destinationCountry || 'Qatar',
+                    dateLeftOrigin: dateA_Out || dateA_In,
+                    dateArrivedDest: dateA_In || dateA_Out,
+                    flightNumber: rec.flightInward || rec.flightNumber || '',
+                    travelWith: othersInRow,
+                    // Clean up legacy fields in new record
+                    dateLeftDest: null, dateReturnedOrigin: null, flightInward: null, flightOutward: null, daysInDest: null
+                  });
+                  imported++;
+                } else { skipped++; }
               }
 
-              trips.push({
-                ...rec,
-                id: uuidv4(),
-                passengerId: passData ? passData.id : '',
-                passengerName: name, // STRICT: Ensure name mapped to passengerName field
-                travelWith: othersInRow,
-                // Assign generalized date keys
-                dateLeftOrigin: rec.dateLeftOrigin || rec.dateOutIndia || rec.dateOutQatar,
-                dateArrivedDest: rec.dateArrivedDest || rec.dateInQatar || rec.dateInIndia,
-                dateLeftDest: rec.dateLeftDest || rec.dateOutQatar || rec.dateOutIndia,
-                dateReturnedOrigin: rec.dateReturnedOrigin || rec.dateInIndia || rec.dateInQatar,
-                daysInDest: rec.daysInDest || rec.daysInQatar,
-                originCountry: deducedOrigin,
-                destinationCountry: deducedDest
-              });
-              imported++;
+              // Pair B: Back to Origin (Returning)
+              // We look for "Date Out Qatar" or "Date Left Destination"
+              const dateB_Out = rec.dateOutQatar || rec.dateLeftDest;
+              const dateB_In  = rec.dateInIndia || rec.dateReturnedOrigin;
+              if (dateB_Out || dateB_In) {
+                const doq = dateB_Out || dateB_In;
+                const keyB = name.toLowerCase() + '|' + doq + '|' + (rec.originCountry || 'India').toLowerCase();
+                if (!existingKeys.has(keyB)) {
+                  existingKeys.add(keyB);
+                  trips.push({
+                    ...rec,
+                    id: uuidv4(),
+                    passengerId: passData ? passData.id : '',
+                    passengerName: name,
+                    originCountry: rec.destinationCountry || 'Qatar',
+                    destinationCountry: rec.originCountry || 'India',
+                    dateLeftOrigin: dateB_Out || dateB_In,
+                    dateArrivedDest: dateB_In || dateB_Out,
+                    flightNumber: rec.flightOutward || rec.flightNumber || '',
+                    travelWith: othersInRow,
+                    // Clean up legacy fields in new record
+                    dateLeftDest: null, dateReturnedOrigin: null, flightInward: null, flightOutward: null, daysInDest: null
+                  });
+                  imported++;
+                } else { skipped++; }
+              }
             });
           });
 
