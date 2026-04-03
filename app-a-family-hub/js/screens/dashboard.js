@@ -18,40 +18,61 @@ import { buildFamilyGroups, getMemberRelations } from '../relation-engine.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getCurrentLocation(person, trips) {
-  // Find the most recent trip for this person
+function getCurrentLocationFromTrips(passengerName, trips) {
+  // Match trips where this passenger is primary or a companion
+  const nameLower = String(passengerName || '').toLowerCase().trim();
   const personTrips = trips
-    .filter(t => t.personId === person.id)
-    .sort((a, b) => new Date(b.dateOutIndia) - new Date(a.dateOutIndia));
+    .filter(t => {
+      const prim = String(t.passengerName || '').toLowerCase() === nameLower;
+      const companions = (Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/))
+        .map(n => String(n || '').trim().toLowerCase());
+      return prim || companions.includes(nameLower);
+    })
+    .sort((a, b) => {
+      const da = new Date(a.dateArrivedDest || a.dateLeftOrigin || 0).getTime();
+      const db = new Date(b.dateArrivedDest || b.dateLeftOrigin || 0).getTime();
+      return db - da; // most recent first
+    });
 
-  if (!personTrips.length) return { location: 'India', days: null, tripId: null };
+  if (!personTrips.length) return { location: 'Unknown', country: '', days: null };
 
   const latest = personTrips[0];
   const todayStr = today();
+  const destCountry = latest.destinationCountry || 'Qatar';
+  const originCountry = latest.originCountry || 'India';
 
-  // Still in Qatar: arrived but not yet left
-  if (latest.dateInQatar && !latest.dateOutQatar) {
-    const days = daysBetween(latest.dateInQatar, todayStr);
-    return { location: 'Qatar', days, tripId: latest.id };
+  // Still in destination: arrived but not left
+  if (latest.dateArrivedDest && !latest.dateLeftDest) {
+    const days = daysBetween(latest.dateArrivedDest, todayStr);
+    return { location: destCountry, country: destCountry, days, tripId: latest.id };
   }
 
-  // Returned from Qatar: dateInIndia exists
-  if (latest.dateInIndia) {
-    const days = daysBetween(latest.dateInIndia, todayStr);
-    return { location: 'India', days, tripId: latest.id };
+  // Left destination: now back in origin, or in transit
+  if (latest.dateLeftDest) {
+    if (latest.dateReturnedOrigin) {
+      const days = daysBetween(latest.dateReturnedOrigin, todayStr);
+      return { location: originCountry, country: originCountry, days, tripId: latest.id };
+    }
+    return { location: 'In transit', country: '', days: null, tripId: latest.id };
   }
 
-  // Left India but not yet arrived in Qatar
-  if (latest.dateOutIndia && !latest.dateInQatar) {
-    return { location: 'In transit', days: null, tripId: latest.id };
+  // Left origin but not arrived yet at destination
+  if (latest.dateLeftOrigin && !latest.dateArrivedDest) {
+    return { location: 'In transit', country: '', days: null, tripId: latest.id };
   }
 
-  // Left Qatar but not arrived back in India
-  if (latest.dateOutQatar && !latest.dateInIndia) {
-    return { location: 'In transit', days: null, tripId: latest.id };
+  // Returned to origin
+  if (latest.dateReturnedOrigin) {
+    const days = daysBetween(latest.dateReturnedOrigin, todayStr);
+    return { location: originCountry, country: originCountry, days, tripId: latest.id };
   }
 
-  return { location: 'India', days: null, tripId: null };
+  return { location: originCountry, country: originCountry, days: null };
+}
+
+function getCurrentLocation(person, trips) {
+  // Legacy support — delegates to new function using name
+  return getCurrentLocationFromTrips(person.name || '', trips);
 }
 
 function getPersonDocs(person, documents) {
@@ -66,14 +87,15 @@ function getNextExpiry(docs) {
   return future[0] || null;
 }
 
-function getYearlyQatarDays(personId, trips, year) {
+function getYearlyDestDays(passengerName, trips, year) {
+  const nameLower = String(passengerName || '').toLowerCase().trim();
   return trips
-    .filter(t => t.personId === personId && t.daysInQatar)
+    .filter(t => String(t.passengerName || '').toLowerCase() === nameLower)
     .filter(t => {
-      const y = t.dateInQatar ? new Date(t.dateInQatar).getFullYear() : null;
-      return y === year;
+      const entryDate = t.dateArrivedDest || t.dateLeftOrigin;
+      return entryDate && new Date(entryDate).getFullYear() === year;
     })
-    .reduce((sum, t) => sum + (t.daysInQatar || 0), 0);
+    .reduce((sum, t) => sum + (Number(t.daysInDest) || Number(t.daysInQatar) || 0), 0);
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -114,7 +136,7 @@ export async function renderDashboard(container) {
       return;
     }
 
-    const { members = [], trips = [], documents = [] } = data;
+    const { members = [], passengers = [], trips = [], documents = [] } = data;
 
     // Read filter state from URL hash
     const params = getHashParams();
@@ -122,8 +144,76 @@ export async function renderDashboard(container) {
     const filterLocation = params.location || 'all';
     const filterDocStatus= params.docstatus || 'all';
 
+    // Build a combined list — passengers from travel data take priority for location widget
+    const allPassengerNames = [...new Set(
+      trips.filter(Boolean).map(t => String(t.passengerName || '').trim()).filter(Boolean)
+    )].sort();
+
+    // Render travel location widget first (works independently of People tab)
+    renderLocationWidget(allPassengerNames, trips);
+
     renderFilterBar(members, filterPerson, filterLocation, filterDocStatus);
-    renderMemberCards(members, trips, documents, filterPerson, filterLocation, filterDocStatus);
+    renderMemberCards(members, passengers, trips, documents, filterPerson, filterLocation, filterDocStatus, allPassengerNames);
+  }
+
+  // ── Travel Location Widget (works from passenger/trip data, no People needed) ──
+  function renderLocationWidget(allPassengerNames, trips) {
+    const content = document.getElementById('dashboard-content');
+    if (!allPassengerNames.length) return;
+
+    const year = new Date().getFullYear();
+
+    // Compute current location for each passenger
+    const located = allPassengerNames.map(name => {
+      const { location, country, days } = getCurrentLocationFromTrips(name, trips);
+      const yearDays = getYearlyDestDays(name, trips, year);
+      return { name, location, country, days, yearDays };
+    });
+
+    // Group by location
+    const groups = {};
+    located.forEach(p => {
+      if (!groups[p.location]) groups[p.location] = [];
+      groups[p.location].push(p);
+    });
+
+    const locationOrder = Object.keys(groups).sort((a, b) => {
+      // Show Qatar first, India second, others after
+      const order = ['Qatar', 'India', 'In transit', 'Unknown'];
+      return (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99);
+    });
+
+    const flagMap = { Qatar: '🇶🇦', India: '🇮🇳', 'In transit': '✈️' };
+    const colorMap = {
+      Qatar: 'background:#FEF9C3; color:#854D0E; border-color:#FDE68A',
+      India: 'background:#FEE2E2; color:#991B1B; border-color:#FECACA',
+      'In transit': 'background:#EEF2FF; color:#3730A3; border-color:#A5B4FC',
+    };
+
+    const widgetHtml = `
+      <div style="background:var(--surface); border-radius:var(--radius-lg); border:1px solid var(--border); overflow:hidden; margin-bottom:4px;">
+        <div style="padding:12px 16px 8px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light);">
+          <span style="font-size:13px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">📍 Current Locations</span>
+          <span style="font-size:12px; color:var(--text-muted);">${allPassengerNames.length} tracked</span>
+        </div>
+        ${locationOrder.map(loc => `
+          <div style="padding:10px 16px; border-bottom:1px solid var(--border-light);">
+            <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:6px;">${flagMap[loc] || '📍'} ${loc} (${groups[loc].length})</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${groups[loc].map(p => `
+                <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:99px; border:1px solid; ${colorMap[loc] || 'background:var(--surface-3); color:var(--text); border-color:var(--border)'}; font-size:13px; font-weight:600;">
+                  ${p.name}
+                  ${p.days !== null ? `<span style="font-size:10px; opacity:0.7; margin-left:2px;">·&nbsp;${p.days}d</span>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    // Inject at the top of dashboard-content
+    content.insertAdjacentHTML('afterbegin', widgetHtml);
   }
 
   function renderFilterBar(members, filterPerson, filterLocation, filterDocStatus) {
@@ -209,12 +299,12 @@ export async function renderDashboard(container) {
     });
   }
 
-  function renderMemberCards(members, trips, documents, filterPerson, filterLocation, filterDocStatus) {
+  function renderMemberCards(members, passengers, trips, documents, filterPerson, filterLocation, filterDocStatus, allPassengerNames = []) {
     const content = document.getElementById('dashboard-content');
     const year = new Date().getFullYear();
     const { familyRelations = [], familyDefaults = {} } = window._travelData || {};
 
-    if (!members.length) {
+    if (!members.length && !allPassengerNames.length) {
       content.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">👨‍👩‍👧‍👦</div>
@@ -223,6 +313,12 @@ export async function renderDashboard(container) {
           <button class="btn btn-primary" style="margin-top:20px;">Go to People</button>
         </div>`;
       content.querySelector('.btn')?.addEventListener('click', () => navigate('people'));
+      return;
+    }
+
+    // If there are no members (People), show just the passenger-based cards
+    if (!members.length && allPassengerNames.length > 0) {
+      // Location widget already rendered above — nothing more to add here
       return;
     }
 
@@ -326,10 +422,10 @@ export async function renderDashboard(container) {
   }
 
   function buildStatusCard(member, trips, documents, year, familyDefaults) {
-    const { location, days } = getCurrentLocation(member, trips);
+    const { location, country, days } = getCurrentLocationFromTrips(member.name || '', trips);
     const memberDocs = documents.filter(d => d.personId === member.id);
     const nextExpiry = getNextExpiry(memberDocs);
-    const yearDays   = getYearlyQatarDays(member.id, trips, year);
+    const yearDays   = getYearlyDestDays(member.name, trips, year);
 
     const locLabel = { Qatar:'🇶🇦 Qatar', India:'🇮🇳 India', 'In transit':'✈️ Transit' };
     const locBadgeClass = location === 'Qatar' ? 'qatar' : location === 'India' ? 'india' : '';
