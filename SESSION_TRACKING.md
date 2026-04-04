@@ -542,7 +542,10 @@ git checkout master
     - Implemented "Year Boundary Splitting" to correctly distribute stay days across Dec 31/Jan 1 transitions.
     - Resolved trip duplication failure for companions by correctly resolving names in `add-trip.js`.
 - **New Features**:
+    - **🛡️ Secure Delete**: Added high-security trip deletion with 2-digit verification code check.
+    - **🔍 Trip Data Doctor**: Researched and implemented "Scan & Repair" tool to de-duplicate and auto-generate missing companion records.
+    - **📝 Manual Repair**: Enabled duplication checkbox in Edit mode for retroactive fixes.
     - Filtered "Current Locations" dashboard widget by country (Qatar/India).
     - Activated Address Photos for Family Defaults and Member Profiles.
     - Added dedicated "Google Plus Location ID" field to all address entry sections.
-- **Commit**: `d9f477e` (master), `9ddf7c4` (main) — `fix: resolve passenger IDs in summary and fix companion trip name resolution`
+- **Commit**: `c3d171f` (master) — `feat: implement trip data doctor repair tool and high-security deletion`
