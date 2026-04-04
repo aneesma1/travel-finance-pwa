@@ -326,22 +326,11 @@ export async function renderTravelLog(container, params = {}) {
         const pName = trip.passengerName || 'Unknown';
         const pInfo = passengerInfoMap[pName] || { name: pName, emoji: '👤', color: '#EEF2FF' };
 
-        // ── Stay Duration Logic (Look Ahead) ──
-        // Find the next trip for this specific passenger (chronologically after this one)
+        // Find next trip to see if currently active (most recent)
         const nextTripForPerson = sorted.find(t => 
-           t.passengerName === pName && 
+           (t.passengerId === trip.passengerId || t.passengerName === pName) && 
            new Date(t.dateLeftOrigin).getTime() > new Date(trip.dateArrivedDest).getTime()
         );
-
-        let days = null;
-        if (nextTripForPerson) {
-          days = daysBetween(trip.dateArrivedDest, nextTripForPerson.dateLeftOrigin);
-        } else {
-          // Still in destination
-          days = daysBetween(trip.dateArrivedDest, today());
-        }
-
-        const daysLabel = days !== null ? `${days}d in ${trip.destinationCountry}` : '--';
         const isCurrent = !nextTripForPerson; 
         const statusDot = isCurrent ? `<span class="status-dot-active"></span>` : '';
 
@@ -363,13 +352,12 @@ export async function renderTravelLog(container, params = {}) {
                 <span style="margin:0 4px;opacity:0.5;">→</span> 
                 <span style="color:var(--primary);">${trip.destinationCountry}</span>
               </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
-                ${formatDisplayDate(trip.dateLeftOrigin)} to ${formatDisplayDate(trip.dateArrivedDest)}
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-weight:600;">
+                Arrived on ${formatDisplayDate(trip.dateArrivedDest || trip.dateLeftOrigin)}
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:12px;font-weight:700;background:${isCurrent ? 'var(--success-bg)' : 'var(--primary-bg)'};color:${isCurrent ? 'var(--success)' : 'var(--primary)'};padding:2px 8px;border-radius:6px;display:inline-block;">${daysLabel}</div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:600;">${trip.flightNumber || '--'}</div>
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;background:var(--primary-bg);color:var(--primary);padding:4px 8px;border-radius:6px;display:inline-block;">${trip.flightNumber || '--'}</div>
             </div>
             <span style="color:var(--text-muted);font-size:16px;margin-left:4px;">›</span>
           </div>

@@ -513,13 +513,18 @@ function renderAccountTab(data, members, user, container) {
         let trips = [...(remote.trips || [])];
         const passengers = remote.passengers || [];
         
+        // Build name-to-id map for repair
+        const nameToId = {};
+        passengers.forEach(p => { if (p.name) nameToId[p.name.toLowerCase().trim()] = p.id; });
+
         // --- 1. Deduplicate ---
         const seen = new Set();
         const nonDupes = [];
         let mergedCount = 0;
         
         trips.forEach(t => {
-          const key = `${t.passengerId || t.passengerName}|${t.dateLeftOrigin}|${t.destinationCountry}`;
+          const d = toISODate(t.dateLeftOrigin || t.dateArrivedDest);
+          const key = `${t.passengerId || t.passengerName}|${d}|${t.destinationCountry}`;
           if (seen.has(key)) {
             mergedCount++;
           } else {
@@ -530,18 +535,32 @@ function renderAccountTab(data, members, user, container) {
         
         trips = nonDupes;
 
-        // --- 2. Companion Repair ---
+        // --- 2. Companion Repair (Advanced) ---
         let repairedCount = 0;
         const tripsToAdd = [];
         
+        // First pass: identify missing records
         trips.forEach(t => {
-          if (!t.travelWith || !t.travelWith.length) return;
+          const tDate = toISODate(t.dateLeftOrigin || t.dateArrivedDest);
+          if (!tDate) return;
+
+          // Collect all potential companion names/IDs from both fields
+          const companionIdsSet = new Set(Array.isArray(t.travelWith) ? t.travelWith : []);
           
-          t.travelWith.forEach(cid => {
-            // Check if this companion already has a trip on this date
+          // Add from travelWithNames string/array
+          const namesStr = Array.isArray(t.travelWithNames) ? t.travelWithNames.join(', ') : String(t.travelWithNames || '');
+          namesStr.split(/[,;]+/).forEach(n => {
+            const clean = n.trim().toLowerCase();
+            if (clean && nameToId[clean]) companionIdsSet.add(nameToId[clean]);
+          });
+
+          companionIdsSet.delete(t.passengerId); // Don't duplicate self
+
+          companionIdsSet.forEach(cid => {
+            // Check if this companion already has a trip on this normalized date
             const hasTrip = trips.some(other => 
-              (other.passengerId === cid) && 
-              (other.dateLeftOrigin === t.dateLeftOrigin)
+              (other.passengerId === cid || (other.passengerName && nameToId[other.passengerName.toLowerCase().trim()] === cid)) && 
+              toISODate(other.dateLeftOrigin || other.dateArrivedDest) === tDate
             );
             
             if (!hasTrip) {
@@ -554,11 +573,11 @@ function renderAccountTab(data, members, user, container) {
                 passengerName: companion?.name || 'Unknown',
                 travelWith: [
                   t.passengerId,
-                  ...t.travelWith.filter(tid => tid !== cid)
+                  ...Array.from(companionIdsSet).filter(tid => tid !== cid)
                 ],
                 travelWithNames: [
                   t.passengerName,
-                  ...t.travelWith.map(tid => passengers.find(p => p.id === tid)?.name).filter(n => n && n !== companion?.name)
+                  ...Array.from(companionIdsSet).map(tid => passengers.find(p => p.id === tid)?.name).filter(n => n && n !== companion?.name)
                 ].filter(Boolean).join(', '),
                 timestamp: new Date().toISOString()
               };
