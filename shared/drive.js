@@ -325,6 +325,54 @@ async function pruneFolder(folderId, keepCount, token) {
   }
 }
 
+export async function getBackupHealthReport(appName) {
+  if (!isOnline()) throw new Error('Internet connection required');
+  const token = (await import('./auth.js')).getToken();
+  if (!token) throw new Error('Not signed in');
+
+  const appFolderId = localStorage.getItem(KEYS.appFolderId);
+  const mirrorFolderId = localStorage.getItem(KEYS.mirrorFolderId);
+  const label = appName === 'travel' ? 'travel' : 'finance';
+  
+  const appFolder = await findOrCreateFolder(label, mirrorFolderId); // Subfolder in mirror
+  const editsFolder   = await findOrCreateFolder('edits',   appFolder);
+  const dailyFolder   = await findOrCreateFolder('daily',   appFolder);
+  const monthlyFolder = await findOrCreateFolder('monthly', appFolder);
+
+  const listFiles = async (id) => {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q='${id}'+in+parents+and+trashed=false&fields=files(id,name,size,modifiedTime)`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    return data.files || [];
+  };
+
+  // 1. Working Folder Audit
+  const workingFiles = await listFiles(appFolderId);
+  const mainFile = workingFiles.find(f => f.name.includes(label));
+  const queueFile = workingFiles.find(f => f.name.includes('queue'));
+
+  // 2. Mirror Tier Audit
+  const cEdits   = await listFiles(editsFolder);
+  const cDaily   = await listFiles(dailyFolder);
+  const cMonthly = await listFiles(monthlyFolder);
+
+  return {
+    working: {
+      folderId: appFolderId,
+      files: workingFiles.length,
+      mainFile: mainFile ? { name: mainFile.name, size: mainFile.size } : null,
+      queueActive: !!queueFile
+    },
+    mirror: {
+      edits:   { count: cEdits.length,   target: TIER_EDITS },
+      daily:   { count: cDaily.length,   target: TIER_DAYS },
+      monthly: { count: cMonthly.length, target: TIER_MONTHS }
+    },
+    status: (mainFile && cEdits.length >= 1) ? 'Healthy' : 'Initializing'
+  };
+}
+
 
 export async function getMirrorSnapshots(appName) {
   const mirrorId = localStorage.getItem(

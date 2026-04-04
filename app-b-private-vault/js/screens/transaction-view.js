@@ -9,7 +9,7 @@ import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.j
 import { writeData } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
-import { formatDisplayDate, formatAmount, showToast } from '../../../shared/utils.js';
+import { formatDisplayDate, formatAmount, showToast, showConfirmModal, showInputModal } from '../../../shared/utils.js';
 import { renderPhotoThumbnails } from '../../../shared/photo-picker.js';
 
 export async function renderTransactionView(container, params = {}) {
@@ -214,7 +214,21 @@ export async function renderTransactionView(container, params = {}) {
   });
 
   document.getElementById('delete-btn').addEventListener('click', async () => {
-    if (!confirm(`Delete this transaction?`)) return;
+    const ok = await showConfirmModal('🗑️ Delete Transaction?', 'This action is permanent and cannot be undone.', {
+      confirmText: 'Delete',
+      danger: true
+    });
+    if (!ok) return;
+
+    // Second factor security check
+    const code = Math.random().toString(36).slice(-2).toUpperCase();
+    const input = await showInputModal('Final Confirmation', `To permanently delete, type the code: <b style="font-size:20px; color:var(--danger);">${code}</b>`, '');
+    
+    if (!input || input.toUpperCase() !== code) {
+      if (input !== null) showToast('Incorrect code. Deletion cancelled.', 'warning');
+      return;
+    }
+
     try {
       const newData = await localSave('finance', remote => ({
         ...remote,
