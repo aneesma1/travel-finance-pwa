@@ -229,9 +229,10 @@ export async function writeData(appName, mergeFn) {
 
 // ── Tiered mirror backup -- 3 tiers: edits(5), daily(5), monthly(3) ──────────
 // Each tier stores JSON. XLSX export is queued as best-effort after JSON write.
-const TIER_EDITS = 5;   // last N individual saves
-const TIER_DAYS = 5;   // last N edit-days (one file per day, overwritten)
-const TIER_MONTHS = 3;   // last N edit-months (one file per month, overwritten)
+const TIER_SESSIONS = 5;   // last N 30-min sessions
+const TIER_DAYS = 5;      // last N edit-days
+const TIER_MONTHS = 3;    // last N edit-months
+const SESSION_WINDOW = 30 * 60 * 1000; // 30 minutes
 
 async function writeMirrorSnapshot(appName, fullData) {
   if (!isOnline()) return;
@@ -244,38 +245,93 @@ async function writeMirrorSnapshot(appName, fullData) {
   if (!token) return;
 
   try {
-    // Ensure subfolder structure exists
     const appFolder = await findOrCreateFolder(label, mirrorFolderId);
-    const editsFolder = await findOrCreateFolder('edits', appFolder);
+    const sessionsFolder = await findOrCreateFolder('sessions', appFolder); // Renamed from edits
     const dailyFolder = await findOrCreateFolder('daily', appFolder);
     const monthlyFolder = await findOrCreateFolder('monthly', appFolder);
 
     const jsonBlob = JSON.stringify(fullData, null, 2);
-    const today = ts.slice(0, 10);               // YYYY-MM-DD
-    const month = ts.slice(0, 7);                // YYYY-MM
+    const xlsxBlob = await generateXLSXBlob(appName, fullData);
+    
+    const now = Date.now();
+    const lastSessionTime = Number(localStorage.getItem(`last_session_time_${appName}`) || 0);
 
-    // ── Tier 1: edits/ -- timestamped per save ──────────────────────────────
-    await createMirrorFile(editsFolder, `${label}_${ts}.json`, jsonBlob, token);
-    await pruneFolder(editsFolder, TIER_EDITS, token);
+    // ── Tier 1: sessions/ -- One snapshot per 30-min session window ─────────
+    if (now - lastSessionTime > SESSION_WINDOW) {
+      const sessionName = `${label}_session_${ts}`;
+      await createMirrorFile(sessionsFolder, `${sessionName}.json`, jsonBlob, token, 'application/json');
+      if (xlsxBlob) {
+        await createMirrorFile(sessionsFolder, `${sessionName}.xlsx`, xlsxBlob, token, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      }
+      await pruneFolder(sessionsFolder, TIER_SESSIONS * 2, token); // * 2 because we have JSON + XLSX pairs
+      localStorage.setItem(`last_session_time_${appName}`, String(now));
+    }
 
     // ── Tier 2: daily/ -- one file per edit-day, overwrite same day ──────────
-    const dailyName = `${label}_${today}.json`;
-    await upsertMirrorFile(dailyFolder, dailyName, jsonBlob, token);
-    await pruneFolder(dailyFolder, TIER_DAYS, token);
+    const today = ts.slice(0, 10);
+    const dailyName = `${label}_${today}`;
+    await upsertMirrorFile(dailyFolder, `${dailyName}.json`, jsonBlob, token, 'application/json');
+    if (xlsxBlob) {
+      await upsertMirrorFile(dailyFolder, `${dailyName}.xlsx`, xlsxBlob, token, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+    await pruneFolder(dailyFolder, TIER_DAYS * 2, token);
 
     // ── Tier 3: monthly/ -- one file per edit-month, overwrite same month ────
-    const monthlyName = `${label}_${month}.json`;
-    await upsertMirrorFile(monthlyFolder, monthlyName, jsonBlob, token);
-    await pruneFolder(monthlyFolder, TIER_MONTHS, token);
+    const month = ts.slice(0, 7);
+    const monthlyName = `${label}_${month}`;
+    await upsertMirrorFile(monthlyFolder, `${monthlyName}.json`, jsonBlob, token, 'application/json');
+    if (xlsxBlob) {
+      await upsertMirrorFile(monthlyFolder, `${monthlyName}.xlsx`, xlsxBlob, token, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+    await pruneFolder(monthlyFolder, TIER_MONTHS * 2, token);
 
-  } catch { /* non-blocking mirror -- never fail main save */ }
+  } catch (err) { console.error('Mirror failed:', err); }
 }
 
-async function createMirrorFile(folderId, name, jsonBlob, token) {
+async function generateXLSXBlob(appName, data) {
+  if (!window.XLSX) return null;
+  try {
+    const wb = XLSX.utils.book_new();
+    if (appName === 'travel') {
+      const trips = data.trips || [];
+      const passengers = data.passengers || [];
+      const pMap = {};
+      passengers.forEach(p => { pMap[p.id] = p.name; });
+      const wsData = trips.map(t => ({
+        Date: t.dateLeftOrigin || t.dateArrivedDest,
+        Passenger: t.passengerName || pMap[t.passengerId] || t.passengerId,
+        Origin: t.originCountry,
+        Destination: t.destinationCountry,
+        Stay: t.duration || t.daysInDest || 0,
+        Note: t.notes || ''
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wsData), 'Trips');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(passengers), 'Passengers');
+    } else {
+      const txns = data.transactions || [];
+      const wsData = txns.map(t => ({
+        Date: t.date,
+        Amount: t.amountSpend || t.income || 0,
+        Description: t.description || '',
+        Category: t.category1 || '',
+        Account: t.account || ''
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wsData), 'Transactions');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.categories || []), 'Categories');
+    }
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  } catch (err) {
+    console.error('XLSX generation failed:', err);
+    return null;
+  }
+}
+
+async function createMirrorFile(folderId, name, blob, token, contentType) {
   const meta = JSON.stringify({ name, parents: [folderId] });
   const form = new FormData();
   form.append('metadata', new Blob([meta], { type: 'application/json' }));
-  form.append('file', new Blob([jsonBlob], { type: 'application/json' }));
+  form.append('file', blob);
   await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
@@ -283,7 +339,7 @@ async function createMirrorFile(folderId, name, jsonBlob, token) {
   });
 }
 
-async function upsertMirrorFile(folderId, name, jsonBlob, token) {
+async function upsertMirrorFile(folderId, name, blob, token, contentType) {
   // Search for existing file with this name in folder
   const searchRes = await fetch(
     `https://www.googleapis.com/drive/v3/files?q=name='${name}'+and+'${folderId}'+in+parents+and+trashed=false&fields=files(id)`,
@@ -298,13 +354,13 @@ async function upsertMirrorFile(folderId, name, jsonBlob, token) {
       `https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`,
       {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: jsonBlob
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': contentType },
+        body: blob
       }
     );
   } else {
     // Create new
-    await createMirrorFile(folderId, name, jsonBlob, token);
+    await createMirrorFile(folderId, name, blob, token, contentType);
   }
 }
 
@@ -336,12 +392,12 @@ export async function getBackupHealthReport(appName) {
   const label = appName === 'travel' ? 'travel' : 'finance';
   
   const appFolder = await findOrCreateFolder(label, mirrorFolderId); // Subfolder in mirror
-  const editsFolder   = await findOrCreateFolder('edits',   appFolder);
-  const dailyFolder   = await findOrCreateFolder('daily',   appFolder);
-  const monthlyFolder = await findOrCreateFolder('monthly', appFolder);
+  const sessionsFolder = await findOrCreateFolder('sessions', appFolder);
+  const dailyFolder    = await findOrCreateFolder('daily',   appFolder);
+  const monthlyFolder  = await findOrCreateFolder('monthly', appFolder);
 
   const listFiles = async (id) => {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q='${id}'+in+parents+and+trashed=false&fields=files(id,name,size,modifiedTime)`, {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q='${id}'+in+parents+and+trashed=false&fields=files(id,name,size,modifiedTime)&orderBy=name+desc`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
@@ -366,9 +422,9 @@ export async function getBackupHealthReport(appName) {
       queueActive: !!queueFile
     },
     mirror: {
-      edits:   { count: cEdits.length,   target: TIER_EDITS },
-      daily:   { count: cDaily.length,   target: TIER_DAYS },
-      monthly: { count: cMonthly.length, target: TIER_MONTHS }
+      sessions: { count: Math.ceil(cSessions.length / 2), target: TIER_SESSIONS }, // Pairs count as 1
+      daily:    { count: Math.ceil(cDaily.length / 2),    target: TIER_DAYS },
+      monthly:  { count: Math.ceil(cMonthly.length / 2),  target: TIER_MONTHS }
     },
     status: (mainFile && cEdits.length >= 1) ? 'Healthy' : 'Initializing'
   };
@@ -453,9 +509,12 @@ export async function purgeOrphanedFiles(appName) {
 
   let purged = 0;
   for (const f of files) {
-    const isMain = f.name.includes(label) && f.name.endsWith('.json');
+    // PROTECT: Main data files for BOTH apps (Travel & Finance)
+    const isMainData = f.name.endsWith('_data.json');
+    // PROTECT: Active sync queues
     const isQueue = f.name.includes('queue');
-    if (!isMain && !isQueue) {
+    
+    if (!isMainData && !isQueue) {
       await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
