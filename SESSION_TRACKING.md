@@ -536,4 +536,7 @@ git checkout master
     - Verified the "Nuclear Reset" eraser logic for total data wiping.
     - Bumped project version to **v4.0.0** across all components.
     - Synchronized `master` and `main` branches.
-- **Commit**: `2663e22` (master), `b66d231` (main) — `feat: restructuring travel log to v4.0.0 (one-way mode, new excel format, multi-passenger entry)`
+- **Bug Fixes**:
+    - Resolved UUID appearance in Passenger Summary dropdown by enhancing name resolution logic.
+    - Fixed overlapping stay calculations in Passenger Summary by implementing a "Sequential Bridging" logic that ends a stay when the next trip begins.
+- **Commit**: `3784f77` (master), `d3a7e58` (main) — `fix: resolve overlapping stays in passenger summary calculation`
