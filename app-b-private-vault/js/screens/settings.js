@@ -11,13 +11,14 @@ import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import {
   currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard,
-  showConfirmModal
+  showConfirmModal, getAppState, setAppState
 } from '../../../shared/utils.js';
 import {
   downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
   getMirrorSnapshots, restoreFromMirror, getBackupHealthReport,
   purgeOrphanedFiles
 } from '../../../shared/drive.js';
+import { getSecurityLogs, clearSecurityLogs } from '../../../shared/db.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
@@ -25,7 +26,6 @@ import { renderImportTool } from '../../../shared/import-tool.js';
 import { openCategoryManager } from '../modals/category-manager.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
 import { exitApp } from '../../../shared/app-utils.js';
-import { getAppState, setAppState } from '../../../shared/db.js';
 
 const CACHE_NAME    = 'vault v4.0.0';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -611,14 +611,27 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.1.0 · 2026-04-04</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.9.6 · 2026-04-04</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions · ${data?.categories?.length || 0} categories</div>
 
         <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
+          <!-- RECOVERY SECTION -->
+          <div style="margin-bottom:20px; padding:16px; background:rgba(var(--primary-rgb), 0.05); border:1px dashed var(--primary); border-radius:12px;">
+            <div style="font-weight:700; color:var(--primary); margin-bottom:4px;">📦 Portable Recovery Engine</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+              Download a single-file ZIP containing both the app code and your current data. You can run this locally if GitHub is ever private or down.
+            </div>
+            <button id="download-recovery-zip" class="btn btn-primary" style="width:100%; border-radius:8px;">
+              Download Recovery Bundle (ZIP)
+            </button>
+          </div>
           <div style="display:flex; gap:10px;">
             <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
             <button id="backup-health-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">📊 Backup Health</button>
+          </div>
+          <div style="margin-top:10px;">
+            <button id="security-audit-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px;">🛡️ Drive Security Audit</button>
           </div>
           <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
             Maintenance: Repairs records & verifies Drive backup compliance.
@@ -636,6 +649,55 @@ export async function renderSettings(container, params = {}) {
       </div>
     `;
     
+    
+    
+    // --- Account Tab Listeners ---
+    document.getElementById('download-recovery-zip')?.addEventListener('click', async () => {
+      try {
+        showToast('Preparing recovery bundle…', 'info', 3000);
+        await downloadRecoveryBundle();
+        showToast('Bundle downloaded successfully!', 'success');
+      } catch (err) {
+        showToast('Bundle failed: ' + err.message, 'error');
+      }
+    });
+
+    // --- Drive Security Audit ---
+    document.getElementById('security-audit-btn').onclick = async () => {
+      const logs = await getSecurityLogs();
+      if (!logs || logs.length === 0) {
+        showToast('✅ No security incidents recorded.', 'success');
+        return;
+      }
+
+      const logHtml = `
+        <div style="font-size:12px; max-height:300px; overflow-y:auto;">
+          ${logs.reverse().map(l => `
+            <div style="padding:10px; border-bottom:1px solid var(--border-light); background:rgba(255,0,0,0.05); margin-bottom:5px; border-radius:4px;">
+              <b style="color:var(--danger);">${l.action} Blocked</b><br/>
+              <span style="opacity:0.7;">${new Date(l.timestamp).toLocaleString()}</span><br/>
+              <code style="display:block; margin-top:4px; font-size:10px; word-break:break-all;">Target: ${l.targetId || l.url}</code>
+              <div style="font-size:10px; margin-top:4px; color:var(--danger);">Reason: ${l.reason}</div>
+            </div>
+          `).join('')}
+        </div>
+        <button id="clear-security-logs" class="btn btn-secondary" style="width:100%; margin-top:10px; color:var(--danger); border-color:var(--danger);">Clear Log</button>
+      `;
+
+      await showConfirmModal('🛡️ Security Audit Log', logHtml, { confirmText: 'Done', cancelText: '' });
+      
+      const clearBtn = document.getElementById('clear-security-logs');
+      if (clearBtn) {
+        clearBtn.onclick = async () => {
+           if (confirm('Clear all security audit records?')) {
+             await clearSecurityLogs();
+             showToast('Audit log cleared.', 'success');
+             document.querySelector('.modal-overlay').remove();
+           }
+        };
+      }
+    };
+
     document.getElementById('repair-data-btn')?.addEventListener('click', async () => {
       const ok = await showConfirmModal('🔍 Scan & Repair Data?', 'This tool will:\n1. Identify exact duplicate transactions\n2. Merge identical records from multiple devices\n\nThis will permanently update your data.', {
         confirmText: 'Run Health Check'
@@ -673,6 +735,7 @@ export async function renderSettings(container, params = {}) {
       }
     });
 
+      // --- Backup Health ---
     document.getElementById('backup-health-btn')?.addEventListener('click', async () => {
       try {
         showToast('Scanning Drive folders…', 'info');
@@ -706,7 +769,7 @@ export async function renderSettings(container, params = {}) {
             <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
             
             <b style="color:var(--primary); font-size:14px;">🕒 Mirror System (Historical)</b><br/>
-            • <b>Edits Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.edits.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.edits.count} / ${report.mirror.edits.target}</span><br/>
+            • <b>Sessions Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.sessions.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.sessions.count} / ${report.mirror.sessions.target}</span><br/>
             • <b>Daily Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.daily.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.daily.count} / ${report.mirror.daily.target}</span><br/>
             • <b>Monthly Tier</b> (Target 3): <span style="font-weight:700; color:${report.mirror.monthly.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.monthly.count} / ${report.mirror.monthly.target}</span>
             

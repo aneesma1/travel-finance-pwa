@@ -410,9 +410,9 @@ export async function getBackupHealthReport(appName) {
   const queueFile = workingFiles.find(f => f.name.includes('queue'));
 
   // 2. Mirror Tier Audit
-  const cEdits   = await listFiles(editsFolder);
-  const cDaily   = await listFiles(dailyFolder);
-  const cMonthly = await listFiles(monthlyFolder);
+  const cSessions = await listFiles(sessionsFolder);
+  const cDaily    = await listFiles(dailyFolder);
+  const cMonthly  = await listFiles(monthlyFolder);
 
   return {
     working: {
@@ -426,7 +426,7 @@ export async function getBackupHealthReport(appName) {
       daily:    { count: Math.ceil(cDaily.length / 2),    target: TIER_DAYS },
       monthly:  { count: Math.ceil(cMonthly.length / 2),  target: TIER_MONTHS }
     },
-    status: (mainFile && cEdits.length >= 1) ? 'Healthy' : 'Initializing'
+    status: (mainFile && cSessions.length >= 1) ? 'Healthy' : 'Initializing'
   };
 }
 
