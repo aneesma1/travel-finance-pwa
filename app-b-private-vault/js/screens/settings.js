@@ -27,7 +27,7 @@ import { openCategoryManager } from '../modals/category-manager.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
 import { exitApp } from '../../../shared/app-utils.js';
 
-const CACHE_NAME    = 'vault v4.0.0';
+const CACHE_NAME    = 'vault v4.9.7';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export async function renderSettings(container, params = {}) {
@@ -611,7 +611,7 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.9.6 · 2026-04-04</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.9.7 · 2026-04-04</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions · ${data?.categories?.length || 0} categories</div>
 
