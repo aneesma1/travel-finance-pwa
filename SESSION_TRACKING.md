@@ -550,3 +550,22 @@ git checkout master
     - Activated Address Photos for Family Defaults and Member Profiles.
     - Added dedicated "Google Plus Location ID" field to all address entry sections.
 - **Commit**: `15e1b2b` (master) — `feat: implement backup health report diagnostic tool`
+553: 
+554: ---
+555: 
+556: ### Emergency Restoration & Security Interlock (v4.9.6 · 2026-04-04)
+557: 
+558: - **Shared Utils Restoration**:
+559:     - Declared missing `getAppState` and `setAppState` (simple `localStorage` wrappers) in `shared/utils.js`. This resolves the "tab crash" where the Security dashboard was trying to read the "Lock Updates" state from an undefined source.
+560: - **Terminology Sweep ("Edits" -> "Sessions")**:
+561:     - Performed a project-wide search and replace to align the Drive folder names with the new v4.9.0 architecture. 
+562:     - Updated `shared/drive.js` and both `settings.js` files to use `mirror.sessions` instead of the legacy `mirror.edits`.
+563:     - This specifically kills the `editsFolder is not defined` runtime error.
+564: - **App A (Family Hub) Repairs**:
+565:     - Fixed a critical syntax error (missing bracket) in the "Security Audit" listener that was preventing the settings screen from rendering.
+566:     - Corrected the template literal for the "Backup Health" report to prevent "undefined" object property access.
+567: - **App B (Private Vault) Repairs**:
+568:     - Fixed an incorrect import source where `getAppState` was being pulled from `db.js` instead of `utils.js`.
+569: - **Force Cache Flush**:
+570:     - Bumped all app headers, SW cache names, and UI version strings to **v4.9.6** to ensure the Service Worker invalidates the broken v3.5.47/v4.9.2 caches.
+571: - **Commit**: `99d6238` (master), `ed2bbd5` (main) — `v4.9.6: Restoration of Security, Account and Terminology`
