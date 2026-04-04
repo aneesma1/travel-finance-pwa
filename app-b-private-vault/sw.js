@@ -1,6 +1,6 @@
-// v4.5.1 — 2026-04-04
+// v4.7.1 — 2026-04-04
 // ...
-const CACHE_NAME    = 'vault-cache-v4.5.1';
+const CACHE_NAME    = 'vault-cache-v4.7.1';
 const STATIC_ASSETS = [
   './',
   './index.html',
