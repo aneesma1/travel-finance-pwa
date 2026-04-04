@@ -530,6 +530,12 @@ function renderAccountTab(data, members, user, container) {
           const key = `${t.passengerId || t.passengerName}|${d}|${t.destinationCountry}`;
           if (seen.has(key)) {
             mergedCount++;
+            // If the duplicate has photos but the original doesn't, keep the one with photos
+            const original = nonDupes.find(x => `${x.passengerId || x.passengerName}|${toISODate(x.dateLeftOrigin || x.dateArrivedDest)}|${x.destinationCountry}` === key);
+            if (original && (!original.photos?.length && t.photos?.length)) {
+              const idx = nonDupes.indexOf(original);
+              nonDupes[idx] = t;
+            }
           } else {
             seen.add(key);
             nonDupes.push(t);
@@ -598,8 +604,18 @@ function renderAccountTab(data, members, user, container) {
       
       await setCachedTravelData(newData);
       const { merged, repaired } = window._repairSummary || {};
-      showToast(`Success! Merged: ${merged}, Repaired: ${repaired}`, 'success', 5000);
-      setTimeout(() => window.location.reload(), 2000);
+      
+      const summary = `
+        <div style="text-align:left; font-size:14px; line-height:1.6;">
+          • Duplicates Merged: <b>${merged}</b><br/>
+          • Missing Records Created: <b>${repaired}</b><br/>
+          <div style="margin-top:12px; padding:10px; background:var(--primary-bg); border-radius:8px; border-left:4px solid var(--primary); font-size:12px;">
+            ✅ Your database is now synchronized across all participants.
+          </div>
+        </div>
+      `;
+      await showConfirmModal('Trip Data: Doctor Summary', summary, { confirmText: 'Great', cancelText: '' });
+      setTimeout(() => window.location.reload(), 500);
     } catch (err) { 
       showToast('Repair failed: ' + err.message, 'error');
       console.error(err);

@@ -11,7 +11,7 @@ import { navigate } from '../router.js';
 import { PillSelect }  from '../../../shared/pill-select.js';
 import { renderPhotoSlots } from '../../../shared/photo-picker.js';
 import { SmartInput }  from '../../../shared/smart-input.js';
-import { uuidv4, today, showToast, formatAmount } from '../../../shared/utils.js';
+import { uuidv4, today, showToast, formatAmount, showConfirmModal, showInputModal } from '../../../shared/utils.js';
 
 export async function renderAddTransaction(container, params = {}) {
   const { txnId, mode } = params;
@@ -353,14 +353,28 @@ export async function renderAddTransaction(container, params = {}) {
   }
 
   async function deleteTxn() {
-    if (!confirm('Delete this transaction?')) return;
+    const ok = await showConfirmModal('🗑️ Delete Transaction?', 'This action is permanent and cannot be undone.', {
+      confirmText: 'Delete',
+      danger: true
+    });
+    if (!ok) return;
+
+    // Second factor security check
+    const code = Math.random().toString(36).slice(-2).toUpperCase();
+    const input = await showInputModal('Final Confirmation', `To permanently delete, type the code: <b style="font-size:20px; color:var(--danger);">${code}</b>`, '');
+    
+    if (!input || input.toUpperCase() !== code) {
+      if (input !== null) showToast('Incorrect code. Deletion cancelled.', 'warning');
+      return;
+    }
+
     try {
       const newData = await localSave('finance', (remote) => ({
         ...remote,
         transactions: (remote.transactions || []).filter(t => t.id !== txnId)
       }));
       await setCachedFinanceData(newData);
-      showToast('Deleted', 'success');
+      showToast('Transaction deleted', 'success');
       navigate('transactions');
     } catch { showToast('Delete failed', 'error'); }
   }
