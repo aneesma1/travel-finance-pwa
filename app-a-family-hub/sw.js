@@ -1,12 +1,6 @@
-// v4.0.0 — 2026-04-04
-
-// ─── app-a-family-hub/sw.js ──────────────────────────────────────────────────
-// Service Worker for Family Hub PWA
-// Handles: static asset caching, offline fallback, background Drive sync
-
-'use strict';
-
-const CACHE_NAME = 'hub-cache-v4.0.0';
+// v4.5.1 — 2026-04-04
+// ...
+const CACHE_NAME = 'hub-cache-v4.5.1';
 const STATIC_ASSETS = [
   './',
   './index.html',
