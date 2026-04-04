@@ -296,7 +296,7 @@ export async function renderTravelLog(container, params = {}) {
     const dropMenu = bar.querySelector('#passenger-dropdown-menu');
     dropBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      dropMenu.style.display = dropMenu.style.display === 'none' ? 'block' : 'none';
+      dropMenu.classList.toggle('hidden');
     });
     
     bar.querySelector('#pass-apply-btn').addEventListener('click', () => {
