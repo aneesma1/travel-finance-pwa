@@ -9,21 +9,21 @@
 
 import { authFetch } from './auth.js';
 
-const DRIVE_API      = 'https://www.googleapis.com/drive/v3';
-const DRIVE_UPLOAD   = 'https://www.googleapis.com/upload/drive/v3';
-const APP_FOLDER     = 'TravelFinanceApp';
-const MIRROR_FOLDER  = 'TravelFinanceApp_Mirror';
-const MAX_RETRIES    = 3;
+const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+const APP_FOLDER = 'TravelFinanceApp';
+const MIRROR_FOLDER = 'TravelFinanceApp_Mirror';
+const MAX_RETRIES = 3;
 const MIRROR_SNAPSHOTS = 3;
 
 // localStorage keys
 const KEYS = {
-  appFolderId:    'drive_app_folder_id',
+  appFolderId: 'drive_app_folder_id',
   mirrorFolderId: 'drive_mirror_folder_id',
-  travelFileId:   'drive_travel_file_id',
-  financeFileId:  'drive_finance_file_id',
+  travelFileId: 'drive_travel_file_id',
+  financeFileId: 'drive_finance_file_id',
   travelMirrorId: 'drive_travel_mirror_id',
-  financeMirrorId:'drive_finance_mirror_id',
+  financeMirrorId: 'drive_finance_mirror_id',
 };
 
 // ── Folder management ─────────────────────────────────────────────────────────
@@ -76,11 +76,11 @@ export async function initDriveFolders() {
 // ── File create / fetch / update ──────────────────────────────────────────────
 async function createJsonFile(name, data, parentId) {
   const metadata = { name, parents: [parentId], mimeType: 'application/json' };
-  const content  = JSON.stringify(data, null, 2);
+  const content = JSON.stringify(data, null, 2);
 
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file',     new Blob([content],                  { type: 'application/json' }));
+  form.append('file', new Blob([content], { type: 'application/json' }));
 
   const res = await authFetch(
     `${DRIVE_UPLOAD}/files?uploadType=multipart&fields=id`,
@@ -138,8 +138,8 @@ async function updateJsonFile(fileId, data, expectedEtag = null) {
 // ── App data file helpers ─────────────────────────────────────────────────────
 export async function initDataFile(appName) {
   // appName: 'travel' | 'finance'
-  const fileKey   = appName === 'travel' ? KEYS.travelFileId : KEYS.financeFileId;
-  const fileName  = appName === 'travel' ? 'travel_data.json' : 'finance_data.json';
+  const fileKey = appName === 'travel' ? KEYS.travelFileId : KEYS.financeFileId;
+  const fileName = appName === 'travel' ? 'travel_data.json' : 'finance_data.json';
   const emptyData = appName === 'travel'
     ? { schemaVersion: 1, members: [], trips: [], documents: [], lastSync: null }
     : { schemaVersion: 1, transactions: [], categories: [], accounts: [], lastSync: null };
@@ -164,7 +164,7 @@ export async function initDataFile(appName) {
 }
 
 export async function initMirrorFile(appName) {
-  const mirrorKey  = appName === 'travel' ? KEYS.travelMirrorId : KEYS.financeMirrorId;
+  const mirrorKey = appName === 'travel' ? KEYS.travelMirrorId : KEYS.financeMirrorId;
   const mirrorName = appName === 'travel' ? 'travel_data_mirror.json' : 'finance_data_mirror.json';
 
   let mirrorId = localStorage.getItem(mirrorKey);
@@ -199,7 +199,7 @@ export async function writeData(appName, mergeFn) {
   // mergeFn receives the latest remote data and returns the data to save
   // This ensures safe concurrent writes from multiple family members
   const fileKey = appName === 'travel' ? KEYS.travelFileId : KEYS.financeFileId;
-  const fileId  = localStorage.getItem(fileKey);
+  const fileId = localStorage.getItem(fileKey);
   if (!fileId) throw new Error('Data file not initialised');
 
   let attempt = 0;
@@ -212,7 +212,7 @@ export async function writeData(appName, mergeFn) {
       await updateJsonFile(fileId, newData, etag);
 
       // Non-blocking mirror write
-      writeMirrorSnapshot(appName, newData).catch(() => {});
+      writeMirrorSnapshot(appName, newData).catch(() => { });
       return newData;
     } catch (err) {
       if (err.message === 'ETAG_CONFLICT' && attempt < MAX_RETRIES) {
@@ -228,16 +228,16 @@ export async function writeData(appName, mergeFn) {
 
 // ── Tiered mirror backup -- 3 tiers: edits(5), daily(5), monthly(3) ──────────
 // Each tier stores JSON. XLSX export is queued as best-effort after JSON write.
-const TIER_EDITS   = 5;   // last N individual saves
-const TIER_DAYS    = 5;   // last N edit-days (one file per day, overwritten)
-const TIER_MONTHS  = 3;   // last N edit-months (one file per month, overwritten)
+const TIER_EDITS = 5;   // last N individual saves
+const TIER_DAYS = 5;   // last N edit-days (one file per day, overwritten)
+const TIER_MONTHS = 3;   // last N edit-months (one file per month, overwritten)
 
 async function writeMirrorSnapshot(appName, fullData) {
   if (!isOnline()) return;
   const mirrorFolderId = localStorage.getItem(KEYS.mirrorFolderId);
   if (!mirrorFolderId) return;
 
-  const ts    = timestampSuffix();
+  const ts = timestampSuffix();
   const label = appName === 'travel' ? 'travel' : 'finance';
   const token = getToken();
   if (!token) return;
@@ -245,13 +245,13 @@ async function writeMirrorSnapshot(appName, fullData) {
   try {
     // Ensure subfolder structure exists
     const appFolder = await findOrCreateFolder(label, mirrorFolderId);
-    const editsFolder   = await findOrCreateFolder('edits',   appFolder);
-    const dailyFolder   = await findOrCreateFolder('daily',   appFolder);
+    const editsFolder = await findOrCreateFolder('edits', appFolder);
+    const dailyFolder = await findOrCreateFolder('daily', appFolder);
     const monthlyFolder = await findOrCreateFolder('monthly', appFolder);
 
     const jsonBlob = JSON.stringify(fullData, null, 2);
-    const today    = ts.slice(0, 10);               // YYYY-MM-DD
-    const month    = ts.slice(0, 7);                // YYYY-MM
+    const today = ts.slice(0, 10);               // YYYY-MM-DD
+    const month = ts.slice(0, 7);                // YYYY-MM
 
     // ── Tier 1: edits/ -- timestamped per save ──────────────────────────────
     await createMirrorFile(editsFolder, `${label}_${ts}.json`, jsonBlob, token);
@@ -271,8 +271,8 @@ async function writeMirrorSnapshot(appName, fullData) {
 }
 
 async function createMirrorFile(folderId, name, jsonBlob, token) {
-  const meta    = JSON.stringify({ name, parents: [folderId] });
-  const form    = new FormData();
+  const meta = JSON.stringify({ name, parents: [folderId] });
+  const form = new FormData();
   form.append('metadata', new Blob([meta], { type: 'application/json' }));
   form.append('file', new Blob([jsonBlob], { type: 'application/json' }));
   await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
@@ -321,7 +321,7 @@ async function pruneFolder(folderId, keepCount, token) {
     await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
-    }).catch(() => {});
+    }).catch(() => { });
   }
 }
 
@@ -347,14 +347,14 @@ export async function restoreFromMirror(appName, snapshotIndex) {
 
 // ── Local device backup ───────────────────────────────────────────────────────
 export function downloadLocalBackup(appName, data) {
-  const ts       = timestampSuffix();
-  const label    = appName === 'travel' ? 'Travel' : 'Finance';
+  const ts = timestampSuffix();
+  const label = appName === 'travel' ? 'Travel' : 'Finance';
   const filename = `${label}_Backup_${ts}.json`;
-  const blob     = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url      = URL.createObjectURL(blob);
-  const a        = document.createElement('a');
-  a.href         = url;
-  a.download     = filename;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -363,7 +363,7 @@ export function downloadLocalBackup(appName, data) {
 export function timestampSuffix() {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
 }
 
 export async function restoreFromLocalFile(file, appName) {
