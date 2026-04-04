@@ -581,10 +581,31 @@ function renderAccountTab(data, members, user, container) {
           </div>
         `).join('')}
       </div>
-      <button id="clear-security-logs" class="btn btn-secondary" style="width:100%; margin-top:10px; color:var(--danger); border-color:var(--danger);">Clear Log</button>
+      <button id="clear-security-logs" class="btn btn-secondary" style="width:100%; margin-top:10px; color:var(--text-secondary); border-color:var(--border);">Clear Security Log</button>
+      
+      <div style="margin:16px 0; border-top:1px solid var(--border-light); opacity:0.3;"></div>
+      
+      <div style="padding:16px; background:rgba(var(--primary-rgb), 0.05); border:1px dashed var(--primary); border-radius:12px;">
+        <div style="font-weight:700; color:var(--primary); margin-bottom:4px; font-size:13px;">🛡️ Drive Scrubber (Deep Clean)</div>
+        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px;">
+          Identify and delete orphaned session files in your Google Drive folder for trips you have deleted.
+        </div>
+        <button id="sec-purge-btn" class="btn btn-primary" style="width:100%; border-radius:8px; font-size:12px;">
+          🗑️ Purge Orphaned Files
+        </button>
+      </div>
     `;
 
-    await showConfirmModal('🛡️ Security Audit Log', logHtml, { confirmText: 'Done', cancelText: '' });
+    await showConfirmModal('🛡️ Drive Security Audit', logHtml, { confirmText: 'Done', cancelText: '' });
+    
+    document.getElementById('sec-purge-btn')?.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
+      showToast('Scanning & Purging…', 'info');
+      const count = await (await import('../../../shared/drive.js')).purgeOrphanedFiles('travel', data);
+      showToast(`Cleaned ${count} orphaned files`, 'success');
+      document.querySelector('.modal-overlay')?.remove();
+      document.getElementById('security-audit-btn').click();
+    });
     document.getElementById('clear-security-logs')?.addEventListener('click', async () => {
       if (confirm('Clear all security audit records?')) {
         await clearSecurityLogs();
