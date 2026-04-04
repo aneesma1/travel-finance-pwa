@@ -12,7 +12,7 @@ import { getCachedTravelData, setCachedTravelData,
          getAppState, setAppState } from './db.js';
 import { writeData, fetchJsonFile, initDriveFolders,
          initDataFile, downloadLocalBackup, timestampSuffix } from './drive.js';
-import { isOnline, uuidv4, showToast } from './utils.js';
+import { isOnline, uuidv4, showToast, showConfirmModal } from './utils.js';
 
 // ── Sync status broadcast ─────────────────────────────────────────────────────
 // Screens listen for 'sync:status' events on window
@@ -159,7 +159,18 @@ export async function processDriveQueue() {
       await writeSafeSnapshot(op.appName, op.dataSnapshot);
 
       // Drive write -- use snapshot directly (already merged locally)
-      const newData = await writeData(op.appName, () => op.dataSnapshot);
+      const newData = await writeData(op.appName, async (driveData) => {
+        const localData = op.dataSnapshot;
+        const localCount = (localData.trips?.length || 0) + (localData.transactions?.length || 0);
+        const driveCount = (driveData?.trips?.length || 0) + (driveData?.transactions?.length || 0);
+
+        // SAFETY INTERLOCK: If local is empty but cloud has data, BLOCK the push.
+        if (localCount === 0 && driveCount > 0) {
+          console.error('SYNC BLOCK: Attempted to overwrite cloud data with empty local state.');
+          throw new Error('Zero-Data Interlock: Cloud data preserved. Please "Restore from Cloud" first.');
+        }
+        return localData;
+      });
 
       // Update local cache with server-confirmed version
       if (op.appName === 'travel') await setCachedTravelData(newData);

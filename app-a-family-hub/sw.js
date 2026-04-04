@@ -1,6 +1,6 @@
-// v4.7.1 — 2026-04-04
+// v4.8.0 — 2026-04-04
 // ...
-const CACHE_NAME = 'hub-cache-v4.7.1';
+const CACHE_NAME = 'hub-cache-v4.8.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -58,30 +58,39 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// ── Fetch: cache-first for static, network-first for API ─────────────────────
+// ── Fetch: Stale-While-Revalidate for app assets ─────────────────────────────
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Skip non-GET and cross-origin Google API calls (auth, drive, calendar)
+  // Skip non-GET and cross-origin Google API calls
   if (e.request.method !== 'GET') return;
   if (url.hostname.includes('googleapis.com') || url.hostname.includes('accounts.google.com')) return;
 
+  // Stale-While-Revalidate Strategy
   e.respondWith(
     caches.match(e.request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(e.request).then(response => {
-        // Cache successful responses
+      // 1. Fire off the network request in background
+      const networkFetch = fetch(e.request).then(response => {
+        // SUCCESS: Update cache if it's a valid local asset (not 403/404)
         if (response && response.status === 200 && response.type !== 'opaque') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         }
         return response;
-      }).catch(() => {
+      }).catch(err => {
+        // FAIL: Silent ignore for background revalidation
+        return null;
+      });
+
+      // 2. Return cached version immediately (0-second load)
+      if (cached) return cached;
+      
+      // 3. If not in cache, wait for the network (first-time load)
+      return networkFetch.then(resp => {
+        if (resp) return resp;
         // Offline fallback for navigation
-        if (e.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
+        if (e.request.mode === 'navigate') return caches.match('./index.html');
+        return new Response('Network unavailable', { status: 503, statusText: 'Offline' });
       });
     })
   );
