@@ -1,4 +1,4 @@
-// v3.5.43 — 2026-03-31
+// v4.9.6 — 2026-04-04
 
 // ─── shared/utils.js ────────────────────────────────────────────────────────
 // Shared utility functions used by both App A and App B
@@ -232,7 +232,7 @@ export function showConfirmModal(title, message, options = {}) {
       <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
         <div style="padding:20px 24px;">
           <div style="font-size:17px; font-weight:700; margin-bottom:8px;">${title}</div>
-          <div style="font-size:14px; color:var(--text-secondary); line-height:1.5;">${message}</div>
+          <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.9.6 · 2026-04-04</div>
           <div style="margin-top:24px; display:flex; gap:12px;">
             ${cancelText ? `<button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>` : ''}
             <button id="modal-confirm" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" style="flex:1;">${confirmText}</button>
@@ -299,4 +299,16 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
     overlay.querySelector('#modal-confirm').onclick = () => close(input.value.trim());
     input.onkeydown = (e) => { if (e.key === 'Enter') overlay.querySelector('#modal-confirm').click(); };
   });
+}
+
+// ── App State Manager (Simplified) ───────────────────────────────────────────
+// These functions are used for persisting UI settings (like Lock Updates).
+export function getAppState(key, defaultVal = false) {
+  const v = localStorage.getItem(`app_state_${key}`);
+  if (v === null) return defaultVal;
+  try { return JSON.parse(v); } catch { return v; }
+}
+
+export async function setAppState(key, val) {
+  localStorage.setItem(`app_state_${key}`, JSON.stringify(val));
 }

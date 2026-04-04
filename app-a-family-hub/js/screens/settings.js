@@ -4,14 +4,14 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
+import { getCachedTravelData, setCachedTravelData, clearAllCachedData, getSecurityLogs, clearSecurityLogs } from '../../../shared/db.js';
 import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData, getBackupHealthReport, purgeOrphanedFiles } from '../../../shared/drive.js';
 import { localSave, clearDriveQueue } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
-import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate, showConfirmModal, showInputModal } from '../../../shared/utils.js';
+import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate, showConfirmModal, showInputModal, getAppState, setAppState } from '../../../shared/utils.js';
 import { authFetch } from '../../../shared/auth.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
@@ -498,7 +498,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v3.5.47 · 2026-03-31</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.9.6 · 2026-04-04</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
@@ -524,6 +524,9 @@ function renderAccountTab(data, members, user, container) {
           <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
           <button id="backup-health-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">📊 Backup Health</button>
         </div>
+        <div style="margin-top:12px;">
+          <button id="security-audit-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px;">🛡️ Drive Security Audit</button>
+        </div>
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
           Maintenance: Repairs records & verifies Drive backup compliance.
         </div>
@@ -536,6 +539,61 @@ function renderAccountTab(data, members, user, container) {
       ">⚠️ Emergency Reset & Update App</button>
     </div>`;
 
+  // --- Account Tab Listeners ---
+  document.getElementById('download-recovery-zip')?.addEventListener('click', async () => {
+    try {
+      showToast('Preparing recovery bundle…', 'info', 3000);
+      await downloadRecoveryBundle();
+      showToast('Bundle downloaded successfully!', 'success');
+    } catch (err) {
+      showToast('Bundle failed: ' + err.message, 'error');
+    }
+  });
+
+  document.getElementById('local-backup-btn')?.addEventListener('click', () => downloadLocalBackup('travel', data));
+  document.getElementById('local-restore-btn')?.addEventListener('click', () => document.getElementById('restore-file-input').click());
+  document.getElementById('restore-file-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const restored = await restoreFromLocalFile(file);
+      await setCachedTravelData(restored);
+      showToast('Restore successful!', 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
+  });
+
+  document.getElementById('security-audit-btn')?.addEventListener('click', async () => {
+    const logs = await getSecurityLogs();
+    if (!logs || logs.length === 0) {
+      showToast('✅ No security incidents recorded.', 'success');
+      return;
+    }
+
+    const logHtml = `
+      <div style="font-size:12px; max-height:300px; overflow-y:auto;">
+        ${logs.reverse().map(l => `
+          <div style="padding:10px; border-bottom:1px solid var(--border-light); background:rgba(255,0,0,0.05); margin-bottom:5px; border-radius:4px;">
+            <b style="color:var(--danger);">${l.action} Blocked</b><br/>
+            <span style="opacity:0.7;">${new Date(l.timestamp).toLocaleString()}</span><br/>
+            <code style="display:block; margin-top:4px; font-size:10px; word-break:break-all;">Target: ${l.targetId || l.url}</code>
+            <div style="font-size:10px; margin-top:4px; color:var(--danger);">Reason: ${l.reason}</div>
+          </div>
+        `).join('')}
+      </div>
+      <button id="clear-security-logs" class="btn btn-secondary" style="width:100%; margin-top:10px; color:var(--danger); border-color:var(--danger);">Clear Log</button>
+    `;
+
+    await showConfirmModal('🛡️ Security Audit Log', logHtml, { confirmText: 'Done', cancelText: '' });
+    document.getElementById('clear-security-logs')?.addEventListener('click', async () => {
+      if (confirm('Clear all security audit records?')) {
+        await clearSecurityLogs();
+        showToast('Audit log cleared.', 'success');
+        document.querySelector('.modal-overlay').remove();
+      }
+    });
+  });
+
   document.getElementById('repair-data-btn')?.addEventListener('click', async () => {
     const ok = await showConfirmModal('🔍 Scan & Repair Data?', 'This tool will:\n1. Merge exact duplicate entries\n2. Create missing travel records for companions\n\nThis will permanently update your data.', {
       confirmText: 'Run Health Check'
@@ -547,12 +605,9 @@ function renderAccountTab(data, members, user, container) {
       const newData = await localSave('travel', (remote) => {
         let trips = [...(remote.trips || [])];
         const passengers = remote.passengers || [];
-        
-        // Build name-to-id map for repair
         const nameToId = {};
         passengers.forEach(p => { if (p.name) nameToId[p.name.toLowerCase().trim()] = p.id; });
 
-        // --- 1. Deduplicate ---
         const seen = new Set();
         const nonDupes = [];
         let mergedCount = 0;
@@ -687,7 +742,7 @@ function renderAccountTab(data, members, user, container) {
           <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
           
           <b style="color:var(--primary); font-size:14px;">🕒 Mirror System (Historical)</b><br/>
-          • <b>Edits Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.edits.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.edits.count} / ${report.mirror.edits.target}</span><br/>
+          • <b>Sessions Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.sessions.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.sessions.count} / ${report.mirror.sessions.target}</span><br/>
           • <b>Daily Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.daily.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.daily.count} / ${report.mirror.daily.target}</span><br/>
           • <b>Monthly Tier</b> (Target 3): <span style="font-weight:700; color:${report.mirror.monthly.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.monthly.count} / ${report.mirror.monthly.target}</span>
           

@@ -7,13 +7,14 @@
 'use strict';
 
 const DB_NAME    = 'TravelFinanceApp';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   travel:       'travel_data',
   finance:      'finance_data',
   syncQueue:    'sync_queue',   // Pending writes to push when back online
   appState:     'app_state',    // UI state, filter preferences
+  securityLog:  'security_log', // Persistent security audit events
 };
 
 let _db = null;
@@ -175,13 +176,32 @@ export async function setAppState(appName, state) {
   return dbSet(STORES.appState, appName, { ...current, ...state });
 }
 
-// ── Clear all data (for sign-out) ─────────────────────────────────────────────
-export async function clearAllCachedData() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(Object.values(STORES), 'readwrite');
-    Object.values(STORES).forEach(store => tx.objectStore(store).clear());
-    tx.oncomplete = () => resolve();
-    tx.onerror    = () => reject(tx.error);
+// ── Security Logging ──────────────────────────────────────────────────────────
+export async function addSecurityLog(event) {
+  const logs = await dbGetAll(STORES.securityLog) || [];
+  logs.push({
+    id: Date.now(),
+    timestamp: new Date().toISOString(),
+    ...event
   });
+  // Keep last 50 logs
+  const trimmed = logs.slice(-50);
+  // Clear and rewrite (simplest for small audit log)
+  const db = await openDB();
+  const tx = db.transaction(STORES.securityLog, 'readwrite');
+  const store = tx.objectStore(STORES.securityLog);
+  store.clear();
+  trimmed.forEach(log => store.put({ key: log.id, value: log }));
+  return new Promise((resolve) => { tx.oncomplete = () => resolve(); });
+}
+
+export async function getSecurityLogs() {
+  return dbGetAll(STORES.securityLog);
+}
+
+export async function clearSecurityLogs() {
+  const db = await openDB();
+  const tx = db.transaction(STORES.securityLog, 'readwrite');
+  tx.objectStore(STORES.securityLog).clear();
+  return new Promise((resolve) => { tx.oncomplete = () => resolve(); });
 }

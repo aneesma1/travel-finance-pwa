@@ -125,13 +125,22 @@ async function fetchAndSaveProfile() {
   } catch { /* non-blocking */ }
 }
 
-// ── Authenticated fetch wrapper ───────────────────────────────────────────────
+// ── Authenticated fetch wrapper with Drive Gatekeeper safety ─────────────────
 export async function authFetch(url, options = {}, clientId) {
   let token = getToken();
 
   if (!token) {
     window.dispatchEvent(new CustomEvent('auth:required'));
     throw new Error('Authentication required');
+  }
+
+  // 🛡️ DRIVE GATEKEEPER (v4.9.1)
+  // Internal safety interlock to restrict access to app-owned folders only
+  if (url.includes('googleapis.com/drive') || url.includes('googleapis.com/upload/drive')) {
+    const method = (options.method || 'GET').toUpperCase();
+    if (method !== 'GET') {
+      validateDriveRequest(url, options);
+    }
   }
 
   const res = await fetch(url, {
@@ -146,6 +155,48 @@ export async function authFetch(url, options = {}, clientId) {
   }
 
   return res;
+}
+
+/**
+ * Validates that a Drive write request is targeting a whitelisted app resource.
+ */
+function validateDriveRequest(url, options) {
+  const method = (options.method || 'GET').toUpperCase();
+  
+  // Whitelist of app-owned IDs stored in localStorage
+  const SAFE_KEYS = [
+    'drive_app_folder_id', 'drive_mirror_folder_id',
+    'drive_travel_file_id', 'drive_finance_file_id',
+    'drive_travel_mirror_id', 'drive_finance_mirror_id',
+    'drive_pending_queue_id'
+  ];
+  const SAFE_IDS = SAFE_KEYS.map(k => localStorage.getItem(k)).filter(id => !!id);
+
+  // 🗃️ Check 1: File/ID updates (PATCH, DELETE)
+  const fileIdMatch = url.match(/\/files\/([a-zA-Z0-9_-]+)/);
+  if (fileIdMatch) {
+    const targetId = fileIdMatch[1];
+    if (!SAFE_IDS.includes(targetId)) {
+      const detail = { action: method, targetId, url, reason: 'Unrecognized Drive ID' };
+      addSecurityLog(detail).catch(() => {});
+      showToast('🛑 Security Interlock: Blocked unauthorized Drive edit.', 'error', 5000);
+      throw new Error(`Security Interlock: Action on unrecognised Drive ID [${targetId}] is forbidden.`);
+    }
+  }
+
+  // 📁 Check 2: File creation (POST)
+  if (method === 'POST') {
+    let bodyStr = '';
+    if (typeof options.body === 'string') bodyStr = options.body;
+    
+    const hasSafeParent = SAFE_IDS.some(id => bodyStr.includes(id));
+    if (bodyStr && !hasSafeParent) {
+      const detail = { action: 'CREATE', url, reason: 'Unsafe Parent Folder' };
+      addSecurityLog(detail).catch(() => {});
+      showToast('🛑 Security Interlock: Blocked file creation in external folder.', 'error', 5000);
+      throw new Error('Security Interlock: Attempted to create file in a non-app folder.');
+    }
+  }
 }
 
 // ── Compatibility exports (used by index.html) ────────────────────────────────
