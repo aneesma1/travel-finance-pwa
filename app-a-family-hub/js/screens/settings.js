@@ -5,7 +5,7 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
-import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData } from '../../../shared/drive.js';
+import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData, getBackupHealthReport } from '../../../shared/drive.js';
 import { localSave, clearDriveQueue } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
@@ -488,9 +488,12 @@ function renderAccountTab(data, members, user, container) {
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
       
       <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
-        <button id="repair-data-btn" class="btn btn-secondary btn-full" style="padding:10px; font-size:12px;">🔍 Trip Data: Scan & Repair</button>
-        <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
-          Merges duplicates & generates missing companion records.
+        <div style="display:flex; gap:10px;">
+          <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
+          <button id="backup-health-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">📊 Backup Health</button>
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
+          Maintenance: Repairs records & verifies Drive backup compliance.
         </div>
       </div>
 
@@ -600,6 +603,49 @@ function renderAccountTab(data, members, user, container) {
     } catch (err) { 
       showToast('Repair failed: ' + err.message, 'error');
       console.error(err);
+    }
+  });
+
+  document.getElementById('backup-health-btn')?.addEventListener('click', async () => {
+    try {
+      showToast('Scanning Drive folders…', 'info');
+      const report = await getBackupHealthReport('travel');
+      
+      const formatBytes = (b) => {
+        const bytes = Number(b);
+        if (!bytes) return '0 B';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024*1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024*1024)).toFixed(1) + ' MB';
+      };
+      
+      const message = `
+        <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
+          <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
+          • Data File: ${report.working.mainFile ? `✅ ${report.working.mainFile.name} (${formatBytes(report.working.mainFile.size)})` : '❌ Missing'}<br/>
+          • Sync Queue: ${report.working.queueActive ? '✅ Active' : '⚪ Empty'}<br/>
+          • Misc Files: ${report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0)} found
+          
+          <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
+          
+          <b style="color:var(--primary); font-size:14px;">🕒 Mirror System (Historical)</b><br/>
+          • <b>Edits Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.edits.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.edits.count} / ${report.mirror.edits.target}</span><br/>
+          • <b>Daily Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.daily.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.daily.count} / ${report.mirror.daily.target}</span><br/>
+          • <b>Monthly Tier</b> (Target 3): <span style="font-weight:700; color:${report.mirror.monthly.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.monthly.count} / ${report.mirror.monthly.target}</span>
+          
+          <div style="margin-top:16px; padding:10px; background:var(--primary-bg); border-radius:8px; border-left:4px solid var(--primary);">
+            <div style="font-weight:700; color:var(--primary); font-size:12px;">Compliance Feedback:</div>
+            <div style="font-size:11px; margin-top:4px;">${report.status === 'Healthy' ? '✅ System is correctly mirroring and pruning data to your Google Drive.' : '⌛ System is still initializing first-time snapshots.'}</div>
+          </div>
+        </div>
+      `;
+      
+      await showConfirmModal(`Status: ${report.status}`, message, { 
+        confirmText: 'Done', 
+        cancelText: '' 
+      });
+    } catch (err) {
+      showToast('Health scan failed: ' + err.message, 'error');
     }
   });
 
