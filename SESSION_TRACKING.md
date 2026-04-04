@@ -537,11 +537,12 @@ git checkout master
     - Bumped project version to **v4.0.0** across all components.
     - Synchronized `master` and `main` branches.
 - **Bug Fixes**:
-    - Resolved UUID appearance in Passenger Summary dropdown by enhancing name resolution logic.
+    - Resolved UUID appearance in Passenger Summary dropdown by enhancing "isUuid" regex and resolution logic.
     - Fixed overlapping stay calculations in Passenger Summary by implementing "Sequential Bridging" logic.
     - Implemented "Year Boundary Splitting" to correctly distribute stay days across Dec 31/Jan 1 transitions.
+    - Resolved trip duplication failure for companions by correctly resolving names in `add-trip.js`.
 - **New Features**:
     - Filtered "Current Locations" dashboard widget by country (Qatar/India).
     - Activated Address Photos for Family Defaults and Member Profiles.
     - Added dedicated "Google Plus Location ID" field to all address entry sections.
-- **Commit**: `7687cc5` (master), `e12bf4a` (main) — `fix: split stay durations across year boundaries`
+- **Commit**: `d9f477e` (master), `9ddf7c4` (main) — `fix: resolve passenger IDs in summary and fix companion trip name resolution`
