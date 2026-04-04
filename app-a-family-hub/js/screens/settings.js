@@ -1,4 +1,4 @@
-// v4.0.0 — 2026-04-04
+// v4.7.1 — 2026-04-04
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -11,7 +11,7 @@ import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
-import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate } from '../../../shared/utils.js';
+import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate, showConfirmModal, showInputModal } from '../../../shared/utils.js';
 import { authFetch } from '../../../shared/auth.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openPersonManage } from './person-manage.js';
