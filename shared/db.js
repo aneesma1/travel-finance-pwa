@@ -205,3 +205,19 @@ export async function clearSecurityLogs() {
   tx.objectStore(STORES.securityLog).clear();
   return new Promise((resolve) => { tx.oncomplete = () => resolve(); });
 }
+
+/**
+ * 💥 Nuclear Reset: Completely wipes ALL local database stores.
+ */
+export async function clearAllCachedData() {
+  const db = await openDB();
+  const stores = Object.values(STORES);
+  const tx = db.transaction(stores, 'readwrite');
+  stores.forEach(s => tx.objectStore(s).clear());
+  return new Promise((resolve) => {
+    tx.oncomplete = () => {
+      _db = null; // Reset singleton to force re-open
+      resolve();
+    };
+  });
+}
