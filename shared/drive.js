@@ -490,38 +490,72 @@ export async function restoreFromLocalFile(file, appName) {
   });
 }
 /**
- * Safely moves orphaned files in the root app folder to trash.
- * Whitelists the main data file and the sync queue.
+ * Safely moves orphaned files in the root app folder and the sessions mirror 
+ * folder to trash. Whitelists the main data file, active sync queue, and 
+ * any session file whose ID is still present in the local database.
  */
-export async function purgeOrphanedFiles(appName) {
+export async function purgeOrphanedFiles(appName, localData) {
   if (!isOnline()) throw new Error('Internet connection required');
   const token = (await import('./auth.js')).getToken();
   if (!token) throw new Error('Not signed in');
 
   const appFolderId = localStorage.getItem(KEYS.appFolderId);
+  const mirrorFolderId = localStorage.getItem(KEYS.mirrorFolderId);
   const label = appName === 'travel' ? 'travel' : 'finance';
-
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q='${appFolderId}'+in+parents+and+trashed=false&fields=files(id,name)`, {
+  
+  // 1. Audit Root App Folder
+  const rootRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${appFolderId}'+in+parents+and+trashed=false&fields=files(id,name)`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  const { files } = await res.json();
-  if (!files || !files.length) return 0;
-
+  const { files: rootFiles } = await rootRes.json();
+  
   let purged = 0;
-  for (const f of files) {
-    // PROTECT: Main data files for BOTH apps (Travel & Finance)
-    const isMainData = f.name.endsWith('_data.json');
-    // PROTECT: Active sync queues
-    const isQueue = f.name.includes('queue');
-    
-    if (!isMainData && !isQueue) {
-      await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trashed: true })
-      }).catch(() => { });
-      purged++;
+  if (rootFiles) {
+    for (const f of rootFiles) {
+      const isMainData = f.name.endsWith('_data.json');
+      const isQueue = f.name.includes('queue');
+      if (!isMainData && !isQueue) {
+        await trashFile(f.id, token);
+        purged++;
+      }
     }
   }
+
+  // 2. Audit Session Mirror Folder (The Deep Clean)
+  const appFolder = await findOrCreateFolder(label, mirrorFolderId);
+  const sessionsFolder = await findOrCreateFolder('sessions', appFolder);
+  
+  const sessRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${sessionsFolder}'+in+parents+and+trashed=false&fields=files(id,name)`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const { files: sessFiles } = await sessRes.json();
+  
+  if (sessFiles && localData) {
+    // Collect all valid IDs from the local database
+    const validIds = new Set();
+    if (appName === 'travel') {
+      (localData.trips || []).forEach(t => validIds.add(String(t.id)));
+    } else {
+      (localData.transactions || []).forEach(t => validIds.add(String(t.id)));
+    }
+
+    for (const f of sessFiles) {
+      // Session files are normally named {id}.json or txn_{id}.json
+      const fileId = f.name.replace('txn_', '').replace('.json', '');
+      if (!validIds.has(fileId)) {
+        await trashFile(f.id, token);
+        purged++;
+      }
+    }
+  }
+
   return purged;
+}
+
+async function trashFile(fileId, token) {
+  return fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trashed: true })
+  }).catch(() => { });
 }

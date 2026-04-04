@@ -1,4 +1,4 @@
-// v4.11.1 — 2026-04-04 — 17:51
+// v4.12.0 — 2026-04-04 — 18:07
 
 // ─── shared/utils.js ────────────────────────────────────────────────────────
 // Shared utility functions used by both App A and App B
@@ -7,7 +7,7 @@
 
 // ── UUID v4 ──────────────────────────────────────────────────────────────────
 export function uuidv4() {
-  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
     (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
   );
 }
@@ -22,9 +22,9 @@ export function toISODate(date) {
   if (parts.length === 3) {
     let day = parts[0], month = parts[1], year = parts[2];
     // If year is the first part (YYYY-MM-DD), reorder
-    if (day.length === 4) return `${day}-${month.padStart(2,'0')}-${year.padStart(2,'0')}`;
+    if (day.length === 4) return `${day}-${month.padStart(2, '0')}-${year.padStart(2, '0')}`;
     // Assume DD-MM-YYYY
-    return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
   const d = new Date(s);
   return isNaN(d.getTime()) ? s : d.toISOString().split('T')[0];
@@ -91,7 +91,7 @@ export function expiryStatus(expiryDateStr) {
   // Returns: 'expired' | 'danger' (≤30d) | 'warning' (≤90d) | 'valid'
   const days = daysFromToday(expiryDateStr);
   if (days === null) return 'unknown';
-  if (days < 0)  return 'expired';
+  if (days < 0) return 'expired';
   if (days <= 30) return 'danger';
   if (days <= 90) return 'warning';
   return 'valid';
@@ -100,9 +100,9 @@ export function expiryStatus(expiryDateStr) {
 export function expiryStatusColor(status) {
   const map = {
     expired: '#EF4444',
-    danger:  '#EF4444',
+    danger: '#EF4444',
     warning: '#F59E0B',
-    valid:   '#10B981',
+    valid: '#10B981',
     unknown: '#94A3B8'
   };
   return map[status] || '#94A3B8';
@@ -153,9 +153,9 @@ export function showToast(message, type = 'info', duration = 3000) {
   if (existing) existing.remove();
 
   const colors = {
-    info:    { bg: '#3730A3', icon: 'ℹ️' },
+    info: { bg: '#3730A3', icon: 'ℹ️' },
     success: { bg: '#065F46', icon: '✅' },
-    error:   { bg: '#B91C1C', icon: '❌' },
+    error: { bg: '#B91C1C', icon: '❌' },
     warning: { bg: '#92400E', icon: '⚠️' }
   };
   const { bg, icon } = colors[type] || colors.info;
@@ -217,13 +217,13 @@ export function isOnline() {
 }
 
 export function onNetworkChange(callback) {
-  window.addEventListener('online',  () => callback(true));
+  window.addEventListener('online', () => callback(true));
   window.addEventListener('offline', () => callback(false));
 }
 // ── Custom Modals (Attractive alternatives to prompt/confirm) ────────────────
 export function showConfirmModal(title, message, options = {}) {
   const { onConfirm, onCancel, confirmText = 'Confirm', cancelText = 'Cancel', danger = false } = options;
-  
+
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -232,7 +232,7 @@ export function showConfirmModal(title, message, options = {}) {
       <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
         <div style="padding:20px 24px;">
           <div style="font-size:17px; font-weight:700; margin-bottom:8px;">${title}</div>
-          <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.11.1 · 2026-04-04 · 17:51</div>
+          <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.12.0 · 2026-04-04 · 18:07</div>
           <div style="margin-top:24px; display:flex; gap:12px;">
             ${cancelText ? `<button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>` : ''}
             <button id="modal-confirm" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" style="flex:1;">${confirmText}</button>
@@ -259,9 +259,9 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '10001';
-    
+
     // Build datalist if suggestions provided
-    const datalistId = suggestions.length ? 'modal-datalist-' + uuidv4().slice(0,8) : null;
+    const datalistId = suggestions.length ? 'modal-datalist-' + uuidv4().slice(0, 8) : null;
     const datalistHtml = datalistId ? `
       <datalist id="${datalistId}">
         ${suggestions.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('')}
