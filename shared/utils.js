@@ -234,7 +234,7 @@ export function showConfirmModal(title, message, options = {}) {
           <div style="font-size:17px; font-weight:700; margin-bottom:8px;">${title}</div>
           <div style="font-size:14px; color:var(--text-secondary); line-height:1.5;">${message}</div>
           <div style="margin-top:24px; display:flex; gap:12px;">
-            <button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>
+            ${cancelText ? `<button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>` : ''}
             <button id="modal-confirm" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" style="flex:1;">${confirmText}</button>
           </div>
         </div>
@@ -247,7 +247,8 @@ export function showConfirmModal(title, message, options = {}) {
       setTimeout(() => { overlay.remove(); resolve(val); }, 150);
     };
 
-    overlay.querySelector('#modal-cancel').onclick = () => { if (onCancel) onCancel(); close(false); };
+    const btnCancel = overlay.querySelector('#modal-cancel');
+    if (btnCancel) btnCancel.onclick = () => { if (onCancel) onCancel(); close(false); };
     overlay.querySelector('#modal-confirm').onclick = () => { if (onConfirm) onConfirm(); close(true); };
   });
 }

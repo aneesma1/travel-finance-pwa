@@ -15,7 +15,8 @@ import {
 } from '../../../shared/utils.js';
 import {
   downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
-  getMirrorSnapshots, restoreFromMirror, getBackupHealthReport
+  getMirrorSnapshots, restoreFromMirror, getBackupHealthReport,
+  purgeOrphanedFiles
 } from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
@@ -685,12 +686,22 @@ export async function renderSettings(container, params = {}) {
           return (bytes / (1024*1024)).toFixed(1) + ' MB';
         };
         
+        const miscCount = report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0);
+        
         const message = `
           <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
             <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
             • Data File: ${report.working.mainFile ? `✅ ${report.working.mainFile.name} (${formatBytes(report.working.mainFile.size)})` : '❌ Missing'}<br/>
             • Sync Queue: ${report.working.queueActive ? '✅ Active' : '⚪ Empty'}<br/>
-            • Misc Files: ${report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0)} found
+            • Misc Files: ${miscCount} found
+            
+            ${miscCount > 0 ? `
+              <div style="margin-top:8px;">
+                <button id="purge-files-btn" class="btn btn-secondary" style="width:100%; padding:6px; font-size:11px; border-color:var(--danger); color:var(--danger);">
+                  🗑️ Purge Orphaned Files
+                </button>
+              </div>
+            ` : ''}
             
             <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
             
@@ -706,10 +717,22 @@ export async function renderSettings(container, params = {}) {
           </div>
         `;
         
-        await showConfirmModal(`Vault Status: ${report.status}`, message, { 
+        const modalOk = await showConfirmModal(`Vault Status: ${report.status}`, message, { 
           confirmText: 'Done', 
           cancelText: '' 
         });
+
+        const purgeBtn = document.getElementById('purge-files-btn');
+        if (purgeBtn) {
+          purgeBtn.onclick = async () => {
+            if (!confirm('Are you sure you want to move all orphaned backups to the trash? This keeps your drive clean.')) return;
+            showToast('Purging…', 'info');
+            const count = await purgeOrphanedFiles('finance');
+            showToast(`Moved ${count} files to trash`, 'success');
+            document.querySelector('.modal-overlay').remove(); 
+            document.getElementById('backup-health-btn').click();
+          };
+        }
       } catch (err) {
         showToast('Vault health scan failed: ' + err.message, 'error');
       }

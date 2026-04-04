@@ -433,3 +433,36 @@ export async function restoreFromLocalFile(file, appName) {
     reader.readAsText(file);
   });
 }
+/**
+ * Safely moves orphaned files in the root app folder to trash.
+ * Whitelists the main data file and the sync queue.
+ */
+export async function purgeOrphanedFiles(appName) {
+  if (!isOnline()) throw new Error('Internet connection required');
+  const token = (await import('./auth.js')).getToken();
+  if (!token) throw new Error('Not signed in');
+
+  const appFolderId = localStorage.getItem(KEYS.appFolderId);
+  const label = appName === 'travel' ? 'travel' : 'finance';
+
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q='${appFolderId}'+in+parents+and+trashed=false&fields=files(id,name)`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const { files } = await res.json();
+  if (!files || !files.length) return 0;
+
+  let purged = 0;
+  for (const f of files) {
+    const isMain = f.name.includes(label) && f.name.endsWith('.json');
+    const isQueue = f.name.includes('queue');
+    if (!isMain && !isQueue) {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trashed: true })
+      }).catch(() => { });
+      purged++;
+    }
+  }
+  return purged;
+}
