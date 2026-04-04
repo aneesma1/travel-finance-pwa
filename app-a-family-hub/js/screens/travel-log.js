@@ -28,7 +28,10 @@ export async function renderTravelLog(container, params = {}) {
   const { passengers = [], trips = [] } = data || {};
 
   // ── 1. Data Normalization ──
-  const isUuid = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  const isUuid = (str) => {
+    const s = String(str || '').trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) || (s.length === 36 && s.includes('-'));
+  };
   const tpMap = Object.fromEntries(passengers.map(p => [p.id, p]));
 
   const safeTrips = Array.isArray(trips) ? trips.filter(Boolean).map(t => {

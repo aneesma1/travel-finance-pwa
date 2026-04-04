@@ -24,6 +24,10 @@ export async function renderAddTrip(container, params = {}) {
   const isEdit = isExisting;  // any existing trip can be edited
   let isViewMode = isExisting && mode !== 'edit';  // view by default, edit when explicit
 
+  const isUuid = (str) => {
+    const s = String(str || '').trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) || (s.length === 36 && s.includes('-'));
+  };
   const data = await getCachedTravelData();
   const { passengers = [], trips = [] } = data || {};
   const persons = [...passengers];
@@ -458,6 +462,8 @@ export async function renderAddTrip(container, params = {}) {
     const selectedPerson = persons.find(m => m.id === state.passengerId);
     const passengerName = state.passengerName || selectedPerson?.name || 'Unknown';
 
+    const shouldDuplicate = !isEdit && state.travelWith.length > 0 && document.getElementById('create-copy-check')?.checked;
+
     const tripData = {
       id:           isEdit ? existingTrip.id : uuidv4(),
       timestamp:    isEdit ? existingTrip.timestamp : new Date().toISOString(),
@@ -495,23 +501,22 @@ export async function renderAddTrip(container, params = {}) {
         // 1. Prepare all trips to be saved (Main + Companions if new)
         const tripsToSave = [tripData];
         
-        if (!isEdit && state.travelWith.length > 0) {
-          const shouldDuplicate = document.getElementById('create-copy-check')?.checked;
-          if (shouldDuplicate) {
-            state.travelWith.forEach(companionId => {
-              const companionTrip = {
-                ...tripData,
-                id: uuidv4(),
-                passengerId: companionId,
-                // Replace companionId in travelWith with the main passengerId
-                travelWith: [
-                  state.passengerId,
-                  ...state.travelWith.filter(bid => bid !== companionId)
-                ]
-              };
-              tripsToSave.push(companionTrip);
-            });
-          }
+        if (shouldDuplicate) {
+          state.travelWith.forEach(companionId => {
+            const compPerson = persons.find(m => m.id === companionId);
+            const companionTrip = {
+              ...tripData,
+              id: uuidv4(),
+              passengerId: companionId,
+              passengerName: compPerson?.name || 'Unknown',
+              // Replace companionId in travelWith with the main passengerId
+              travelWith: [
+                state.passengerId,
+                ...state.travelWith.filter(bid => bid !== companionId)
+              ]
+            };
+            tripsToSave.push(companionTrip);
+          });
         }
 
         // 2. Update the trips array
