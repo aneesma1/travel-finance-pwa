@@ -222,7 +222,7 @@ export async function renderTransactions(container) {
   const activeMonth    = p.month  ? Number(p.month) : 0;
   const activeAccount  = p.account  || '';
   
-  let searchText = '';
+  let searchText = p.q || '';
   let selectedCategories = JSON.parse(sessionStorage.getItem('vault_search_cats') || '[]');
   if (p.category && !selectedCategories.includes(p.category)) {
     selectedCategories.push(p.category);
@@ -243,11 +243,12 @@ export async function renderTransactions(container) {
   function renderSearchBar() {
     const wrap = document.getElementById('search-bar-wrap');
     wrap.innerHTML = `
-      <div style="position:relative;">
+      <div style="position:relative; display:flex; align-items:center;">
         <input type="text" id="txn-search-input" placeholder="Search categories or description..." 
-          style="width:100%;padding:10px 12px 10px 36px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--surface-2);font-size:14px;font-family:inherit;"
-          value="${searchText}" />
-        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;opacity:0.5;">🔍</span>
+          style="width:100%; padding:10px 36px 10px 36px; border-radius:var(--radius-md); border:1.5px solid var(--border); background:var(--surface-2); font-size:14px; font-family:inherit;"
+          value="${searchText}">
+        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:16px; opacity:0.5;">🔍</span>
+        <button id="search-clear-btn" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; cursor:pointer; display:${searchText ? 'block' : 'none'}; font-size:18px; color:var(--text-muted);">ⓧ</button>
         <div id="search-suggestions" class="hidden" style="
           position:absolute;top:100%;left:0;right:0;z-index:1100;
           background:var(--surface);border:1px solid var(--border);border-radius:0 0 var(--radius-lg) var(--radius-lg);
@@ -259,11 +260,26 @@ export async function renderTransactions(container) {
 
     const input = document.getElementById('txn-search-input');
     const suggs = document.getElementById('search-suggestions');
+    const clearBtn = document.getElementById('search-clear-btn');
+
+    const updateUIState = () => {
+      clearBtn.style.display = searchText ? 'block' : 'none';
+      setHashParams({ q: searchText || null });
+      renderList();
+    };
 
     input.addEventListener('input', () => {
       searchText = input.value.toLowerCase();
       updateSuggestions();
-      renderList();
+      updateUIState();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      searchText = '';
+      input.value = '';
+      suggs.classList.add('hidden');
+      updateUIState();
+      input.focus();
     });
 
     input.addEventListener('focus', () => updateSuggestions());

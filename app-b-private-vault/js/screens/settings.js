@@ -27,8 +27,8 @@ import { openCategoryManager } from '../modals/category-manager.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
 import { exitApp } from '../../../shared/app-utils.js';
 
-const CACHE_NAME    = 'vault v4.9.7';
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const CACHE_NAME = 'vault v4.9.7';
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export async function renderSettings(container, params = {}) {
   const data = await getCachedFinanceData();
@@ -46,11 +46,11 @@ export async function renderSettings(container, params = {}) {
     <!-- Tab bar -->
     <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;">
       ${[
-        { id: 'data',     label: '💾 Data'    },
-        { id: 'export',   label: '📤 Export'  },
-        { id: 'security', label: '🔐 Security'},
-        { id: 'account',  label: '👤 Account' },
-      ].map(tab => `
+      { id: 'data', label: '💾 Data' },
+      { id: 'export', label: '📤 Export' },
+      { id: 'security', label: '🔐 Security' },
+      { id: 'account', label: '👤 Account' },
+    ].map(tab => `
         <button class="settings-tab ${activeTab === tab.id ? 'active' : ''}" data-tab="${tab.id}" style="
           flex:1; padding:12px 4px; border:none; background:none; cursor:pointer;
           font-size:11px; font-weight:600; color:${activeTab === tab.id ? 'var(--primary)' : 'var(--text-muted)'};
@@ -71,10 +71,10 @@ export async function renderSettings(container, params = {}) {
   });
 
   switch (activeTab) {
-    case 'data':     renderDataTab(transactions, data); break;
-    case 'export':   renderExportTab(transactions, data); break;
+    case 'data': renderDataTab(transactions, data); break;
+    case 'export': renderExportTab(transactions, data); break;
     case 'security': renderSecurityTab(); break;
-    case 'account':  renderAccountTab(user, data); break;
+    case 'account': renderAccountTab(user, data); break;
   }
 
   // ── DATA TAB ──────────────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ export async function renderSettings(container, params = {}) {
     document.getElementById('reset-db-btn').addEventListener('click', async () => {
       if (!confirm('⚠️ RESET DATABASE?\n\nThis will PERMANENTLY DELETE all your transactions, categories, and account settings.\n\nHave you taken a backup first?')) return;
       if (!confirm('SECOND CONFIRMATION:\n\nThis action cannot be undone. All your data in the cloud (Google Drive) will also be wiped out. Are you absolutely sure?')) return;
-      
+
       try {
         showToast('Resetting database…', 'info', 3000);
         await localSave('finance', () => ({ transactions: [], categories: [], accounts: [] }));
@@ -241,8 +241,8 @@ export async function renderSettings(container, params = {}) {
   // ── EXPORT TAB ────────────────────────────────────────────────────────────
   function renderExportTab(transactions, data) {
     const tab = document.getElementById('tab-content');
-    const yr  = currentYear();
-    const mo  = currentMonth();
+    const yr = currentYear();
+    const mo = currentMonth();
 
     tab.innerHTML = `
       <div class="section-title">Filter to Export</div>
@@ -252,7 +252,7 @@ export async function renderSettings(container, params = {}) {
             <label class="form-label">Year</label>
             <select class="form-input" id="exp-year" style="padding:10px 12px;">
               <option value="">All years</option>
-              ${[...new Set(transactions.map(t => t.date?.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a).map(y => `
+              ${[...new Set(transactions.map(t => t.date?.slice(0, 4)).filter(Boolean))].sort((a, b) => b - a).map(y => `
                 <option value="${y}" ${y === String(yr) ? 'selected' : ''}>${y}</option>
               `).join('')}
             </select>
@@ -261,7 +261,7 @@ export async function renderSettings(container, params = {}) {
             <label class="form-label">Month</label>
             <select class="form-input" id="exp-month" style="padding:10px 12px;">
               <option value="">All months</option>
-              ${MONTHS.map((m,i) => `<option value="${i+1}" ${i+1 === mo ? 'selected' : ''}>${m}</option>`).join('')}
+              ${MONTHS.map((m, i) => `<option value="${i + 1}" ${i + 1 === mo ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -269,7 +269,7 @@ export async function renderSettings(container, params = {}) {
           <label class="form-label">Currency</label>
           <select class="form-input" id="exp-currency" style="padding:10px 12px;">
             <option value="">All currencies</option>
-            ${['QAR','INR','USD'].map(c => `<option value="${c}" ${c === 'QAR' ? 'selected' : ''}>${c}</option>`).join('')}
+            ${['QAR', 'INR', 'USD'].map(c => `<option value="${c}" ${c === 'QAR' ? 'selected' : ''}>${c}</option>`).join('')}
           </select>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
@@ -324,17 +324,17 @@ export async function renderSettings(container, params = {}) {
 
     // Live count update
     function updateCount() {
-      const yr   = document.getElementById('exp-year').value;
-      const mo   = document.getElementById('exp-month').value;
-      const cur  = document.getElementById('exp-currency').value;
+      const yr = document.getElementById('exp-year').value;
+      const mo = document.getElementById('exp-month').value;
+      const cur = document.getElementById('exp-currency').value;
       const cat1 = document.getElementById('exp-cat1').value;
       const cat2 = document.getElementById('exp-cat2').value;
       const filtered = transactions.filter(t => {
-        if (yr   && t.date?.slice(0,4)             !== yr)          return false;
-        if (mo   && Number(t.date?.slice(5,7))     !== Number(mo))  return false;
-        if (cur  && t.currency                     !== cur)          return false;
-        if (cat1 && t.category1                    !== cat1)         return false;
-        if (cat2 && t.category2                    !== cat2)         return false;
+        if (yr && t.date?.slice(0, 4) !== yr) return false;
+        if (mo && Number(t.date?.slice(5, 7)) !== Number(mo)) return false;
+        if (cur && t.currency !== cur) return false;
+        if (cat1 && t.category1 !== cat1) return false;
+        if (cat2 && t.category2 !== cat2) return false;
         return true;
       });
       document.getElementById('export-count').textContent =
@@ -342,7 +342,7 @@ export async function renderSettings(container, params = {}) {
       return filtered;
     }
     updateCount();
-    ['exp-year','exp-month','exp-currency','exp-cat1','exp-cat2'].forEach(id => {
+    ['exp-year', 'exp-month', 'exp-currency', 'exp-cat1', 'exp-cat2'].forEach(id => {
       document.getElementById(id).addEventListener('change', updateCount);
     });
 
@@ -376,22 +376,22 @@ export async function renderSettings(container, params = {}) {
     const XLSX = window.XLSX;
 
     // Column headers
-    const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Currency'];
+    const headers = ['Timestamp', 'Date', 'Description', 'Amount Spend', 'Income', 'Category 1', 'Category 2', 'Notes 1', 'Account', 'Currency'];
 
     // Build rows
     const rows = transactions
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .map(t => [
-        t.timestamp   || '',
-        t.date        || '',
+        t.timestamp || '',
+        t.date || '',
         t.description || '',
         t.amountSpend != null ? Number(t.amountSpend) : '',
-        t.income      != null ? Number(t.income)      : '',
-        t.category1   || '',
-        t.category2   || '',
-        t.notes1      || '',
-        t.account     || '',
-        t.currency    || '',
+        t.income != null ? Number(t.income) : '',
+        t.category1 || '',
+        t.category2 || '',
+        t.notes1 || '',
+        t.account || '',
+        t.currency || '',
       ]);
 
     // Create workbook
@@ -413,12 +413,12 @@ export async function renderSettings(container, params = {}) {
     XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
 
     // Filename
-    const yr  = document.getElementById('exp-year')?.value  || 'All';
-    const mo  = document.getElementById('exp-month')?.value;
+    const yr = document.getElementById('exp-year')?.value || 'All';
+    const mo = document.getElementById('exp-month')?.value;
     const cur = document.getElementById('exp-currency')?.value || 'All';
-    const moLabel = mo ? MONTHS[Number(mo)-1] : 'All';
+    const moLabel = mo ? MONTHS[Number(mo) - 1] : 'All';
     const ts = timestampSuffix();
-    const filename = `Finance_Export_${cur}_${yr}${moLabel ? '_'+moLabel : ''}_${ts}.xlsx`;
+    const filename = `Finance_Export_${cur}_${yr}${moLabel ? '_' + moLabel : ''}_${ts}.xlsx`;
 
     if (!sendEmail) {
       // Direct download
@@ -430,7 +430,7 @@ export async function renderSettings(container, params = {}) {
       try {
         const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
         const subject = encodeURIComponent(`Finance Export -- ${moLabel} ${yr}`);
-        const body    = encodeURIComponent(
+        const body = encodeURIComponent(
           `Finance export attached.\n\nPeriod: ${moLabel} ${yr}\nCurrency: ${cur}\nRecords: ${transactions.length}\n\nGenerated by Private Vault App`
         );
         // Try Web Share API with file first (works on Android)
@@ -446,7 +446,7 @@ export async function renderSettings(container, params = {}) {
         } else {
           // Fallback: mailto with data URI (works in Gmail/Outlook on Android)
           const dataUri = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
-          const mailto  = `mailto:?subject=${subject}&body=${body}`;
+          const mailto = `mailto:?subject=${subject}&body=${body}`;
           window.location.href = mailto;
           // Also download as fallback since mailto attachment isn't always supported
           setTimeout(() => {
@@ -502,20 +502,20 @@ export async function renderSettings(container, params = {}) {
         <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Lock app after inactivity</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;" id="lock-timeout-pills">
           ${[
-            { label:'1 min',  ms: 60000 },
-            { label:'5 min',  ms: 300000 },
-            { label:'15 min', ms: 900000 },
-            { label:'30 min', ms: 1800000 },
-            { label:'Never',  ms: 0 }
-          ].map(opt => {
-            const current = Number(localStorage.getItem('vault_lock_timeout_ms') || 300000);
-            const active = opt.ms === current || (opt.ms === 300000 && !localStorage.getItem('vault_lock_timeout_ms'));
-            const cls = active ? 'pill-btn active' : 'pill-btn';
-            const border = active ? 'var(--primary)' : 'var(--border)';
-            const bg = active ? 'var(--primary-bg)' : 'transparent';
-            const col = active ? 'var(--primary)' : 'var(--text)';
-            return '<button class="' + cls + '" data-ms="' + opt.ms + '" style="padding:8px 16px;border-radius:20px;border:1.5px solid ' + border + ';background:' + bg + ';color:' + col + ';font-size:14px;cursor:pointer;">' + opt.label + '</button>';
-          }).join('')}
+        { label: '1 min', ms: 60000 },
+        { label: '5 min', ms: 300000 },
+        { label: '15 min', ms: 900000 },
+        { label: '30 min', ms: 1800000 },
+        { label: 'Never', ms: 0 }
+      ].map(opt => {
+        const current = Number(localStorage.getItem('vault_lock_timeout_ms') || 300000);
+        const active = opt.ms === current || (opt.ms === 300000 && !localStorage.getItem('vault_lock_timeout_ms'));
+        const cls = active ? 'pill-btn active' : 'pill-btn';
+        const border = active ? 'var(--primary)' : 'var(--border)';
+        const bg = active ? 'var(--primary-bg)' : 'transparent';
+        const col = active ? 'var(--primary)' : 'var(--text)';
+        return '<button class="' + cls + '" data-ms="' + opt.ms + '" style="padding:8px 16px;border-radius:20px;border:1.5px solid ' + border + ';background:' + bg + ';color:' + col + ';font-size:14px;cursor:pointer;">' + opt.label + '</button>';
+      }).join('')}
         </div>
       </div>
 
@@ -566,21 +566,21 @@ export async function renderSettings(container, params = {}) {
     });
 
     document.getElementById('change-pin-btn').addEventListener('click', async () => {
-      const cur  = document.getElementById('current-pin').value;
-      const nw   = document.getElementById('new-pin').value;
+      const cur = document.getElementById('current-pin').value;
+      const nw = document.getElementById('new-pin').value;
       const conf = document.getElementById('confirm-pin').value;
-      const err  = document.getElementById('pin-error');
+      const err = document.getElementById('pin-error');
 
-      if (!cur || cur.length !== 4)  { err.textContent = 'Enter your current 4-digit PIN'; return; }
-      if (!nw  || nw.length  !== 4)  { err.textContent = 'New PIN must be 4 digits'; return; }
-      if (nw !== conf)               { err.textContent = 'New PINs do not match'; return; }
-      if (nw === cur)                { err.textContent = 'New PIN must be different from current'; return; }
+      if (!cur || cur.length !== 4) { err.textContent = 'Enter your current 4-digit PIN'; return; }
+      if (!nw || nw.length !== 4) { err.textContent = 'New PIN must be 4 digits'; return; }
+      if (nw !== conf) { err.textContent = 'New PINs do not match'; return; }
+      if (nw === cur) { err.textContent = 'New PIN must be different from current'; return; }
 
       try {
         await changePin(cur, nw);
         showToast('PIN changed successfully!', 'success');
         err.textContent = '';
-        ['current-pin','new-pin','confirm-pin'].forEach(id => { document.getElementById(id).value = ''; });
+        ['current-pin', 'new-pin', 'confirm-pin'].forEach(id => { document.getElementById(id).value = ''; });
       } catch (e) {
         err.textContent = e.message.startsWith('WRONG') ? 'Current PIN is incorrect' : e.message;
       }
@@ -648,9 +648,9 @@ export async function renderSettings(container, params = {}) {
         </div>
       </div>
     `;
-    
-    
-    
+
+
+
     // --- Account Tab Listeners ---
     document.getElementById('download-recovery-zip')?.addEventListener('click', async () => {
       try {
@@ -685,15 +685,15 @@ export async function renderSettings(container, params = {}) {
       `;
 
       await showConfirmModal('🛡️ Security Audit Log', logHtml, { confirmText: 'Done', cancelText: '' });
-      
+
       const clearBtn = document.getElementById('clear-security-logs');
       if (clearBtn) {
         clearBtn.onclick = async () => {
-           if (confirm('Clear all security audit records?')) {
-             await clearSecurityLogs();
-             showToast('Audit log cleared.', 'success');
-             document.querySelector('.modal-overlay').remove();
-           }
+          if (confirm('Clear all security audit records?')) {
+            await clearSecurityLogs();
+            showToast('Audit log cleared.', 'success');
+            document.querySelector('.modal-overlay').remove();
+          }
         };
       }
     };
@@ -711,7 +711,7 @@ export async function renderSettings(container, params = {}) {
           const seen = new Set();
           const nonDupes = [];
           let mergedCount = 0;
-          
+
           txns.forEach(t => {
             const key = `${t.date}|${t.amountSpend || 0}|${t.income || 0}|${t.description}|${t.category1}|${t.account}`;
             if (seen.has(key)) {
@@ -721,11 +721,11 @@ export async function renderSettings(container, params = {}) {
               nonDupes.push(t);
             }
           });
-          
+
           window._repairSummary = { merged: mergedCount };
           return { ...remote, transactions: nonDupes };
         });
-        
+
         await setCachedFinanceData(newData);
         const { merged } = window._repairSummary || {};
         showToast(`Success! Merged ${merged} duplicates.`, 'success', 5000);
@@ -735,22 +735,22 @@ export async function renderSettings(container, params = {}) {
       }
     });
 
-      // --- Backup Health ---
+    // --- Backup Health ---
     document.getElementById('backup-health-btn')?.addEventListener('click', async () => {
       try {
         showToast('Scanning Drive folders…', 'info');
         const report = await getBackupHealthReport('finance');
-        
+
         const formatBytes = (b) => {
           const bytes = Number(b);
           if (!bytes) return '0 B';
           if (bytes < 1024) return bytes + ' B';
-          if (bytes < 1024*1024) return (bytes / 1024).toFixed(1) + ' KB';
-          return (bytes / (1024*1024)).toFixed(1) + ' MB';
+          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+          return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         };
-        
+
         const miscCount = report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0);
-        
+
         const message = `
           <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
             <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
@@ -779,10 +779,10 @@ export async function renderSettings(container, params = {}) {
             </div>
           </div>
         `;
-        
-        const modalOk = await showConfirmModal(`Vault Status: ${report.status}`, message, { 
-          confirmText: 'Done', 
-          cancelText: '' 
+
+        const modalOk = await showConfirmModal(`Vault Status: ${report.status}`, message, {
+          confirmText: 'Done',
+          cancelText: ''
         });
 
         const purgeBtn = document.getElementById('purge-files-btn');
@@ -792,7 +792,7 @@ export async function renderSettings(container, params = {}) {
             showToast('Purging…', 'info');
             const count = await purgeOrphanedFiles('finance');
             showToast(`Moved ${count} files to trash`, 'success');
-            document.querySelector('.modal-overlay').remove(); 
+            document.querySelector('.modal-overlay').remove();
             document.getElementById('backup-health-btn').click();
           };
         }
@@ -840,8 +840,8 @@ export async function renderSettings(container, params = {}) {
             if (p?.startsWith('data:')) {
               const b64 = p.split(',')[1];
               const date = t.date || 'unknown';
-              const desc = (t.description || 'txn').replace(/[^a-zA-Z0-9]/g,'_').slice(0,20);
-              zip.folder('transactions').file(`${date}_${desc}_${i+1}.jpg`, b64, { base64: true });
+              const desc = (t.description || 'txn').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20);
+              zip.folder('transactions').file(`${date}_${desc}_${i + 1}.jpg`, b64, { base64: true });
               count++;
             }
           });
@@ -849,8 +849,8 @@ export async function renderSettings(container, params = {}) {
 
         if (count === 0) { showToast('No photos found to export', 'warning'); return; }
 
-        const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
-        const blob = await zip.generateAsync({ type:'blob' });
+        const ts = new Date().toISOString().replace('T', '_').slice(0, 16).replace(':', '-');
+        const blob = await zip.generateAsync({ type: 'blob' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `Finance_Photos_${ts}.zip`;

@@ -18,8 +18,8 @@ import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recove
 import { openPersonManage } from './person-manage.js';
 import { exitApp } from '../../../shared/app-utils.js';
 
-const MEMBER_EMOJIS = ['👤','👨','👩','🧑','👦','👧','🧔','👱','🧒'];
-const MEMBER_COLORS = ['#EEF2FF','#D1FAE5','#FEF3C7','#FCE7F3','#E0F2FE','#F3E8FF'];
+const MEMBER_EMOJIS = ['👤', '👨', '👩', '🧑', '👦', '👧', '🧔', '👱', '🧒'];
+const MEMBER_COLORS = ['#EEF2FF', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#E0F2FE', '#F3E8FF'];
 
 // ── Main entry ────────────────────────────────────────────────────────────────
 export async function renderSettings(container, params = {}) {
@@ -28,20 +28,20 @@ export async function renderSettings(container, params = {}) {
   const { members = [] } = data || {};
   const user = getUser();
 
-  const tabs = ['people','data','security','account'];
+  const tabs = ['people', 'data', 'security', 'account'];
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">⚙️ Settings</span>
     </div>
     <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 4px;">
       ${tabs.map(id => `
-        <button class="settings-tab ${activeTab===id?'active':''}" data-tab="${id}"
+        <button class="settings-tab ${activeTab === id ? 'active' : ''}" data-tab="${id}"
           style="flex:1;padding:12px 4px;border:none;background:none;cursor:pointer;
             font-size:11px;font-weight:600;font-family:inherit;
-            color:${activeTab===id?'var(--primary)':'var(--text-muted)'};
-            border-bottom:2px solid ${activeTab===id?'var(--primary)':'transparent'};
+            color:${activeTab === id ? 'var(--primary)' : 'var(--text-muted)'};
+            border-bottom:2px solid ${activeTab === id ? 'var(--primary)' : 'transparent'};
             transition:all 0.15s;">
-          ${id==='people'?'👥 People':id==='data'?'💾 Data':id==='security'?'🔐 Security':'👤 Account'}
+          ${id === 'people' ? '👥 People' : id === 'data' ? '💾 Data' : id === 'security' ? '🔐 Security' : '👤 Account'}
         </button>`).join('')}
     </div>
     <div id="tab-content" style="padding-bottom:32px;"></div>
@@ -59,10 +59,10 @@ export async function renderSettings(container, params = {}) {
     btn.addEventListener('click', () => renderSettings(container, { tab: btn.dataset.tab }));
   });
 
-  if      (activeTab === 'people')   renderPeopleTab(container, data, members, user);
-  else if (activeTab === 'data')     renderDataTab(data, members, container);
+  if (activeTab === 'people') renderPeopleTab(container, data, members, user);
+  else if (activeTab === 'data') renderDataTab(data, members, container);
   else if (activeTab === 'security') renderSecurityTab();
-  else if (activeTab === 'account')  renderAccountTab(data, members, user, container);
+  else if (activeTab === 'account') renderAccountTab(data, members, user, container);
 }
 
 // ── PEOPLE TAB ────────────────────────────────────────────────────────────────
@@ -136,11 +136,11 @@ function buildDupeWarning(members) {
     for (let j = i + 1; j < members.length; j++) {
       const a = members[i].name.toLowerCase().trim();
       const b = members[j].name.toLowerCase().trim();
-      const dp = Array.from({length:a.length+1}, (_,r) =>
-        Array.from({length:b.length+1}, (_,c) => r===0?c:c===0?r:0));
-      for (let r=1;r<=a.length;r++)
-        for (let c=1;c<=b.length;c++)
-          dp[r][c]=a[r-1]===b[c-1]?dp[r-1][c-1]:1+Math.min(dp[r-1][c],dp[r][c-1],dp[r-1][c-1]);
+      const dp = Array.from({ length: a.length + 1 }, (_, r) =>
+        Array.from({ length: b.length + 1 }, (_, c) => r === 0 ? c : c === 0 ? r : 0));
+      for (let r = 1; r <= a.length; r++)
+        for (let c = 1; c <= b.length; c++)
+          dp[r][c] = a[r - 1] === b[c - 1] ? dp[r - 1][c - 1] : 1 + Math.min(dp[r - 1][c], dp[r][c - 1], dp[r - 1][c - 1]);
       if (dp[a.length][b.length] <= 2)
         dupes.push('"' + members[i].name + '" and "' + members[j].name + '"');
     }
@@ -162,8 +162,8 @@ function renderMembersList(members) {
   list.innerHTML = members.map(m => `
     <div class="card" style="padding:0;">
       <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
-        <div style="width:40px;height:40px;border-radius:50%;background:${m.color||'#EEF2FF'};display:flex;align-items:center;justify-content:center;font-size:20px;">
-          ${m.photo?.startsWith('data:') ? `<img src="${m.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" />` : (m.emoji||'👤')}
+        <div style="width:40px;height:40px;border-radius:50%;background:${m.color || '#EEF2FF'};display:flex;align-items:center;justify-content:center;font-size:20px;">
+          ${m.photo?.startsWith('data:') ? `<img src="${m.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" />` : (m.emoji || '👤')}
         </div>
         <div style="flex:1;"><div style="font-size:15px;font-weight:600;">${m.name}</div></div>
         <button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" data-edit="${m.id}">Edit</button>
@@ -280,31 +280,31 @@ function renderDataTab(data, members, container) {
       }
       const zip = new window.JSZip();
       let count = 0;
-      (cached.members||[]).forEach(m => {
+      (cached.members || []).forEach(m => {
         if (m.photo?.startsWith('data:')) {
-          zip.folder('profiles').file((m.name||'member')+'_profile.jpg', m.photo.split(',')[1], {base64:true});
+          zip.folder('profiles').file((m.name || 'member') + '_profile.jpg', m.photo.split(',')[1], { base64: true });
           count++;
         }
       });
-      (cached.documents||[]).forEach(doc => {
-        const mn = (cached.members||[]).find(m=>m.id===doc.personId)?.name||'unknown';
-        (doc.photos||[]).forEach((p,i) => {
+      (cached.documents || []).forEach(doc => {
+        const mn = (cached.members || []).find(m => m.id === doc.personId)?.name || 'unknown';
+        (doc.photos || []).forEach((p, i) => {
           if (p?.startsWith('data:')) {
-            zip.folder('documents').file(mn+'_'+(doc.docName||'doc')+'_'+(i===0?'front':'back')+'.jpg', p.split(',')[1], {base64:true});
+            zip.folder('documents').file(mn + '_' + (doc.docName || 'doc') + '_' + (i === 0 ? 'front' : 'back') + '.jpg', p.split(',')[1], { base64: true });
             count++;
           }
         });
       });
-      if (count===0) { showToast('No photos found', 'warning'); return; }
-      const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
-      const blob = await zip.generateAsync({type:'blob'});
+      if (count === 0) { showToast('No photos found', 'warning'); return; }
+      const ts = new Date().toISOString().replace('T', '_').slice(0, 16).replace(':', '-');
+      const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'Travel_Photos_'+ts+'.zip';
+      a.download = 'Travel_Photos_' + ts + '.zip';
       a.click();
       URL.revokeObjectURL(a.href);
-      showToast('✅ '+count+' photos exported', 'success');
-    } catch (err) { showToast('ZIP failed: '+err.message, 'error'); }
+      showToast('✅ ' + count + ' photos exported', 'success');
+    } catch (err) { showToast('ZIP failed: ' + err.message, 'error'); }
   });
 
 
@@ -323,18 +323,18 @@ function renderDataTab(data, members, container) {
 
     try {
       showToast('Wiping cloud database clean…', 'info', 5000);
-      const emptySet = { 
+      const emptySet = {
         schemaVersion: 1,
-        trips: [], 
-        passengers: [], 
-        members: [], 
-        documents: [], 
+        trips: [],
+        passengers: [],
+        members: [],
+        documents: [],
         familyDefaults: {},
         familyRelations: [],
         customDocTypes: [],
-        appInfo: { version: 'v4.0.0', lastReset: new Date().toISOString() } 
+        appInfo: { version: 'v4.0.0', lastReset: new Date().toISOString() }
       };
-      
+
       const fileId = localStorage.getItem('drive_travel_file_id');
       if (isOnline() && fileId) {
         // 1. Wipe Cloud Sync Queue (the primary cause of data reappearing)
@@ -347,7 +347,7 @@ function renderDataTab(data, members, container) {
           body: JSON.stringify(emptySet, null, 2)
         });
       }
-      
+
       // 3. Wipe local IndexedDB entirely
       await clearAllCachedData();
 
@@ -418,7 +418,7 @@ function renderSecurityTab() {
           <div style="font-size:14px;font-weight:600;">Lock App Version</div>
           <div style="font-size:12px;color:var(--text-muted);">Prevent auto-updates</div>
         </div>
-        <input type="checkbox" id="lock-update-check" ${getAppState('lockUpdates')?'checked':''}>
+        <input type="checkbox" id="lock-update-check" ${getAppState('lockUpdates') ? 'checked' : ''}>
       </div>
     </div>`;
 
@@ -428,11 +428,11 @@ function renderSecurityTab() {
     modal.innerHTML = '<div class="modal-sheet" style="max-height:90vh;">' +
       '<div class="modal-handle"></div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">' +
-        '<span style="font-size:16px;font-weight:700;">🛡️ Security</span>' +
-        '<button id="close-sec" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>' +
+      '<span style="font-size:16px;font-weight:700;">🛡️ Security</span>' +
+      '<button id="close-sec" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>' +
       '</div>' +
       '<div id="security-content" style="overflow-y:auto;max-height:70vh;padding:0 20px 24px;">' +
-        '<div style="font-size:13px;color:var(--text-muted);">Loading…</div>' +
+      '<div style="font-size:13px;color:var(--text-muted);">Loading…</div>' +
       '</div></div>';
     document.getElementById('close-sec').addEventListener('click', () => modal.classList.add('hidden'));
     modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
@@ -442,19 +442,19 @@ function renderSecurityTab() {
     ]);
     const sc = document.getElementById('security-content');
     if (!sc) return;
-    const ri = r => r==='high'?'🔴':r==='medium'?'🟠':r==='low'?'🟡':'🟢';
+    const ri = r => r === 'high' ? '🔴' : r === 'medium' ? '🟠' : r === 'low' ? '🟡' : '🟢';
     sc.innerHTML =
-      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions ('+sessions.length+')</div>' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions (' + sessions.length + ')</div>' +
       (sessions.length ? sessions.map(s =>
         '<div style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;">' +
-        '<div style="font-size:13px;font-weight:600;">'+s.userEmail+'</div>' +
-        '<div style="font-size:12px;color:var(--text-muted);">'+s.device+' · '+new Date(s.lastActive).toLocaleString()+'</div></div>'
+        '<div style="font-size:13px;font-weight:600;">' + s.userEmail + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);">' + s.device + ' · ' + new Date(s.lastActive).toLocaleString() + '</div></div>'
       ).join('') : '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No active sessions logged</div>') +
       '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;">Activity Log (last 30)</div>' +
       (log.length ? log.map(e =>
         '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light);">' +
-        '<span>'+ri(e.risk)+'</span><div><div style="font-size:13px;font-weight:500;">'+e.action+'</div>' +
-        '<div style="font-size:11px;color:var(--text-muted);">'+e.detail+' · '+new Date(e.time).toLocaleString()+'</div></div></div>'
+        '<span>' + ri(e.risk) + '</span><div><div style="font-size:13px;font-weight:500;">' + e.action + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">' + e.detail + ' · ' + new Date(e.time).toLocaleString() + '</div></div></div>'
       ).join('') : '<div style="font-size:13px;color:var(--text-muted);">No activity logged yet</div>');
   });
 
@@ -463,7 +463,7 @@ function renderSecurityTab() {
     await new Promise(r => setTimeout(r, 1500));
     await exitApp();
   });
-  
+
   document.getElementById('lock-update-check').onchange = async (e) => {
     await setAppState('lockUpdates', e.target.checked);
     showToast(e.target.checked ? 'App Locked.' : 'Update checks enabled.', 'info');
@@ -478,20 +478,20 @@ function renderAccountTab(data, members, user, container) {
     <div class="card" style="margin:0 16px;">
       <div class="card-body" style="display:flex;align-items:center;gap:12px;">
         ${user?.picture
-          ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />`
-          : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
+      ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />`
+      : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
         <div style="flex:1;min-width:0;">
-          <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name||'Signed in'}</div>
-          <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email||''}</div>
+          <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name || 'Signed in'}</div>
+          <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email || ''}</div>
         </div>
       </div>
       <div class="divider"></div>
       <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <span style="font-size:13px;color:var(--text-secondary);">Drive sync</span>
-          <span style="font-size:13px;font-weight:600;color:${isOnline()?'var(--success)':'var(--warning)'};">${isOnline()?'● Online':'● Offline'}</span>
+          <span style="font-size:13px;font-weight:600;color:${isOnline() ? 'var(--success)' : 'var(--warning)'};">${isOnline() ? '● Online' : '● Offline'}</span>
         </div>
-        ${data?.lastSync?`<div style="font-size:11px;color:var(--text-muted);">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>`:''}
+        ${data?.lastSync ? `<div style="font-size:11px;color:var(--text-muted);">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>` : ''}
         <button class="btn btn-primary btn-full" style="margin-top:16px; margin-bottom:10px;" id="account-exit-btn">💾 Save & Exit App</button>
         <button class="btn btn-secondary btn-full" id="signout-btn">Sign out of Google</button>
       </div>
@@ -500,8 +500,8 @@ function renderAccountTab(data, members, user, container) {
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
       <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.9.7 · 2026-04-04</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length||0} · Docs: ${data?.documents?.length||0}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin() ? '👑 Admin' : '👁 Viewer'} · ${user?.email || 'Not signed in'}</div>
       
       <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
         <!-- RECOVERY SECTION -->
@@ -611,7 +611,7 @@ function renderAccountTab(data, members, user, container) {
         const seen = new Set();
         const nonDupes = [];
         let mergedCount = 0;
-        
+
         trips.forEach(t => {
           const d = toISODate(t.dateLeftOrigin || t.dateArrivedDest);
           const key = `${t.passengerId || t.passengerName}|${d}|${t.destinationCountry}`;
@@ -628,13 +628,13 @@ function renderAccountTab(data, members, user, container) {
             nonDupes.push(t);
           }
         });
-        
+
         trips = nonDupes;
 
         // --- 2. Companion Repair (Advanced) ---
         let repairedCount = 0;
         const tripsToAdd = [];
-        
+
         // First pass: identify missing records
         trips.forEach(t => {
           const tDate = toISODate(t.dateLeftOrigin || t.dateArrivedDest);
@@ -642,7 +642,7 @@ function renderAccountTab(data, members, user, container) {
 
           // Collect all potential companion names/IDs from both fields
           const companionIdsSet = new Set(Array.isArray(t.travelWith) ? t.travelWith : []);
-          
+
           // Add from travelWithNames string/array
           const namesStr = Array.isArray(t.travelWithNames) ? t.travelWithNames.join(', ') : String(t.travelWithNames || '');
           namesStr.split(/[,;]+/).forEach(n => {
@@ -654,11 +654,11 @@ function renderAccountTab(data, members, user, container) {
 
           companionIdsSet.forEach(cid => {
             // Check if this companion already has a trip on this normalized date
-            const hasTrip = trips.some(other => 
-              (other.passengerId === cid || (other.passengerName && nameToId[other.passengerName.toLowerCase().trim()] === cid)) && 
+            const hasTrip = trips.some(other =>
+              (other.passengerId === cid || (other.passengerName && nameToId[other.passengerName.toLowerCase().trim()] === cid)) &&
               toISODate(other.dateLeftOrigin || other.dateArrivedDest) === tDate
             );
-            
+
             if (!hasTrip) {
               // Create missing trip
               const companion = passengers.find(p => p.id === cid);
@@ -682,16 +682,16 @@ function renderAccountTab(data, members, user, container) {
             }
           });
         });
-        
+
         const finalTrips = [...trips, ...tripsToAdd];
-        
+
         window._repairSummary = { merged: mergedCount, repaired: repairedCount };
         return { ...remote, trips: finalTrips };
       });
-      
+
       await setCachedTravelData(newData);
       const { merged, repaired } = window._repairSummary || {};
-      
+
       const summary = `
         <div style="text-align:left; font-size:14px; line-height:1.6;">
           • Duplicates Merged: <b>${merged}</b><br/>
@@ -703,7 +703,7 @@ function renderAccountTab(data, members, user, container) {
       `;
       await showConfirmModal('Trip Data: Doctor Summary', summary, { confirmText: 'Great', cancelText: '' });
       setTimeout(() => window.location.reload(), 500);
-    } catch (err) { 
+    } catch (err) {
       showToast('Repair failed: ' + err.message, 'error');
       console.error(err);
     }
@@ -713,17 +713,17 @@ function renderAccountTab(data, members, user, container) {
     try {
       showToast('Scanning Drive folders…', 'info');
       const report = await getBackupHealthReport('travel');
-      
+
       const formatBytes = (b) => {
         const bytes = Number(b);
         if (!bytes) return '0 B';
         if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024*1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024*1024)).toFixed(1) + ' MB';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
       };
-      
+
       const miscCount = report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0);
-      
+
       const message = `
         <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
           <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
@@ -752,10 +752,10 @@ function renderAccountTab(data, members, user, container) {
           </div>
         </div>
       `;
-      
-      const modalOk = await showConfirmModal(`Status: ${report.status}`, message, { 
-        confirmText: 'Done', 
-        cancelText: '' 
+
+      const modalOk = await showConfirmModal(`Status: ${report.status}`, message, {
+        confirmText: 'Done',
+        cancelText: ''
       });
 
       // Special handling for the purge button within the modal
@@ -767,7 +767,7 @@ function renderAccountTab(data, members, user, container) {
           const count = await purgeOrphanedFiles('travel');
           showToast(`Moved ${count} files to trash`, 'success');
           // Refresh the modal logic could go here, but a close/re-open is safer
-          document.querySelector('.modal-overlay').remove(); 
+          document.querySelector('.modal-overlay').remove();
           document.getElementById('backup-health-btn').click();
         };
       }
@@ -808,7 +808,7 @@ function showMirrorModal(snapshots) {
       <div class="modal-handle"></div>
       <div style="padding:0 20px 20px;">
         <div style="font-size:17px;font-weight:700;margin-bottom:16px;">Restore from Mirror</div>
-        ${snapshots.map((s,i) => `
+        ${snapshots.map((s, i) => `
           <button class="list-row" data-snapshot="${i}" style="width:100%;text-align:left;border-radius:var(--radius-md);margin-bottom:8px;border:1px solid var(--border);">
             <div style="flex:1;">
               <div style="font-size:14px;font-weight:600;">${new Date(s.timestamp).toLocaleString('en-GB')}</div>
@@ -864,7 +864,7 @@ function openImportModal(data, persons) {
   });
 
   const toolContainer = document.getElementById('import-tool-container');
-  const statusBar    = document.getElementById('import-status');
+  const statusBar = document.getElementById('import-status');
 
   const setStatus = (msg, color) => {
     statusBar.style.display = 'block';
@@ -905,7 +905,7 @@ function openImportModal(data, persons) {
             const primaryName = (rec.personName || 'Unknown').trim();
             const dateStr = rec.dateOut || rec.dateIn;
             if (!dateStr) { skipped++; return; }
-            
+
             const doi = toISODate(dateStr);
 
             const companionsRaw = [

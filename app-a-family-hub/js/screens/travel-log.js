@@ -106,7 +106,7 @@ export async function renderTravelLog(container, params = {}) {
   if (params.passengerId) setHashParams({ passenger: params.passengerId });
   const hashParams = getHashParams();
   let filterPassenger = hashParams.passenger || '';
-  let searchQuery = '';
+  let searchQuery = hashParams.q || '';
 
   // Tab State
   let activeTab = 'trips'; // 'trips' or 'summary'
@@ -166,11 +166,12 @@ export async function renderTravelLog(container, params = {}) {
   function renderTripsTab(tabContent) {
     tabContent.innerHTML = `
       <div style="padding:16px 16px 8px 16px; background:var(--surface); position:sticky; top:104px; z-index:35;">
-        <div style="position:relative;">
+        <div style="position:relative; display:flex; align-items:center;">
           <input type="text" id="log-search-input" placeholder="Search people, countries, flights..." 
-            style="width:100%; padding:12px 16px 12px 42px; border-radius:12px; border:1px solid var(--border); background:var(--page-bg); font-size:14px; transition:border-color 0.2s;" 
+            style="width:100%; padding:12px 36px 12px 42px; border-radius:12px; border:1px solid var(--border); background:var(--page-bg); font-size:14px; transition:border-color 0.2s;" 
             value="${searchQuery}">
           <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); font-size:16px; opacity:0.5;">🔍</span>
+          <button id="search-clear-btn" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; cursor:pointer; display:${searchQuery ? 'block' : 'none'}; font-size:18px; color:var(--text-muted);">ⓧ</button>
           <div id="search-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-top:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; max-height:250px; overflow-y:auto; padding:8px;"></div>
         </div>
       </div>
@@ -181,11 +182,26 @@ export async function renderTravelLog(container, params = {}) {
 
     const input = tabContent.querySelector('#log-search-input');
     const suggestions = tabContent.querySelector('#search-suggestions');
+    const clearBtn = tabContent.querySelector('#search-clear-btn');
+
+    const updateUIState = () => {
+      clearBtn.style.display = searchQuery ? 'block' : 'none';
+      setHashParams({ q: searchQuery || null });
+      renderTrips(filterPassenger, filterYear, true, tabContent.querySelector('#log-content'));
+    };
 
     input.addEventListener('input', (e) => {
       searchQuery = e.target.value;
       updateSuggestions(searchQuery, suggestions, input);
-      renderTrips(filterPassenger, filterYear, true, tabContent.querySelector('#log-content'));
+      updateUIState();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      searchQuery = '';
+      input.value = '';
+      suggestions.style.display = 'none';
+      updateUIState();
+      input.focus();
     });
 
     input.addEventListener('focus', () => searchQuery && updateSuggestions(searchQuery, suggestions, input));
