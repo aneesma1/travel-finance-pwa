@@ -42,6 +42,21 @@ export async function renderTravelLog(container, params = {}) {
     }
     if (!t.passengerName) t.passengerName = 'Unknown';
     
+    // Resolve companion names
+    let companionNames = [];
+    if (Array.isArray(t.travelWith)) {
+      companionNames = t.travelWith.map(id => tpMap[id]?.name).filter(Boolean);
+    } else if (t.travelWithNames) {
+      companionNames = String(t.travelWithNames).split(/[,;]+/).map(n => n.trim()).filter(Boolean);
+    } else if (t.travelWith) {
+      // Legacy string or mixed IDs
+      companionNames = String(t.travelWith).split(/[,;]+/).map(n => {
+        const trimmed = n.trim();
+        return isUuid(trimmed) ? (tpMap[trimmed]?.name || '') : trimmed;
+      }).filter(Boolean);
+    }
+    t._resolvedCompanionNames = companionNames;
+
     // One-Way Model Normalization
     t.dateLeftOrigin = t.dateLeftOrigin || t.dateOutIndia || t.dateOutQatar;
     t.dateArrivedDest = t.dateArrivedDest || t.dateInQatar || t.dateInIndia;
@@ -58,8 +73,9 @@ export async function renderTravelLog(container, params = {}) {
   const yearsSet = new Set();
 
   safeTrips.forEach(t => {
-    const travelWithArr = Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/);
-    const namesInTrip = [String(t.passengerName || ''), ...travelWithArr].map(n => String(n || '').trim()).filter(Boolean);
+    const namesInTrip = [t.passengerName, ...(t._resolvedCompanionNames || [])]
+      .map(n => String(n || '').trim())
+      .filter(n => n && !isUuid(n) && n.toLowerCase() !== 'unknown');
 
     namesInTrip.forEach(name => {
       const cleanName = name.trim();
@@ -417,31 +433,41 @@ export async function renderTravelLog(container, params = {}) {
       return prim || travelWithNames.includes(pNameLower);
     });
 
+    // Sort trips chronologically to bridge them correctly
+    const pTripsSorted = pTrips.sort((a,b) => {
+      const da = a.dateArrivedDest || a.dateLeftOrigin;
+      const db = b.dateArrivedDest || b.dateLeftOrigin;
+      return new Date(da) - new Date(db);
+    });
+
     const records = [];
     let lifetimeDays = 0;
     const countryCounts = {};
     let longestStay = 0;
 
-    pTrips.forEach(t => {
+    pTripsSorted.forEach((t, idx) => {
       const entryDt = t.dateArrivedDest || t.dateLeftOrigin;
       if (!entryDt) return;
       const year = entryDt.substring(0, 4);
       
-      let days = (t.daysInDest != null && t.daysInDest !== '') ? Number(t.daysInDest) : null;
-      if (days === null || isNaN(days)) {
-        const leftMs = t.dateLeftDest ? new Date(t.dateLeftDest).getTime() : new Date(today()).getTime();
-        const arrMs = new Date(entryDt).getTime();
-        if (!isNaN(arrMs) && !isNaN(leftMs) && leftMs >= arrMs) {
-          days = Math.floor((leftMs - arrMs) / (1000 * 60 * 60 * 24)) + 1;
-        } else days = 0;
-      }
+      // Determine when this stay ended (the beginning of the next trip)
+      const nextTrip = pTripsSorted[idx + 1];
+      const endDt = nextTrip ? (nextTrip.dateArrivedDest || nextTrip.dateLeftOrigin) : today();
       
-      if (days > 0) {
+      const arrMs = new Date(entryDt).getTime();
+      const endMs = new Date(endDt).getTime();
+      
+      let days = 0;
+      if (!isNaN(arrMs) && !isNaN(endMs) && endMs >= arrMs) {
+        days = Math.floor((endMs - arrMs) / (1000 * 60 * 60 * 24)) + (nextTrip ? 0 : 1); // Only add +1 for ongoing
+      }
+
+      if (days >= 0) {
         const country = t.destinationCountry || 'Qatar';
         records.push({
           year, country, days,
-          dateIn: t.dateArrivedDest || t.dateLeftOrigin || '',
-          dateOut: t.dateLeftDest || '',
+          dateIn: entryDt,
+          dateOut: nextTrip ? endDt : null, // null means "Present"
           reason: t.reason || '',
         });
         
