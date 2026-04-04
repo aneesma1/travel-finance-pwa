@@ -488,9 +488,9 @@ function renderAccountTab(data, members, user, container) {
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
       
       <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
-        <button id="merge-dupes-btn" class="btn btn-secondary btn-full" style="padding:10px; font-size:12px;">🧹 Merge Duplicate Trips</button>
+        <button id="repair-data-btn" class="btn btn-secondary btn-full" style="padding:10px; font-size:12px;">🔍 Trip Data: Scan & Repair</button>
         <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
-          Cleans up repeated entries for same person and dates.
+          Merges duplicates & generates missing companion records.
         </div>
       </div>
 
@@ -501,27 +501,87 @@ function renderAccountTab(data, members, user, container) {
       ">⚠️ Emergency Reset & Update App</button>
     </div>`;
 
-  document.getElementById('merge-dupes-btn')?.addEventListener('click', async () => {
-    if (!confirm('Identify and merge trips with identical names and dates?')) return;
+  document.getElementById('repair-data-btn')?.addEventListener('click', async () => {
+    const ok = await showConfirmModal('🔍 Scan & Repair Data?', 'This tool will:\n1. Merge exact duplicate entries\n2. Create missing travel records for companions\n\nThis will permanently update your data.', {
+      confirmText: 'Run Health Check'
+    });
+    if (!ok) return;
+
     try {
-      showToast('Merging…', 'info');
+      showToast('Scanning trip data…', 'info');
       const newData = await localSave('travel', (remote) => {
-        const trips = remote.trips || [];
+        let trips = [...(remote.trips || [])];
+        const passengers = remote.passengers || [];
+        
+        // --- 1. Deduplicate ---
         const seen = new Set();
-        const kept = [];
+        const nonDupes = [];
+        let mergedCount = 0;
+        
         trips.forEach(t => {
-          const key = `${t.passengerName || t.personName}|${t.dateLeftOrigin || t.dateOutIndia}|${t.dateReturnedOrigin || t.dateInIndia}`;
-          if (!seen.has(key)) {
+          const key = `${t.passengerId || t.passengerName}|${t.dateLeftOrigin}|${t.destinationCountry}`;
+          if (seen.has(key)) {
+            mergedCount++;
+          } else {
             seen.add(key);
-            kept.push(t);
+            nonDupes.push(t);
           }
         });
-        return { ...remote, trips: kept };
+        
+        trips = nonDupes;
+
+        // --- 2. Companion Repair ---
+        let repairedCount = 0;
+        const tripsToAdd = [];
+        
+        trips.forEach(t => {
+          if (!t.travelWith || !t.travelWith.length) return;
+          
+          t.travelWith.forEach(cid => {
+            // Check if this companion already has a trip on this date
+            const hasTrip = trips.some(other => 
+              (other.passengerId === cid) && 
+              (other.dateLeftOrigin === t.dateLeftOrigin)
+            );
+            
+            if (!hasTrip) {
+              // Create missing trip
+              const companion = passengers.find(p => p.id === cid);
+              const compTrip = {
+                ...t,
+                id: uuidv4(),
+                passengerId: cid,
+                passengerName: companion?.name || 'Unknown',
+                travelWith: [
+                  t.passengerId,
+                  ...t.travelWith.filter(tid => tid !== cid)
+                ],
+                travelWithNames: [
+                  t.passengerName,
+                  ...t.travelWith.map(tid => passengers.find(p => p.id === tid)?.name).filter(n => n && n !== companion?.name)
+                ].filter(Boolean).join(', '),
+                timestamp: new Date().toISOString()
+              };
+              tripsToAdd.push(compTrip);
+              repairedCount++;
+            }
+          });
+        });
+        
+        const finalTrips = [...trips, ...tripsToAdd];
+        
+        window._repairSummary = { merged: mergedCount, repaired: repairedCount };
+        return { ...remote, trips: finalTrips };
       });
+      
       await setCachedTravelData(newData);
-      showToast('Merge complete!', 'success');
-      window.location.reload();
-    } catch { showToast('Merge failed', 'error'); }
+      const { merged, repaired } = window._repairSummary || {};
+      showToast(`Success! Merged: ${merged}, Repaired: ${repaired}`, 'success', 5000);
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (err) { 
+      showToast('Repair failed: ' + err.message, 'error');
+      console.error(err);
+    }
   });
 
   document.getElementById('force-update-btn')?.addEventListener('click', async () => {
