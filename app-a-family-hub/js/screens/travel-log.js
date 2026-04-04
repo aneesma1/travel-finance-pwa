@@ -106,12 +106,20 @@ export async function renderTravelLog(container, params = {}) {
   if (params.passengerId) setHashParams({ passenger: params.passengerId });
   const hashParams = getHashParams();
   let filterPassenger = hashParams.passenger || '';
+  let searchQuery = '';
 
   // Tab State
   let activeTab = 'trips'; // 'trips' or 'summary'
   let summaryState = {
     selectedPassenger: filterPassenger ? filterPassenger.split(',')[0].trim() : (uniquePassengers[0]?.name || ''),
     pivotMode: 'year'
+  };
+
+  // Suggestion pool (Unique names, countries, reasons)
+  const suggestionPool = {
+    names: [...passengerNamesSet].sort(),
+    countries: Array.from(new Set(safeTrips.flatMap(t => [t.originCountry, t.destinationCountry]))).filter(Boolean).sort(),
+    reasons: Array.from(new Set(safeTrips.map(t => t.reason))).filter(Boolean).sort()
   };
 
   if (!data) { 
@@ -129,34 +137,21 @@ export async function renderTravelLog(container, params = {}) {
   // ── 3. Base Layout Renderer ──
   function renderLayout() {
     container.innerHTML = `
-      <!-- App Header (strict 60px) -->
       <div class="app-header">
         <span class="app-header-title">✈️ Travel</span>
         <button class="app-header-action" id="header-export-btn" title="Export History">📤</button>
       </div>
-      
-      <!-- Tab Bar (separate, below header) -->
       <div style="display:flex; background:var(--surface); border-bottom:2px solid var(--border); position:sticky; top:60px; z-index:40;">
          <button id="tab-btn-trips" style="flex:1; padding:12px; font-size:14px; font-weight:700; text-align:center; border-bottom:3px solid ${activeTab === 'trips' ? 'var(--primary)' : 'transparent'}; color:${activeTab === 'trips' ? 'var(--primary)' : 'var(--text-muted)'}; background:none; border-top:none; border-left:none; border-right:none; transition:all 0.2s; cursor:pointer;">Trip Log</button>
          <button id="tab-btn-summary" style="flex:1; padding:12px; font-size:14px; font-weight:700; text-align:center; border-bottom:3px solid ${activeTab === 'summary' ? 'var(--primary)' : 'transparent'}; color:${activeTab === 'summary' ? 'var(--primary)' : 'var(--text-muted)'}; background:none; border-top:none; border-left:none; border-right:none; transition:all 0.2s; cursor:pointer;">Passenger Summary</button>
       </div>
-      
-      <!-- Content Viewport -->
       <div id="tab-content" style="background:var(--page-bg);"></div>
     `;
 
-    document.getElementById('header-export-btn')?.addEventListener('click', () => {
-      openTravelExportSheet(uniquePassengers, safeTrips, data.documents || []);
-    });
-
     container.querySelector('#tab-btn-trips').addEventListener('click', () => { activeTab = 'trips'; renderLayout(); });
-    // When switching to summary, pre-select a passenger if none selected
     container.querySelector('#tab-btn-summary').addEventListener('click', () => { 
-       if (!summaryState.selectedPassenger && uniquePassengers.length > 0) {
-           summaryState.selectedPassenger = uniquePassengers[0].name;
-       }
-       activeTab = 'summary'; 
-       renderLayout(); 
+       if (!summaryState.selectedPassenger && uniquePassengers.length > 0) summaryState.selectedPassenger = uniquePassengers[0].name;
+       activeTab = 'summary'; renderLayout(); 
     });
 
     const tabContent = container.querySelector('#tab-content');
@@ -170,15 +165,70 @@ export async function renderTravelLog(container, params = {}) {
 
   function renderTripsTab(tabContent) {
     tabContent.innerHTML = `
+      <div style="padding:16px 16px 8px 16px; background:var(--surface); position:sticky; top:104px; z-index:35;">
+        <div style="position:relative;">
+          <input type="text" id="log-search-input" placeholder="Search people, countries, flights..." 
+            style="width:100%; padding:12px 16px 12px 42px; border-radius:12px; border:1px solid var(--border); background:var(--page-bg); font-size:14px; transition:border-color 0.2s;" 
+            value="${searchQuery}">
+          <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); font-size:16px; opacity:0.5;">🔍</span>
+          <div id="search-suggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-top:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; max-height:250px; overflow-y:auto; padding:8px;"></div>
+        </div>
+      </div>
       <div id="filter-bar-container"></div>
       <div id="log-content"></div>
       <button class="fab" id="add-trip-fab">＋</button>
     `;
 
+    const input = tabContent.querySelector('#log-search-input');
+    const suggestions = tabContent.querySelector('#search-suggestions');
+
+    input.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      updateSuggestions(searchQuery, suggestions, input);
+      renderTrips(filterPassenger, filterYear, true, tabContent.querySelector('#log-content'));
+    });
+
+    input.addEventListener('focus', () => searchQuery && updateSuggestions(searchQuery, suggestions, input));
+    document.addEventListener('click', (e) => { if (!input.contains(e.target)) suggestions.style.display = 'none'; });
+
     tabContent.querySelector('#add-trip-fab').addEventListener('click', () => navigate('add-trip'));
-    
     renderFilters(filterPassenger, filterYear, tabContent.querySelector('#filter-bar-container'));
     renderTrips(filterPassenger, filterYear, true, tabContent.querySelector('#log-content'));
+  }
+
+  function updateSuggestions(query, container, input) {
+    if (!query || query.length < 1) { container.style.display = 'none'; return; }
+    const q = query.toLowerCase().trim();
+    
+    // Build actual suggestion list
+    const filteredNames = suggestionPool.names.filter(n => n.toLowerCase().includes(q)).slice(0, 3);
+    const filteredCountries = suggestionPool.countries.filter(c => c.toLowerCase().includes(q)).slice(0, 3);
+    const filteredReasons = suggestionPool.reasons.filter(r => r.toLowerCase().includes(q)).slice(0, 3);
+
+    const all = [
+      ...filteredNames.map(n => ({ type: '👤 Passenger', val: n })),
+      ...filteredCountries.map(c => ({ type: '📍 Country', val: c })),
+      ...filteredReasons.map(r => ({ type: '📝 Purpose', val: r }))
+    ];
+
+    if (all.length === 0) { container.style.display = 'none'; return; }
+
+    container.innerHTML = all.map(s => `
+      <div class="suggestion-item" style="padding:10px 12px; border-radius:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;" data-val="${s.val}">
+        <span style="font-size:13px; font-weight:500;">${s.val}</span>
+        <span style="font-size:10px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">${s.type}</span>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('click', () => {
+        searchQuery = item.dataset.val;
+        input.value = searchQuery;
+        container.style.display = 'none';
+        renderTrips(filterPassenger, filterYear, true, document.getElementById('log-content'));
+      });
+    });
+    container.style.display = 'block';
   }
 
   function renderFilters(fPass, fYear, bar) {
@@ -189,35 +239,34 @@ export async function renderTravelLog(container, params = {}) {
     const selectedPasses = fPass ? fPass.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     bar.innerHTML = `
-      <div class="filter-bar" style="border-bottom:1px solid var(--border);">
-        <div class="filter-chips">
-          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Passengers</span>
+      <div class="filter-bar" style="border-bottom:1px solid var(--border); padding:8px 16px;">
+        <div class="filter-chips" style="padding:0;">
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:8px;flex-shrink:0;">Filter</span>
           
           <div style="position:relative; display:inline-block;" id="passenger-dropdown-container">
-             <button class="btn btn-secondary" style="padding:6px 12px; font-size:13px; border-radius:99px;" id="passenger-dropdown-btn">
-               ${selectedPasses.length === 0 ? 'All' : selectedPasses.length === 1 ? selectedPasses[0] : `${selectedPasses.length} selected`} ▾
+             <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px; border-radius:99px;" id="passenger-dropdown-btn">
+               👤 ${selectedPasses.length === 0 ? 'All' : selectedPasses.length === 1 ? selectedPasses[0] : `${selectedPasses.length} Selected`} ▾
              </button>
              
-             <div id="passenger-dropdown-menu" style="display:none; position:absolute; top:100%; left:0; width:220px; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-top:8px; z-index:100; max-height:50vh; overflow-y:auto; padding:8px;">
-               <label style="display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer; border-radius:6px;">
-                 <input type="checkbox" value="" ${selectedPasses.length === 0 ? 'checked' : ''} class="pass-checkbox pass-all-cb" />
-                 <span style="font-size:13px; font-weight:600;">All Passengers</span>
+             <div id="passenger-dropdown-menu" style="display:none; position:absolute; top:100%; left:0; width:220px; background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-top:8px; box-shadow:0 8px 32px rgba(0,0,0,0.15); z-index:100; max-height:50vh; overflow-y:auto; padding:8px;">
+               <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; cursor:pointer; border-radius:8px;">
+                 <input type="checkbox" value="" ${selectedPasses.length === 0 ? 'checked' : ''} class="pass-checkbox pass-all-cb">
+                 <span style="font-size:13px; font-weight:700;">All Passengers</span>
                </label>
-               <div style="height:1px; background:var(--border-light); margin:4px 0;"></div>
+               <div style="height:1px; background:var(--border); margin:6px 0;"></div>
                ${uniquePassengers.map(p => `
-                 <label style="display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer;" class="pass-label">
-                    <input type="checkbox" value="${p.name}" ${selectedPasses.includes(p.name) ? 'checked' : ''} class="pass-checkbox pass-item-cb" />
+                 <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; cursor:pointer;" class="pass-label">
+                    <input type="checkbox" value="${p.name}" ${selectedPasses.includes(p.name) ? 'checked' : ''} class="pass-checkbox pass-item-cb">
                     <span style="font-size:13px;">${p.emoji || '👤'} ${p.name}</span>
                  </label>
                `).join('')}
-               <div style="margin-top:8px; display:flex; justify-content:flex-end;">
-                 <button class="btn btn-primary" style="padding:4px 12px; font-size:12px;" id="pass-apply-btn">Apply</button>
+               <div style="margin-top:12px; display:flex;">
+                 <button class="btn btn-primary" style="flex:1; padding:8px; font-size:12px;" id="pass-apply-btn">Apply Filters</button>
                </div>
              </div>
           </div>
 
-          <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 4px;"></div>
-          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:4px;flex-shrink:0;">Year</span>
+          <div style="width:1px;height:16px;background:var(--border);flex-shrink:0;margin:0 8px;"></div>
           <button class="filter-chip ${fYear === 'all' ? 'active' : ''}" data-filter="year" data-value="all">All</button>
           ${yearsDisplay.map(y => `
             <button class="filter-chip ${fYear === y ? 'active' : ''}" data-filter="year" data-value="${y}">${y}</button>
@@ -233,28 +282,13 @@ export async function renderTravelLog(container, params = {}) {
       e.stopPropagation();
       dropMenu.style.display = dropMenu.style.display === 'none' ? 'block' : 'none';
     });
-    document.addEventListener('click', (e) => {
-      if (bar.querySelector('#passenger-dropdown-container') && !bar.querySelector('#passenger-dropdown-container').contains(e.target)) {
-        dropMenu.style.display = 'none';
-      }
-    });
-
-    const allCb = bar.querySelector('.pass-all-cb');
-    const itemCbs = bar.querySelectorAll('.pass-item-cb');
-    allCb.addEventListener('change', () => {
-      if (allCb.checked) itemCbs.forEach(cb => cb.checked = false);
-      else allCb.checked = true;
-    });
-    itemCbs.forEach(cb => cb.addEventListener('change', () => {
-      allCb.checked = !Array.from(itemCbs).some(c => c.checked);
-    }));
-
+    
     bar.querySelector('#pass-apply-btn').addEventListener('click', () => {
-      const checked = Array.from(itemCbs).filter(c => c.checked).map(c => c.value);
+      const checked = Array.from(bar.querySelectorAll('.pass-item-cb')).filter(c => c.checked).map(c => c.value);
       filterPassenger = checked.length > 0 ? checked.join(',') : null;
       setHashParams({ passenger: filterPassenger });
       _tripPage = 1;
-      renderLayout();
+      renderTrips(filterPassenger, filterYear, true, document.getElementById('log-content'));
     });
 
     bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(btn => {
@@ -262,7 +296,7 @@ export async function renderTravelLog(container, params = {}) {
         filterYear = btn.dataset.value === 'all' ? null : btn.dataset.value;
         setHashParams({ year: filterYear });
         _tripPage = 1;
-        renderLayout();
+        renderTrips(filterPassenger, filterYear, true, document.getElementById('log-content'));
       });
     });
   }
@@ -273,12 +307,9 @@ export async function renderTravelLog(container, params = {}) {
       if (resetPage) _tripPage = 1;
 
       const sorted = [...safeTrips].sort((a, b) => {
-        const da = String(a.dateLeftOrigin || '');
-        const db = String(b.dateLeftOrigin || '');
-        const ta = new Date(da).getTime();
-        const tb = new Date(db).getTime();
+        const ta = new Date(a.dateLeftOrigin || 0).getTime();
+        const tb = new Date(b.dateLeftOrigin || 0).getTime();
         if (!isNaN(ta) && !isNaN(tb) && ta !== tb) return tb - ta;
-        // If same day, use arrival to further sort
         const aa = new Date(a.dateArrivedDest || 0).getTime();
         const ab = new Date(b.dateArrivedDest || 0).getTime();
         return ab - aa;
@@ -286,16 +317,30 @@ export async function renderTravelLog(container, params = {}) {
 
       let filtered = sorted;
 
+      // ── 1. Search Query Multi-Field Match ──
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(t => {
+          return (t.passengerName || '').toLowerCase().includes(q) ||
+                 (t.destinationCountry || '').toLowerCase().includes(q) ||
+                 (t.originCountry || '').toLowerCase().includes(q) ||
+                 (t.flightNumber || '').toLowerCase().includes(q) ||
+                 (t.reason || '').toLowerCase().includes(q) ||
+                 (t._resolvedCompanionNames || []).some(n => n.toLowerCase().includes(q));
+        });
+      }
+
+      // ── 2. Passenger Filter ──
       if (fPass) {
         const selectedArr = fPass.split(',').map(s => s.toLowerCase().trim()).filter(Boolean);
         filtered = filtered.filter(t => {
           const primaryMatch = String(t.passengerName || '').toLowerCase().trim();
-          const travelWithNames = (Array.isArray(t.travelWith) ? t.travelWith : String(t.travelWith || '').split(/[,;]+/))
-            .map(n => String(n || '').trim().toLowerCase());
+          const travelWithNames = (t._resolvedCompanionNames || []).map(n => n.toLowerCase());
           return selectedArr.some(sel => primaryMatch === sel || travelWithNames.includes(sel));
         });
       }
       
+      // ── 3. Year Filter ──
       const actualYearStr = fYear || 'all'; 
       if (actualYearStr && actualYearStr !== 'all') {
         filtered = filtered.filter(t => extractYear(t.dateLeftOrigin) === actualYearStr);
@@ -303,9 +348,10 @@ export async function renderTravelLog(container, params = {}) {
 
       if (!filtered.length) {
         logContent.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">✈️</div>
-            <div class="empty-state-title">No trips found</div>
+          <div class="empty-state" style="padding:40px 0;">
+            <div class="empty-state-icon">🔎</div>
+            <div class="empty-state-title">No matching trips</div>
+            <div class="empty-state-text">Try a different search term or filter</div>
           </div>`;
         return;
       }
