@@ -151,9 +151,10 @@ export function showToast(message, type = 'info', duration = 3000) {
   // type: 'info' | 'success' | 'error' | 'warning'
   const existing = document.getElementById('app-toast');
   document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
+    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Vault Drive? This will trash both root clutter and backups for deleted transactions.')) return;
     showToast('Scanning & Purging…', 'info');
-    const count = await (await import('../../../shared/drive.js')).purgeOrphanedFiles('travel', data);
+    const { purgeOrphanedFiles } = await import('../../shared/drive.js');
+    const count = await purgeOrphanedFiles('finance', data);
     showToast(`Cleaned ${count} orphaned files`, 'success');
   });
   if (existing) existing.remove();
@@ -238,7 +239,7 @@ export function showConfirmModal(title, message, options = {}) {
       <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
         <div style="padding:20px 24px;">
           <div style="font-size:17px; font-weight:700; margin-bottom:8px;">${title}</div>
-          <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.13.0 · 2026-04-04 · 18:25</div>
+          <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.13.1 · 2026-04-04 · 18:30</div>
           <div style="margin-top:24px; display:flex; gap:12px;">
             ${cancelText ? `<button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>` : ''}
             <button id="modal-confirm" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" style="flex:1;">${confirmText}</button>
@@ -267,7 +268,7 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
     overlay.style.zIndex = '10001';
 
     // Build datalist if suggestions provided
-    const datalistId = suggestions.length ? 'modal-datalist-' + uuidv4().slice(0, 8) : null;
+    const datalistId = suggestions.length ? 'modal-datalist-' + crypto.randomUUID().slice(0, 8) : null;
     const datalistHtml = datalistId ? `
       <datalist id="${datalistId}">
         ${suggestions.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('')}
@@ -298,6 +299,17 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
     const input = overlay.querySelector('#modal-input');
     input.focus();
     input.setSelectionRange(0, input.value.length);
+
+    // DROP-DOWN TOGGLE: Bulletproof implementation
+    const dropBtn = overlay.querySelector('#passenger-dropdown-btn');
+    const dropMenu = overlay.querySelector('#passenger-dropdown-menu');
+    if (dropBtn && dropMenu) {
+      dropBtn.onclick = (e) => {
+        e.stopPropagation();
+        const isHidden = dropMenu.style.display === 'none' || dropMenu.style.display === '';
+        dropMenu.style.display = isHidden ? 'block' : 'none';
+      };
+    }
 
     const close = (val) => {
       overlay.style.opacity = '0';
