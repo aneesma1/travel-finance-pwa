@@ -1,11 +1,6 @@
-// v4.0.0 — 2026-04-04
-
-// ─── app-b-private-vault/sw.js ───────────────────────────────────────────────
-// Service Worker for Private Vault PWA
-
-'use strict';
-
-const CACHE_NAME    = 'vault-cache-v4.0.0';
+// v4.5.1 — 2026-04-04
+// ...
+const CACHE_NAME    = 'vault-cache-v4.5.1';
 const STATIC_ASSETS = [
   './',
   './index.html',
