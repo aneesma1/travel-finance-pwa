@@ -788,11 +788,11 @@ export async function renderSettings(container, params = {}) {
         const purgeBtn = document.getElementById('purge-files-btn');
         if (purgeBtn) {
           purgeBtn.onclick = async () => {
-            if (!confirm('Are you sure you want to move all orphaned backups to the trash? This keeps your drive clean.')) return;
-            showToast('Purging…', 'info');
-            const count = await purgeOrphanedFiles('finance');
-            showToast(`Moved ${count} files to trash`, 'success');
-            document.querySelector('.modal-overlay').remove();
+            if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Vault Drive? This will trash both root clutter and backups for deleted transactions.')) return;
+            showToast('Scanning & Purging…', 'info');
+            const count = await purgeOrphanedFiles('finance', data);
+            showToast(`Cleaned ${count} orphaned files`, 'success');
+            document.querySelector('.modal-overlay')?.remove();
             document.getElementById('backup-health-btn').click();
           };
         }
