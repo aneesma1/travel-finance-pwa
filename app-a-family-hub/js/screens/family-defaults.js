@@ -14,6 +14,7 @@ import {
   RELATIONS, addRelation, removeRelation, getMemberRelations,
   resolveReverse, buildRelationEmergencyContacts, layoutFamilyTree
 } from '../relation-engine.js';
+import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
 
 const RELATIONSHIPS_EC = ['Spouse','Father','Mother','Brother','Sister','Son','Daughter','Friend','Doctor','Colleague','Other'];
 
@@ -125,10 +126,13 @@ export async function renderFamilyDefaults(container) {
           <input type="text" class="form-input" id="${key}-label"
             value="${esc(loc.label)}" placeholder="e.g. Pearl Qatar, Apt 12B" />
         </div>
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">Full Address</label>
-          <textarea class="form-input" id="${key}-address" rows="2" style="resize:vertical;"
+          <textarea class="form-input" id="${key}-address" rows="1" style="resize:vertical;"
             placeholder="Street, area, city…">${esc(loc.address)}</textarea>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Google plus location ID</label>
+          <input type="text" class="form-input" id="${key}-pluscode"
+            value="${esc(loc.plusCode || '')}" placeholder="e.g. 7HQG+XR" />
         </div>
 
         <!-- Map picker -->
@@ -210,6 +214,9 @@ export async function renderFamilyDefaults(container) {
     });
     document.getElementById(`${key}-address`)?.addEventListener('input', e => {
       locObj.address = e.target.value;
+    });
+    document.getElementById(`${key}-pluscode`)?.addEventListener('input', e => {
+      locObj.plusCode = e.target.value;
     });
 
     // GPS
