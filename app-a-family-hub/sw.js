@@ -1,6 +1,5 @@
-// v4.8.0 — 2026-04-04
-// ...
-const CACHE_NAME = 'hub-cache-v4.8.0';
+// v4.14.0 · 2026-04-04 · 18:45
+const CACHE_NAME = 'hub-cache-v4.14.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
