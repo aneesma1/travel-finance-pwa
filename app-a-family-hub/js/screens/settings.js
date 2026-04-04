@@ -5,7 +5,7 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
-import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData, getBackupHealthReport } from '../../../shared/drive.js';
+import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData, getBackupHealthReport, purgeOrphanedFiles } from '../../../shared/drive.js';
 import { localSave, clearDriveQueue } from '../../../shared/sync-manager.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import { navigate } from '../router.js';
@@ -667,12 +667,22 @@ function renderAccountTab(data, members, user, container) {
         return (bytes / (1024*1024)).toFixed(1) + ' MB';
       };
       
+      const miscCount = report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0);
+      
       const message = `
         <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
           <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
           • Data File: ${report.working.mainFile ? `✅ ${report.working.mainFile.name} (${formatBytes(report.working.mainFile.size)})` : '❌ Missing'}<br/>
           • Sync Queue: ${report.working.queueActive ? '✅ Active' : '⚪ Empty'}<br/>
-          • Misc Files: ${report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0)} found
+          • Misc Files: ${miscCount} found
+          
+          ${miscCount > 0 ? `
+            <div style="margin-top:8px;">
+              <button id="purge-files-btn" class="btn btn-secondary" style="width:100%; padding:6px; font-size:11px; border-color:var(--danger); color:var(--danger);">
+                🗑️ Purge Orphaned Files
+              </button>
+            </div>
+          ` : ''}
           
           <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
           
@@ -688,10 +698,24 @@ function renderAccountTab(data, members, user, container) {
         </div>
       `;
       
-      await showConfirmModal(`Status: ${report.status}`, message, { 
+      const modalOk = await showConfirmModal(`Status: ${report.status}`, message, { 
         confirmText: 'Done', 
         cancelText: '' 
       });
+
+      // Special handling for the purge button within the modal
+      const purgeBtn = document.getElementById('purge-files-btn');
+      if (purgeBtn) {
+        purgeBtn.onclick = async () => {
+          if (!confirm('Are you sure you want to move all orphaned backups to the trash? This keeps your drive clean.')) return;
+          showToast('Purging…', 'info');
+          const count = await purgeOrphanedFiles('travel');
+          showToast(`Moved ${count} files to trash`, 'success');
+          // Refresh the modal logic could go here, but a close/re-open is safer
+          document.querySelector('.modal-overlay').remove(); 
+          document.getElementById('backup-health-btn').click();
+        };
+      }
     } catch (err) {
       showToast('Health scan failed: ' + err.message, 'error');
     }
