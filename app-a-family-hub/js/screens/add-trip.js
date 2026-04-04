@@ -9,6 +9,7 @@ import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js'
 import { localSave } from '../../../shared/sync-manager.js';
 import { PillSelect }  from '../../../shared/pill-select.js';
 import { SmartInput }  from '../../../shared/smart-input.js';
+import { MultiSmartInput } from '../../../shared/multi-smart-input.js';
 import {
   uuidv4, today, toISODate, daysBetween, formatDisplayDate, showToast
 } from '../../../shared/utils.js';
@@ -326,13 +327,22 @@ export async function renderAddTrip(container, params = {}) {
       onSelect: (v) => { state.reason = v; }
     });
 
-    if (otherPersons.length) {
-      new PillSelect(document.getElementById('travel-with-pills'), {
-        options: otherPersons.map(m => ({ value: m.id, label: m.name, emoji: m.emoji || '👤' })),
-        selected: state.travelWith,
-        multi: true,
-        color: 'indigo',
-        onSelect: (val) => { state.travelWith = val || []; }
+    if (otherPersons.length || true) { // Always show even if empty list to allow adding new
+      const msi = new MultiSmartInput(document.getElementById('travel-with-pills'), {
+        suggestions: otherPersons.map(m => ({ id: m.id, name: m.name, emoji: m.emoji || '👤' })),
+        selected: Array.isArray(state.travelWith) 
+          ? state.travelWith.map(id => persons.find(p => p.id === id)).filter(Boolean)
+          : [],
+        placeholder: 'Search or type name to add...',
+        onAdd: async (name) => {
+          const newPerson = { id: uuidv4(), name: name, emoji: '👤', color: '#EEF2FF' };
+          await saveNewPerson(newPerson);
+          // After saving, add to selected list
+          msi.add(newPerson);
+        },
+        onChange: (selected) => {
+          state.travelWith = selected.map(s => s.id);
+        }
       });
     }
   }
