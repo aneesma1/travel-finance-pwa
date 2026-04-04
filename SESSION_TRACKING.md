@@ -516,3 +516,24 @@ git checkout master
         - Enhanced reset logic in `settings.js` to perform a total wipe of cloud queues, local cache, and metadata, while **preserving** historical snapshots in the Mirror folder.
 - **Service Worker**: Bumped all cache versions to **v3.8.0** to ensure deployment of the new logic.
 - **Commit**: `[TBD]`
+- **Status**: Completed one-way architecture pivot.
+
+---
+
+## Session Start: 2026-04-04
+
+### Travel Log Restructuring & One-Way Mode (v4.0.0 · 2026-04-04)
+
+- **One-Way Model Implementation**:
+    - Finalized the transition to a strict "One-Way Event" per row model.
+    - Updated `shared/import-tool.js` with the new Excel column layout.
+    - Refactored `onImportComplete` in `settings.js` to process rows as independent one-way trips and handle multi-column "Accompanied by" data.
+- **Enhanced Passenger Entry**:
+    - Created `shared/multi-smart-input.js` for robust multi-passenger selection.
+    - Enabled on-the-fly passenger creation within the "Travelling with" field.
+    - Updated `add-trip.js` to use the new component and support instant database saving for new names.
+- **Maintenance & Deployment**:
+    - Verified the "Nuclear Reset" eraser logic for total data wiping.
+    - Bumped project version to **v4.0.0** across all components.
+    - Synchronized `master` and `main` branches.
+- **Commit**: `2663e22` (master), `b66d231` (main) — `feat: restructuring travel log to v4.0.0 (one-way mode, new excel format, multi-passenger entry)`
