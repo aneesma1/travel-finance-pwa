@@ -11,7 +11,8 @@ import { PillSelect }  from '../../../shared/pill-select.js';
 import { SmartInput }  from '../../../shared/smart-input.js';
 import { MultiSmartInput } from '../../../shared/multi-smart-input.js';
 import {
-  uuidv4, today, toISODate, daysBetween, formatDisplayDate, showToast
+  uuidv4, today, toISODate, daysBetween, formatDisplayDate, showToast,
+  showConfirmModal, showInputModal
 } from '../../../shared/utils.js';
 import { navigate } from '../router.js';
 import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';

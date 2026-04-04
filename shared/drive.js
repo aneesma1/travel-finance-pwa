@@ -8,6 +8,7 @@
 'use strict';
 
 import { authFetch } from './auth.js';
+import { isOnline } from './utils.js';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
