@@ -10,6 +10,7 @@ import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js'
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { uuidv4, showToast, copyToClipboard, today, daysFromToday, expiryStatus, expiryStatusColor } from '../../../shared/utils.js';
+import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
 
 const BLOOD_GROUPS    = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
 const RELATIONSHIPS   = ['Spouse','Father','Mother','Brother','Sister','Son','Daughter','Friend','Doctor','Colleague','Other'];
@@ -427,8 +428,13 @@ export async function renderPersonProfile(container, params = {}) {
           <div class="form-group" style="margin:0;">
             <label class="form-label">Full Address</label>
             <textarea class="form-input loc-address" data-loc="${fieldKey}"
-              rows="2" placeholder="Street, area, city…"
+              rows="1" placeholder="Street, area, city…"
               style="resize:vertical;">${loc.address || ''}</textarea>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Google plus location ID</label>
+            <input type="text" class="form-input loc-pluscode" data-loc="${fieldKey}"
+              value="${loc.plusCode || ''}" placeholder="e.g. 7HQG+XR" />
           </div>
 
           <!-- Map Picker -->
@@ -547,6 +553,11 @@ export async function renderPersonProfile(container, params = {}) {
     document.querySelector(`.loc-address[data-loc="${fieldKey}"]`)?.addEventListener('input', e => {
       if (!draft[fieldKey]) draft[fieldKey] = {};
       draft[fieldKey].address = e.target.value;
+      markDirty();
+    });
+    document.querySelector(`.loc-pluscode[data-loc="${fieldKey}"]`)?.addEventListener('input', e => {
+      if (!draft[fieldKey]) draft[fieldKey] = {};
+      draft[fieldKey].plusCode = e.target.value;
       markDirty();
     });
 

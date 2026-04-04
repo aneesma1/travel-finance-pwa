@@ -131,14 +131,14 @@ export async function renderDashboard(container) {
     )].sort();
 
     // Render travel location widget first (works independently of People tab)
-    renderLocationWidget(allPassengerNames, trips);
+    renderLocationWidget(allPassengerNames, trips, filterLocation);
 
     renderFilterBar(members, filterPerson, filterLocation, filterDocStatus);
     renderMemberCards(members, passengers, trips, documents, filterPerson, filterLocation, filterDocStatus, allPassengerNames);
   }
 
   // ── Travel Location Widget (works from passenger/trip data, no People needed) ──
-  function renderLocationWidget(allPassengerNames, trips) {
+  function renderLocationWidget(allPassengerNames, trips, filterLocation = 'all') {
     const content = document.getElementById('dashboard-content');
     if (!allPassengerNames.length) return;
 
@@ -158,11 +158,16 @@ export async function renderDashboard(container) {
       groups[p.location].push(p);
     });
 
-    const locationOrder = Object.keys(groups).sort((a, b) => {
+    let locationOrder = Object.keys(groups).sort((a, b) => {
       // Show Qatar first, India second, others after
       const order = ['Qatar', 'India', 'In transit', 'Unknown'];
       return (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99);
     });
+
+    // Apply country filter to the widget itself
+    if (filterLocation !== 'all') {
+      locationOrder = locationOrder.filter(loc => loc === filterLocation);
+    }
 
     const flagMap = { Qatar: '🇶🇦', India: '🇮🇳', 'In transit': '✈️' };
     const colorMap = {
