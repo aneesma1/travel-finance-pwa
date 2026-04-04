@@ -1,4 +1,4 @@
-// v3.8.0 — 2026-04-03
+// v4.0.0 — 2026-04-04
 
 // ─── app-a-family-hub/sw.js ──────────────────────────────────────────────────
 // Service Worker for Family Hub PWA
@@ -6,7 +6,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'hub-cache-v3.8.0';
+const CACHE_NAME = 'hub-cache-v4.0.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -30,6 +30,7 @@ const STATIC_ASSETS = [
   '../shared/drive.js',
   '../shared/db.js',
   '../shared/smart-input.js',
+  '../shared/multi-smart-input.js',
   '../shared/pill-select.js',
   '../shared/import-tool.js',
   '../shared/photo-picker.js',

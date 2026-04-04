@@ -9,17 +9,17 @@
 import { uuidv4 } from './utils.js';
 
 export const TRAVEL_COLUMNS = [
-  { key: 'personName',    label: 'Name of Person',            required: false },
-  { key: 'dateOutIndia',  label: 'Date Out India',            required: false },
-  { key: 'dateInQatar',   label: 'Date In Qatar',             required: false },
-  { key: 'dateOutQatar',  label: 'Date Out Qatar',            required: false },
-  { key: 'dateInIndia',   label: 'Date In India',             required: false },
-  { key: 'flightInward',  label: 'Inward Flight to Qatar',    required: false },
-  { key: 'flightOutward', label: 'Outward Flight From Qatar', required: false },
+  { key: 'personName',    label: 'Name of Person',            required: true  },
+  { key: 'origin',        label: 'Origin',                    required: false },
+  { key: 'destination',   label: 'Destination',               required: false },
+  { key: 'dateOut',       label: 'Date Out Origin',           required: false },
+  { key: 'dateIn',        label: 'Date In Destination',        required: false },
+  { key: 'flightDetails', label: 'Flight details',            required: false },
   { key: 'reason',        label: 'Reason for Travel',         required: false },
-  { key: 'travelWith',    label: 'Travel With',               required: false },
-  { key: 'originCountry', label: 'Origin Country',            required: false },
-  { key: 'destinationCountry', label: 'Destination Country',  required: false },
+  { key: 'accompanied1',  label: 'Accompanied by 1',          required: false },
+  { key: 'accompanied2',  label: 'Accompanied by 2',          required: false },
+  { key: 'accompanied3',  label: 'Accompanied by 3',          required: false },
+  { key: 'accompanied4',  label: 'Accompanied by 4',          required: false },
 ];
 
 export const FINANCE_COLUMNS = [

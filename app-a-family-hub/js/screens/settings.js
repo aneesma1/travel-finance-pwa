@@ -1,4 +1,4 @@
-// v3.5.47 — 2026-03-31
+// v4.0.0 — 2026-04-04
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -331,7 +331,7 @@ function renderDataTab(data, members, container) {
         familyDefaults: {},
         familyRelations: [],
         customDocTypes: [],
-        appInfo: { version: 'v3.8.0', lastReset: new Date().toISOString() } 
+        appInfo: { version: 'v4.0.0', lastReset: new Date().toISOString() } 
       };
       
       const fileId = localStorage.getItem('drive_travel_file_id');
@@ -625,7 +625,7 @@ function openImportModal(data, persons) {
     existingData: data,
     onImportComplete: async (records, progressCb) => {
       importInProgress = true;
-      setStatus(`Importing ${records.length} trips…`);
+      setStatus(`Importing ${records.length} records…`);
 
       let imported = 0, skipped = 0;
 
@@ -634,7 +634,6 @@ function openImportModal(data, persons) {
           const trips = [...(remote.trips || [])];
           const passengers = [...(remote.passengers || remote.travelPersons || [])];
 
-          // Helper to decouple explicitly: auto-create passenger
           const getOrAddPassenger = (nameStr) => {
             const n = (nameStr || '').trim();
             if (!n) return null;
@@ -646,96 +645,59 @@ function openImportModal(data, persons) {
             return p;
           };
 
-          // Deduplication key: passengerName (lowered) + ISO dateLeftOrigin
           const existingKeys = new Set(
-            trips.map(t => ((t.passengerName || t.personName || '').toLowerCase().trim()) + '|' + toISODate(t.dateLeftOrigin || t.dateOutIndia))
+            trips.map(t => ((t.passengerName || '').toLowerCase().trim()) + '|' + toISODate(t.dateLeftOrigin))
           );
 
           records.forEach(rec => {
-            const rawPrimary = (rec.passengerName || rec.personName || 'Unknown').trim();
-            const doi        = toISODate(rec.dateLeftOrigin || rec.dateOutIndia);
+            const primaryName = (rec.personName || 'Unknown').trim();
+            const dateStr = rec.dateOut || rec.dateIn;
+            if (!dateStr) { skipped++; return; }
+            
+            const doi = toISODate(dateStr);
 
-            // Split ONLY the companion column ("Travel With") using Comma or Semi-colon
-            const companionNames = (rec.travelWith || '')
-              .split(/[,;]+/)
-              .map(n => n.trim())
-              .filter(Boolean);
+            const companionsRaw = [
+              rec.accompanied1, rec.accompanied2, rec.accompanied3, rec.accompanied4
+            ].map(n => String(n || '').trim()).filter(Boolean);
 
-            // Maintain the primary name exactly as provided in the Excel cell
-            const allNames = [...new Set([rawPrimary, ...companionNames])];
+            if (rec.travelWith) {
+              const legacy = String(rec.travelWith).split(/[,;]+/).map(n => n.trim()).filter(Boolean);
+              companionsRaw.push(...legacy);
+            }
 
-            // Create a trip for EACH person mentioned in the row
-            allNames.forEach(passengerNameStr => {
-              const name = passengerNameStr.trim();
-              if (!name) return;
+            const allNames = [...new Set([primaryName, ...companionsRaw])];
+            const resolvedPersons = allNames.map(n => getOrAddPassenger(n)).filter(Boolean);
 
-              // Dedup check (only if both name and date exist)
-              if (name && doi) {
-                const key = name.toLowerCase() + '|' + doi;
-                if (existingKeys.has(key)) { skipped++; return; }
-                existingKeys.add(key);
-              }
+            resolvedPersons.forEach(person => {
+              const key = person.name.toLowerCase() + '|' + doi;
+              if (existingKeys.has(key)) { skipped++; return; }
+              existingKeys.add(key);
 
-              // Others in this row become this person's companions
-              const othersInRow = allNames
-                .filter(n => n.toLowerCase() !== name.toLowerCase())
+              const companionsForThis = resolvedPersons
+                .filter(p => p.id !== person.id)
+                .map(p => p.name)
                 .join(', ');
 
-              const passData = getOrAddPassenger(name);
+              const companionIds = resolvedPersons
+                .filter(p => p.id !== person.id)
+                .map(p => p.id);
 
-              // Pair A: Out of Origin (Going)
-              // We look for "Date Out India" or "Date Left Origin"
-              const dateA_Out = rec.dateOutIndia || rec.dateLeftOrigin;
-              const dateA_In  = rec.dateInQatar || rec.dateArrivedDest;
-              if (dateA_Out || dateA_In) {
-                const doi = dateA_Out || dateA_In;
-                const keyA = name.toLowerCase() + '|' + doi + '|' + (rec.destinationCountry || 'Qatar').toLowerCase();
-                if (!existingKeys.has(keyA)) {
-                  existingKeys.add(keyA);
-                  trips.push({
-                    ...rec,
-                    id: uuidv4(),
-                    passengerId: passData ? passData.id : '',
-                    passengerName: name,
-                    originCountry: rec.originCountry || 'India',
-                    destinationCountry: rec.destinationCountry || 'Qatar',
-                    dateLeftOrigin: dateA_Out || dateA_In,
-                    dateArrivedDest: dateA_In || dateA_Out,
-                    flightNumber: rec.flightInward || rec.flightNumber || '',
-                    travelWith: othersInRow,
-                    // Clean up legacy fields in new record
-                    dateLeftDest: null, dateReturnedOrigin: null, flightInward: null, flightOutward: null, daysInDest: null
-                  });
-                  imported++;
-                } else { skipped++; }
-              }
-
-              // Pair B: Back to Origin (Returning)
-              // We look for "Date Out Qatar" or "Date Left Destination"
-              const dateB_Out = rec.dateOutQatar || rec.dateLeftDest;
-              const dateB_In  = rec.dateInIndia || rec.dateReturnedOrigin;
-              if (dateB_Out || dateB_In) {
-                const doq = dateB_Out || dateB_In;
-                const keyB = name.toLowerCase() + '|' + doq + '|' + (rec.originCountry || 'India').toLowerCase();
-                if (!existingKeys.has(keyB)) {
-                  existingKeys.add(keyB);
-                  trips.push({
-                    ...rec,
-                    id: uuidv4(),
-                    passengerId: passData ? passData.id : '',
-                    passengerName: name,
-                    originCountry: rec.destinationCountry || 'Qatar',
-                    destinationCountry: rec.originCountry || 'India',
-                    dateLeftOrigin: dateB_Out || dateB_In,
-                    dateArrivedDest: dateB_In || dateB_Out,
-                    flightNumber: rec.flightOutward || rec.flightNumber || '',
-                    travelWith: othersInRow,
-                    // Clean up legacy fields in new record
-                    dateLeftDest: null, dateReturnedOrigin: null, flightInward: null, flightOutward: null, daysInDest: null
-                  });
-                  imported++;
-                } else { skipped++; }
-              }
+              trips.push({
+                id: uuidv4(),
+                timestamp: new Date().toISOString(),
+                passengerId: person.id,
+                passengerName: person.name,
+                originCountry: rec.origin || 'India',
+                destinationCountry: rec.destination || 'Qatar',
+                dateLeftOrigin: rec.dateOut || rec.dateIn,
+                dateArrivedDest: rec.dateIn || rec.dateOut,
+                flightNumber: rec.flightDetails || '',
+                reason: rec.reason || '',
+                travelWith: companionIds,
+                travelWithNames: companionsForThis,
+                photos: []
+              });
+              imported++;
             });
           });
 
