@@ -10,12 +10,13 @@ import { getActiveSessions, getActivityLog } from '../../../shared/security-log.
 import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
 import { clearAuth, getUser } from '../../../shared/auth.js';
 import {
-  downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
-  getMirrorSnapshots, restoreFromMirror
-} from '../../../shared/drive.js';
-import {
-  currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard
+  currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard,
+  showConfirmModal
 } from '../../../shared/utils.js';
+import {
+  downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
+  getMirrorSnapshots, restoreFromMirror, getBackupHealthReport
+} from '../../../shared/drive.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
@@ -608,9 +609,19 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.0.0 · 2026-04-04</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.1.0 · 2026-04-04</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions on Drive</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions · ${data?.categories?.length || 0} categories</div>
+
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
+          <div style="display:flex; gap:10px;">
+            <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
+            <button id="backup-health-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">📊 Backup Health</button>
+          </div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
+            Maintenance: Repairs records & verifies Drive backup compliance.
+          </div>
+        </div>
         
         <button id="force-update-btn" style="
           margin-top:16px; width:100%; padding:10px; font-size:12px; font-weight:700;
@@ -622,6 +633,86 @@ export async function renderSettings(container, params = {}) {
         </div>
       </div>
     `;
+    
+    document.getElementById('repair-data-btn')?.addEventListener('click', async () => {
+      const ok = await showConfirmModal('🔍 Scan & Repair Data?', 'This tool will:\n1. Identify exact duplicate transactions\n2. Merge identical records from multiple devices\n\nThis will permanently update your data.', {
+        confirmText: 'Run Health Check'
+      });
+      if (!ok) return;
+
+      try {
+        showToast('Scanning financial data…', 'info');
+        const newData = await localSave('finance', (remote) => {
+          let txns = [...(remote.transactions || [])];
+          const seen = new Set();
+          const nonDupes = [];
+          let mergedCount = 0;
+          
+          txns.forEach(t => {
+            const key = `${t.date}|${t.amountSpend || 0}|${t.income || 0}|${t.description}|${t.category1}|${t.account}`;
+            if (seen.has(key)) {
+              mergedCount++;
+            } else {
+              seen.add(key);
+              nonDupes.push(t);
+            }
+          });
+          
+          window._repairSummary = { merged: mergedCount };
+          return { ...remote, transactions: nonDupes };
+        });
+        
+        await setCachedFinanceData(newData);
+        const { merged } = window._repairSummary || {};
+        showToast(`Success! Merged ${merged} duplicates.`, 'success', 5000);
+        setTimeout(() => window.location.reload(), 2000);
+      } catch (err) {
+        showToast('Repair failed: ' + err.message, 'error');
+      }
+    });
+
+    document.getElementById('backup-health-btn')?.addEventListener('click', async () => {
+      try {
+        showToast('Scanning Drive folders…', 'info');
+        const report = await getBackupHealthReport('finance');
+        
+        const formatBytes = (b) => {
+          const bytes = Number(b);
+          if (!bytes) return '0 B';
+          if (bytes < 1024) return bytes + ' B';
+          if (bytes < 1024*1024) return (bytes / 1024).toFixed(1) + ' KB';
+          return (bytes / (1024*1024)).toFixed(1) + ' MB';
+        };
+        
+        const message = `
+          <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
+            <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
+            • Data File: ${report.working.mainFile ? `✅ ${report.working.mainFile.name} (${formatBytes(report.working.mainFile.size)})` : '❌ Missing'}<br/>
+            • Sync Queue: ${report.working.queueActive ? '✅ Active' : '⚪ Empty'}<br/>
+            • Misc Files: ${report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0)} found
+            
+            <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
+            
+            <b style="color:var(--primary); font-size:14px;">🕒 Mirror System (Historical)</b><br/>
+            • <b>Edits Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.edits.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.edits.count} / ${report.mirror.edits.target}</span><br/>
+            • <b>Daily Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.daily.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.daily.count} / ${report.mirror.daily.target}</span><br/>
+            • <b>Monthly Tier</b> (Target 3): <span style="font-weight:700; color:${report.mirror.monthly.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.monthly.count} / ${report.mirror.monthly.target}</span>
+            
+            <div style="margin-top:16px; padding:10px; background:var(--primary-bg); border-radius:8px; border-left:4px solid var(--primary);">
+              <div style="font-weight:700; color:var(--primary); font-size:12px;">Compliance Feedback:</div>
+              <div style="font-size:11px; margin-top:4px;">${report.status === 'Healthy' ? '✅ System is correctly mirroring finance data to Drive.' : '⌛ System is still initializing snapshots.'}</div>
+            </div>
+          </div>
+        `;
+        
+        await showConfirmModal(`Vault Status: ${report.status}`, message, { 
+          confirmText: 'Done', 
+          cancelText: '' 
+        });
+      } catch (err) {
+        showToast('Vault health scan failed: ' + err.message, 'error');
+      }
+    });
 
     document.getElementById('force-update-btn')?.addEventListener('click', async () => {
       if (confirm('This will unregister the Service Worker and hard-reload the app. Continue?')) {
