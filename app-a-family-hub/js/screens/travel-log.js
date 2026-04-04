@@ -304,7 +304,9 @@ export async function renderTravelLog(container, params = {}) {
       filterPassenger = checked.length > 0 ? checked.join(',') : null;
       setHashParams({ passenger: filterPassenger });
       _tripPage = 1;
-      renderTrips(filterPassenger, filterYear, true, document.getElementById('log-content'));
+      const content = document.getElementById('log-content');
+      if (content) renderTrips(filterPassenger, filterYear, true, content);
+      bar.querySelector('.filter-dropdown').classList.add('hidden');
     });
 
     bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(btn => {
@@ -312,7 +314,14 @@ export async function renderTravelLog(container, params = {}) {
         filterYear = btn.dataset.value === 'all' ? null : btn.dataset.value;
         setHashParams({ year: filterYear });
         _tripPage = 1;
-        renderTrips(filterPassenger, filterYear, true, document.getElementById('log-content'));
+        
+        // Update active UI state for pills immediately
+        bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(b => {
+          b.classList.toggle('active', b.dataset.value === (filterYear || 'all'));
+        });
+
+        const content = document.getElementById('log-content');
+        if (content) renderTrips(filterPassenger, filterYear, true, content);
       });
     });
   }
