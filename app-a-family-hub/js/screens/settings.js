@@ -265,6 +265,18 @@ function renderDataTab(data, members, container) {
     openImportModal(freshData, freshPersons);
   });
 
+  document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
+    showToast('Scanning & Purging…', 'info');
+    try {
+      const { purgeOrphanedFiles } = await import('../../shared/drive.js');
+      const count = await purgeOrphanedFiles('travel', data);
+      showToast(`Cleaned ${count} orphaned files`, 'success');
+    } catch (err) {
+      showToast('Purge failed: ' + err.message, 'error');
+    }
+  });
+
   document.getElementById('photo-zip-btn').addEventListener('click', async () => {
     try {
       showToast('Preparing photos…', 'info', 2000);
@@ -332,7 +344,7 @@ function renderDataTab(data, members, container) {
         familyDefaults: {},
         familyRelations: [],
         customDocTypes: [],
-        appInfo: { version: 'v4.0.0', lastReset: new Date().toISOString() }
+        appInfo: { version: 'v4.14.0', lastReset: new Date().toISOString() }
       };
 
       const fileId = localStorage.getItem('drive_travel_file_id');
@@ -498,7 +510,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.13.0 · 2026-04-04 · 18:20</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.14.0 · 2026-04-04 · 18:45</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin() ? '👑 Admin' : '👁 Viewer'} · ${user?.email || 'Not signed in'}</div>
@@ -566,6 +578,18 @@ function renderAccountTab(data, members, user, container) {
     } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
   });
 
+  document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
+    showToast('Scanning & Purging…', 'info');
+    try {
+      const { purgeOrphanedFiles } = await import('../../shared/drive.js');
+      const count = await purgeOrphanedFiles('travel', data);
+      showToast(`Cleaned ${count} orphaned files`, 'success');
+    } catch (err) {
+      showToast('Purge failed: ' + err.message, 'error');
+    }
+  });
+
   document.getElementById('security-audit-btn')?.addEventListener('click', async () => {
     const logs = await getSecurityLogs();
     if (!logs || logs.length === 0) {
@@ -604,7 +628,8 @@ function renderAccountTab(data, members, user, container) {
     document.getElementById('sec-purge-btn')?.addEventListener('click', async () => {
       if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
       showToast('Scanning & Purging…', 'info');
-      const count = await (await import('../../../shared/drive.js')).purgeOrphanedFiles('travel', data);
+      const { purgeOrphanedFiles } = await import('../../../shared/drive.js');
+      const count = await purgeOrphanedFiles('travel', data);
       showToast(`Cleaned ${count} orphaned files`, 'success');
       document.querySelector('.modal-overlay')?.remove();
       document.getElementById('security-audit-btn').click();
