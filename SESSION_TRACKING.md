@@ -538,9 +538,10 @@ git checkout master
     - Synchronized `master` and `main` branches.
 - **Bug Fixes**:
     - Resolved UUID appearance in Passenger Summary dropdown by enhancing name resolution logic.
-    - Fixed overlapping stay calculations in Passenger Summary by implementing a "Sequential Bridging" logic that ends a stay when the next trip begins.
+    - Fixed overlapping stay calculations in Passenger Summary by implementing "Sequential Bridging" logic.
+    - Implemented "Year Boundary Splitting" to correctly distribute stay days across Dec 31/Jan 1 transitions.
 - **New Features**:
     - Filtered "Current Locations" dashboard widget by country (Qatar/India).
-    - Activated Address Photos for Family Defaults and Member Profiles (fixed missing utility imports).
-    - Added dedicated "Google Plus Location ID" field to all address entry sections for manual Plus Code management.
-- **Commit**: `7562751` (master), `7b40bf1` (main) — `feat: filter dashboard widget by country & enable address photos & plus code field`
+    - Activated Address Photos for Family Defaults and Member Profiles.
+    - Added dedicated "Google Plus Location ID" field to all address entry sections.
+- **Commit**: `7687cc5` (master), `e12bf4a` (main) — `fix: split stay durations across year boundaries`
