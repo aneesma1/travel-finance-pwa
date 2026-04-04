@@ -448,32 +448,55 @@ export async function renderTravelLog(container, params = {}) {
     pTripsSorted.forEach((t, idx) => {
       const entryDt = t.dateArrivedDest || t.dateLeftOrigin;
       if (!entryDt) return;
-      const year = entryDt.substring(0, 4);
       
-      // Determine when this stay ended (the beginning of the next trip)
       const nextTrip = pTripsSorted[idx + 1];
       const endDt = nextTrip ? (nextTrip.dateArrivedDest || nextTrip.dateLeftOrigin) : today();
       
-      const arrMs = new Date(entryDt).getTime();
-      const endMs = new Date(endDt).getTime();
+      const startMs = new Date(entryDt + 'T00:00:00').getTime();
+      const finalEndMs = new Date(endDt + 'T00:00:00').getTime();
       
-      let days = 0;
-      if (!isNaN(arrMs) && !isNaN(endMs) && endMs >= arrMs) {
-        days = Math.floor((endMs - arrMs) / (1000 * 60 * 60 * 24)) + (nextTrip ? 0 : 1); // Only add +1 for ongoing
-      }
+      if (isNaN(startMs) || isNaN(finalEndMs) || finalEndMs < startMs) return;
 
-      if (days >= 0) {
-        const country = t.destinationCountry || 'Qatar';
-        records.push({
-          year, country, days,
-          dateIn: entryDt,
-          dateOut: nextTrip ? endDt : null, // null means "Present"
-          reason: t.reason || '',
-        });
+      const totalStayDays = Math.round((finalEndMs - startMs) / 86400000) + (nextTrip ? 0 : 1);
+      if (totalStayDays > longestStay) longestStay = totalStayDays;
+      lifetimeDays += totalStayDays;
+
+      // ── Split Stay by Year ──
+      let currentStart = new Date(startMs);
+      const country = t.destinationCountry || 'Qatar';
+
+      while (currentStart.getTime() < finalEndMs || (!nextTrip && currentStart.getTime() === finalEndMs)) {
+        const curYear = currentStart.getFullYear();
+        const yearEnd = new Date(`${curYear}-12-31T23:59:59.999`).getTime();
         
-        lifetimeDays += days;
-        if (days > longestStay) longestStay = days;
-        countryCounts[country] = (countryCounts[country] || 0) + days;
+        // Find if we end this fragment at year end or final end
+        let fragmentEndMs = Math.min(finalEndMs, yearEnd);
+        
+        // Calculate days in this fragment
+        // If it's the very last day of an ongoing trip, we need to ensure the +1 is handled
+        let fragmentDays = Math.round((fragmentEndMs - currentStart.getTime()) / 86400000);
+        
+        // inclusive logic: if we are at the end and it's ongoing, add the +1
+        if (!nextTrip && fragmentEndMs === finalEndMs) {
+          fragmentDays += 1;
+        }
+
+        if (fragmentDays > 0) {
+          records.push({
+            year: String(curYear),
+            country,
+            days: fragmentDays,
+            dateIn: currentStart.toISOString().split('T')[0],
+            dateOut: (fragmentEndMs === finalEndMs && !nextTrip) ? null : new Date(fragmentEndMs).toISOString().split('T')[0],
+            reason: t.reason || '',
+          });
+          
+          countryCounts[country] = (countryCounts[country] || 0) + fragmentDays;
+        }
+
+        // Move to start of next year
+        currentStart = new Date(`${curYear + 1}-01-01T00:00:00`);
+        if (currentStart.getTime() > finalEndMs) break;
       }
     });
 
