@@ -314,9 +314,9 @@ export async function renderAddTrip(container, params = {}) {
           <label class="form-label">Travelling with</label>
           <div id="travel-with-pills"></div>
           <div style="margin-top:12px; display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--surface-3); border-radius:var(--radius-md); border:1px solid var(--border);">
-            <input type="checkbox" id="create-copy-check" checked style="width:18px;height:18px;cursor:pointer;" />
+            <input type="checkbox" id="create-copy-check" ${!isEdit ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;" />
             <label for="create-copy-check" style="font-size:12px;font-weight:600;color:var(--text);cursor:pointer;">
-              Create same travel details for each person
+              Create individual copies for companions
             </label>
           </div>
         </div>
@@ -423,8 +423,9 @@ export async function renderAddTrip(container, params = {}) {
       </div>
 
       <div style="margin-top:20px;display:flex;gap:10px;">
-        <button id="share-trip-btn" class="btn btn-secondary" style="flex:1;">📤 Share Details</button>
-        ${isViewMode ? `<button id="edit-trip-btn" class="btn btn-primary" style="flex:1;">📝 Edit Details</button>` : ''}
+        <button id="share-trip-btn" class="btn btn-secondary" style="flex:1;">📤 Share</button>
+        ${isViewMode ? `<button id="edit-trip-btn" class="btn btn-primary" style="flex:1;">📝 Edit</button>` : ''}
+        ${isEdit || isViewMode ? `<button id="delete-trip-btn" class="btn btn-danger" style="flex:1;">🗑️ Delete</button>` : ''}
       </div>
 
       <div id="save-error" style="color:var(--danger);font-size:13px;margin-top:12px;text-align:center;"></div>
@@ -433,6 +434,37 @@ export async function renderAddTrip(container, params = {}) {
     if (state.photos?.length) {
       renderPhotoThumbnails(document.getElementById('review-photos'), state.photos);
     }
+
+    document.getElementById('delete-trip-btn')?.addEventListener('click', async () => {
+      const ok = await showConfirmModal('Delete Trip?', 'Are you sure you want to permanently remove this travel record from your device and cloud mirror?', {
+        danger: true,
+        confirmText: 'Yes, Delete'
+      });
+      if (!ok) return;
+
+      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Non-confusable chars
+      const code = chars[Math.floor(Math.random() * chars.length)] + chars[Math.floor(Math.random() * chars.length)];
+      
+      const input = await showInputModal('Security Verification', `Type "${code}" to confirm permanent deletion:`, '', {
+        placeholder: 'Enter 2-digit code'
+      });
+      
+      if (input?.toUpperCase() !== code) {
+        if (input !== null) showToast('Verification code incorrect', 'error');
+        return;
+      }
+
+      try {
+        await localSave('travel', (remote) => {
+          const trips = (remote.trips || []).filter(t => t.id !== existingTrip.id);
+          return { ...remote, trips };
+        });
+        showToast('Trip deleted permanently', 'success');
+        navigate('travel-log');
+      } catch (err) {
+        showToast('Delete failed: ' + err.message, 'error');
+      }
+    });
   }
 
   // ── Validation ──────────────────────────────────────────────────────
