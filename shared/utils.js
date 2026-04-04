@@ -1,4 +1,4 @@
-// v4.12.0 — 2026-04-04 — 18:07
+// v4.13.0 — 2026-04-04 — 18:20
 
 // ─── shared/utils.js ────────────────────────────────────────────────────────
 // Shared utility functions used by both App A and App B
@@ -150,6 +150,12 @@ export async function copyToClipboard(text) {
 export function showToast(message, type = 'info', duration = 3000) {
   // type: 'info' | 'success' | 'error' | 'warning'
   const existing = document.getElementById('app-toast');
+  document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
+    showToast('Scanning & Purging…', 'info');
+    const count = await (await import('../../../shared/drive.js')).purgeOrphanedFiles('travel', data);
+    showToast(`Cleaned ${count} orphaned files`, 'success');
+  });
   if (existing) existing.remove();
 
   const colors = {
@@ -232,7 +238,7 @@ export function showConfirmModal(title, message, options = {}) {
       <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
         <div style="padding:20px 24px;">
           <div style="font-size:17px; font-weight:700; margin-bottom:8px;">${title}</div>
-          <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.12.0 · 2026-04-04 · 18:07</div>
+          <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.13.0 · 2026-04-04 · 18:25</div>
           <div style="margin-top:24px; display:flex; gap:12px;">
             ${cancelText ? `<button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>` : ''}
             <button id="modal-confirm" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" style="flex:1;">${confirmText}</button>
@@ -278,6 +284,9 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
             ${datalistId ? `list="${datalistId}"` : ''}
             style="margin-top:4px;" />
           ${datalistHtml}
+        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
+          Maintenance: Repairs records & verifies Drive backup compliance.
+        </div>
           <div style="margin-top:24px; display:flex; gap:12px;">
             <button id="modal-cancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
             <button id="modal-confirm" class="btn btn-primary" style="flex:1;">Save</button>

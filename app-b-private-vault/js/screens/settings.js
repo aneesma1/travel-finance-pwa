@@ -611,7 +611,7 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.11.0 · 2026-04-04 · 16:58</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.13.0 · 2026-04-04 · 18:25</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel & Finance PWA Suite</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions · ${data?.categories?.length || 0} categories</div>
 
@@ -632,6 +632,9 @@ export async function renderSettings(container, params = {}) {
           </div>
           <div style="margin-top:10px;">
             <button id="security-audit-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px;">🛡️ Drive Security Audit</button>
+          </div>
+          <div style="margin-top:10px;">
+            <button id="standalone-deep-clean-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px; color:var(--primary); border-color:var(--primary);">🧹 Drive Deep Clean</button>
           </div>
           <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
             Maintenance: Repairs records & verifies Drive backup compliance.
@@ -799,6 +802,13 @@ export async function renderSettings(container, params = {}) {
       } catch (err) {
         showToast('Vault health scan failed: ' + err.message, 'error');
       }
+    });
+
+    document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Vault Drive? This will trash both root clutter and backups for deleted transactions.')) return;
+      showToast('Scanning & Purging…', 'info');
+      const count = await (await import('../../../shared/drive.js')).purgeOrphanedFiles('finance', data);
+      showToast(`Cleaned ${count} orphaned files`, 'success');
     });
 
     document.getElementById('force-update-btn')?.addEventListener('click', async () => {

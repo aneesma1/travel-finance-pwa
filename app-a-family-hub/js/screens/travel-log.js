@@ -292,12 +292,20 @@ export async function renderTravelLog(container, params = {}) {
     `;
 
     // Dropdown toggle logic
-    const dropBtn = bar.querySelector('#passenger-dropdown-btn');
-    const dropMenu = bar.querySelector('#passenger-dropdown-menu');
-    dropBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropMenu.classList.toggle('hidden');
-    });
+    // DROP-DOWN DELEGATOR: Resilient to re-renders
+    const toggleDropdown = (e) => {
+      const btn = e.target.closest('#passenger-dropdown-btn');
+      if (btn) {
+        e.stopPropagation();
+        const menu = bar.querySelector('#passenger-dropdown-menu');
+        if (menu) {
+          const isHidden = menu.style.display === 'none' || menu.style.display === '';
+          menu.style.display = isHidden ? 'block' : 'none';
+        }
+      }
+    };
+    bar.removeEventListener('click', toggleDropdown); // Prevent doubles
+    bar.addEventListener('click', toggleDropdown);
     
     bar.querySelector('#pass-apply-btn').addEventListener('click', () => {
       const checked = Array.from(bar.querySelectorAll('.pass-item-cb')).filter(c => c.checked).map(c => c.value);
