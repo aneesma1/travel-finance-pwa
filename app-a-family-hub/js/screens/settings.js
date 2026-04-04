@@ -498,7 +498,7 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.12.0 · 2026-04-04 · 18:02</div>
+      <div style="font-size:13px;color:var(--text-muted);">Family Hub v4.13.0 · 2026-04-04 · 18:20</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v1.1 · Travel &amp; Finance PWA Suite</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin() ? '👑 Admin' : '👁 Viewer'} · ${user?.email || 'Not signed in'}</div>
@@ -526,6 +526,9 @@ function renderAccountTab(data, members, user, container) {
         </div>
         <div style="margin-top:12px;">
           <button id="security-audit-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px;">🛡️ Drive Security Audit</button>
+        </div>
+        <div style="margin-top:12px;">
+          <button id="standalone-deep-clean-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px; color:var(--primary); border-color:var(--primary);">🧹 Drive Deep Clean</button>
         </div>
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
           Maintenance: Repairs records & verifies Drive backup compliance.
