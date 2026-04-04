@@ -14,6 +14,7 @@ import { getActiveSessions, getActivityLog } from '../../../shared/security-log.
 import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate, showConfirmModal, showInputModal } from '../../../shared/utils.js';
 import { authFetch } from '../../../shared/auth.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
+import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
 import { openPersonManage } from './person-manage.js';
 import { exitApp } from '../../../shared/app-utils.js';
 
@@ -409,6 +410,16 @@ function renderSecurityTab() {
         </div>
         <span style="color:var(--text-muted);">›</span>
       </div>
+    </div>
+    <div class="section-title" style="margin-top:16px;">App Settings</div>
+    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:12px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:600;">Lock App Version</div>
+          <div style="font-size:12px;color:var(--text-muted);">Prevent auto-updates</div>
+        </div>
+        <input type="checkbox" id="lock-update-check" ${getAppState('lockUpdates')?'checked':''}>
+      </div>
     </div>`;
 
   document.getElementById('security-dashboard-btn').addEventListener('click', async () => {
@@ -452,6 +463,11 @@ function renderSecurityTab() {
     await new Promise(r => setTimeout(r, 1500));
     await exitApp();
   });
+  
+  document.getElementById('lock-update-check').onchange = async (e) => {
+    await setAppState('lockUpdates', e.target.checked);
+    showToast(e.target.checked ? 'App Locked.' : 'Update checks enabled.', 'info');
+  };
 }
 
 // ── ACCOUNT TAB ───────────────────────────────────────────────────────────────
@@ -488,7 +504,23 @@ function renderAccountTab(data, members, user, container) {
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin()?'👑 Admin':'👁 Viewer'} · ${user?.email||'Not signed in'}</div>
       
       <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light);">
-        <div style="display:flex; gap:10px;">
+        <!-- RECOVERY SECTION -->
+        <div style="margin-top:24px; padding:16px; background:rgba(var(--primary-rgb), 0.05); border:1px dashed var(--primary); border-radius:12px;">
+          <div style="font-weight:700; color:var(--primary); margin-bottom:4px;">📦 Portable Recovery Engine</div>
+          <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+            Download a single-file ZIP containing both the app code and your current data. You can run this locally if GitHub is ever private or down.
+          </div>
+          <button id="download-recovery-zip" class="btn btn-primary" style="width:100%; border-radius:8px;">
+            Download Recovery Bundle (ZIP)
+          </button>
+        </div>
+        
+        <div style="margin-top:20px; display:flex; gap:12px;">
+          <button id="local-backup-btn" class="btn btn-secondary" style="flex:1;">JSON Backup</button>
+          <button id="local-restore-btn" class="btn btn-secondary" style="flex:1;">Verify & Restore</button>
+        </div>
+        
+        <div style="margin-top:12px; display:flex; gap:10px;">
           <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
           <button id="backup-health-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">📊 Backup Health</button>
         </div>
