@@ -32,21 +32,20 @@
 export const CLIENT_ID = '36787254386-n0ee36r22mhr3g5620q10ob4phe6i59o.apps.googleusercontent.com';
 
 // Auto-detects current origin + path -- works regardless of where folder is moved
-// e.g. http://localhost:8080/app-a-family-hub/
-//   or http://127.0.0.1:5500/app-a-family-hub/
-//   or https://yoursite.com/app-a-family-hub/
 function detectRedirectUri() {
+  // Native Android Capacitor WebView — use GitHub Pages as OAuth redirect
+  if (window.Capacitor?.isNative) {
+    return 'https://aneesma1.github.io/travel-finance-pwa/';
+  }
   const loc = window.location;
-  // Find the app folder in the current path
   const pathParts = loc.pathname.split('/');
   const appIndex  = pathParts.findIndex(p => p === 'app-a-family-hub');
   if (appIndex !== -1) {
-    // Reconstruct path up to and including the app folder
     const basePath = pathParts.slice(0, appIndex + 1).join('/') + '/';
     return loc.origin + basePath;
   }
-  // Fallback: use origin + expected path
   return loc.origin + '/app-a-family-hub/';
 }
 
 export const REDIRECT_URI = detectRedirectUri();
+

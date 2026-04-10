@@ -23,6 +23,10 @@
 export const CLIENT_ID = '36787254386-n0ee36r22mhr3g5620q10ob4phe6i59o.apps.googleusercontent.com';
 
 function detectRedirectUri() {
+  // Native Android Capacitor WebView
+  if (window.Capacitor?.isNative) {
+    return 'https://aneesma1.github.io/travel-finance-pwa/';
+  }
   const loc = window.location;
   const pathParts = loc.pathname.split('/');
   const appIndex  = pathParts.findIndex(p => p === 'app-b-private-vault');
@@ -34,3 +38,4 @@ function detectRedirectUri() {
 }
 
 export const REDIRECT_URI = detectRedirectUri();
+
