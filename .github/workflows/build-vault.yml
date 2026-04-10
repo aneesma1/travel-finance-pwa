@@ -26,19 +26,12 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Dependencies & Wrap with Capacitor
+      - name: Install Dependencies & Sync with Capacitor
         working-directory: Travel-Vault_Android/Personal_vault
         run: |
-          if [ ! -f package.json ]; then
-            npm init -y
-            npm install @capacitor/core @capacitor/android
-            npm install -D @capacitor/cli
-            npx cap init "Personal Vault" "com.antigravity.vault" --web-dir src
-            npx cap add android
-          else
-            npm install
-          fi
-          npx cap sync android
+          npm install
+          chmod +x node_modules/.bin/cap
+          node_modules/.bin/cap sync android
 
       - name: Build Android Release APK (Gradle)
         working-directory: Travel-Vault_Android/Personal_vault/android
