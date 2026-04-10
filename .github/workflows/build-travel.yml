@@ -6,7 +6,9 @@ on:
     branches:
       - main
     paths:
-      - 'Travel-Vault_Android/Travel_app/**' # Only trigger if Travel App files change
+      - 'Travel-Vault_Android/Travel_app/**'
+      - 'Travel-Vault_PWA/shared/**'
+      - '.github/workflows/build-travel.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

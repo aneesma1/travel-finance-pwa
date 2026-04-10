@@ -6,7 +6,9 @@ on:
     branches:
       - main
     paths:
-      - 'Travel-Vault_Android/Personal_vault/**' # Isolated trigger path
+      - 'Travel-Vault_Android/Personal_vault/**'
+      - 'Travel-Vault_PWA/shared/**'
+      - '.github/workflows/build-vault.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
