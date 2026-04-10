@@ -77,7 +77,7 @@
 
 </div><!-- #app -->
 
-<!-- ── App bootstrap (v5.3.0 Standard Script Model) ─────────────────── -->
+<!-- ── App bootstrap (v5.4.0 Local-First Model) ─────────────────── -->
 <!-- We load these in order because they are no longer ES Modules -->
 <script src="shared/utils.js"></script>
 <script src="shared/auth.js"></script>
@@ -93,39 +93,51 @@
 <script src="js/pin.js"></script>
 
 <script>
-  // 🛡️ NATIVE BOOTSTRAPPER
+  // 🛡️ NATIVE BOOTSTRAPPER (v5.4.0)
   async function bootApp() {
     try {
-      console.log('App: Booting in standard mode...');
+      console.log('App: Booting in Local-First mode...');
       
+      // Update Sync Badge UI
+      updateSyncStatusBadge();
+
       // Handle OAuth callback (Listener)
       window.addEventListener('oauth:callback_received', async () => {
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
         location.reload(); 
       });
 
-      // 1. Initial Auth Check
-      if (typeof handleOAuthCallback === 'function') {
-        const urlHash = window.location.hash;
-        if (urlHash.includes('access_token')) {
-          await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        }
+      // 1. Initial Auth Check (Discovery)
+      const urlHash = window.location.hash;
+      if (urlHash.includes('access_token')) {
+        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
       }
 
-      if (!isAuthenticated()) {
-        if (typeof showLogin === 'function') showLogin();
-        return;
-      }
-
-      // 2. Database & Data
+      // 2. Database & Data (Load Local cache first)
       await openDB();
       const cached = await getCachedFinanceData();
       if (cached) {
         window._financeData = cached;
         if (typeof showApp === 'function') showApp(cached);
+      } else {
+        // If no data AND no auth, show a special "Welcome" or Login screen
+        if (!isAuthenticated() && typeof showLogin === 'function') {
+           showLogin(); 
+        }
       }
 
-      // 3. Background Sync & Integrity
+      // 3. Cloud Provisioning (Only if authenticated)
+      if (isAuthenticated()) {
+        try {
+          await initDriveFolders();
+          await initDataFile('finance');
+        } catch (err) {
+          console.warn('Cloud Sync initialization failed:', err);
+          showToast('⚠️ Cloud Sync unavailable', 'warning');
+        }
+      }
+
+      // 4. Background Sync & Integrity
       runBootIntegrityCheck('finance').catch(console.error);
       initSyncManager();
       watchSync();
@@ -136,10 +148,24 @@
     }
   }
 
+  function updateSyncStatusBadge() {
+    const isAuth = isAuthenticated();
+    const badge = document.getElementById('sync-status-badge');
+    if (!badge) return;
+    
+    if (isAuth) {
+      badge.innerHTML = '<span style="color:#10B981">●</span> Cloud Sync Active';
+      badge.style.background = 'rgba(16, 185, 129, 0.1)';
+    } else {
+      badge.innerHTML = '<span style="color:#94A3B8">○</span> Offline/Guest Mode';
+      badge.style.background = 'rgba(148, 163, 184, 0.1)';
+    }
+  }
+
   // Execute boot when everything is loaded
   window.addEventListener('load', bootApp);
 
-  // 🛡️ 404 CATCHER (Detects missing files in the APK)
+  // 🛡️ 404 CATCHER
   window.addEventListener('error', function(e) {
     if (e.target.tagName === 'SCRIPT') {
       const fileName = e.target.src.split('/').pop();

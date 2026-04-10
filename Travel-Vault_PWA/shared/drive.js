@@ -56,17 +56,21 @@ async function findOrCreateFolder(name, parentId = null) {
   return folder.id;
 }
 
+// ── Folder discovery & provisioning (v5.4.0) ──────────────────────────────────
 export async function initDriveFolders() {
-  // Main app folder
+  // We search for our specific app folders by name.
+  // This allows any user to install the app and have it "just work".
+  
   let appFolderId = localStorage.getItem(KEYS.appFolderId);
   if (!appFolderId) {
+    console.log('Discovery: Searching for main App folder...');
     appFolderId = await findOrCreateFolder(APP_FOLDER);
     localStorage.setItem(KEYS.appFolderId, appFolderId);
   }
 
-  // Mirror folder (sibling of main)
   let mirrorFolderId = localStorage.getItem(KEYS.mirrorFolderId);
   if (!mirrorFolderId) {
+    console.log('Discovery: Searching for Mirror folder...');
     mirrorFolderId = await findOrCreateFolder(MIRROR_FOLDER);
     localStorage.setItem(KEYS.mirrorFolderId, mirrorFolderId);
   }
@@ -558,4 +562,42 @@ async function trashFile(fileId, token) {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ trashed: true })
   }).catch(() => { });
+}
+
+// ── Family Sharing Discovery (v5.4.0) ───────────────────────────────────────────
+/**
+ * 🔍 Searches Google Drive for database files shared WITH the user.
+ * This is the core engine for family sharing.
+ */
+export async function findSharedDatabases(appName) {
+  const fileName = appName === 'travel' ? 'travel_data.json' : 'finance_data.json';
+  
+  // Search Query: 
+  // 1. Correct Name
+  // 2. Not trashed
+  // 3. 'sharedWithMe' must be true (handled by listing shared space)
+  const query = `name='${fileName}' and trashed=false and not 'me' in owners`;
+  
+  try {
+    const res = await authFetch(
+      `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,owners(displayName,emailAddress),modifiedTime)`,
+      { method: 'GET' }
+    );
+    const data = await res.json();
+    return data.files || [];
+  } catch (err) {
+    console.error('Discovery failed:', err);
+    return [];
+  }
+}
+
+/**
+ * 🔗 Connects the app to a shared database by updating the local file pointers.
+ */
+export async function connectSharedDatabase(appName, fileId) {
+  const fileKey = appName === 'travel' ? 'drive_travel_file_id' : 'drive_finance_file_id';
+  localStorage.setItem(fileKey, fileId);
+  // We also try to find the mirror folder, or just use personal mirror for now
+  showToast('Connected to Shared Database', 'success');
+  setTimeout(() => window.location.reload(), 1500);
 }

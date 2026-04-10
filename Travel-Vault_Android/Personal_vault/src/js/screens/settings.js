@@ -8,7 +8,7 @@
 import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '../../../shared/db.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
 import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
-import { clearAuth, getUser } from '../../../shared/auth.js';
+import { clearAuth, getUser, isAuthenticated, startOAuthFlow } from '../../../shared/auth.js';
 import {
   currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard,
   showConfirmModal, getAppState, setAppState
@@ -16,7 +16,7 @@ import {
 import {
   downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
   getMirrorSnapshots, restoreFromMirror, getBackupHealthReport,
-  purgeOrphanedFiles
+  purgeOrphanedFiles, findSharedDatabases, connectSharedDatabase
 } from '../../../shared/drive.js';
 import { getSecurityLogs, clearSecurityLogs } from '../../../shared/db.js';
 import { localSave } from '../../../shared/sync-manager.js';
@@ -26,6 +26,7 @@ import { renderImportTool } from '../../../shared/import-tool.js';
 import { openCategoryManager } from '../modals/category-manager.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
 import { exitApp } from '../../../shared/app-utils.js';
+import { CLIENT_ID, REDIRECT_URI } from '../auth-config.js';
 
 const CACHE_NAME = 'vault v4.11.0';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -589,14 +590,29 @@ export async function renderSettings(container, params = {}) {
         <div class="card-body" style="display:flex;align-items:center;gap:12px;">
           ${user?.picture ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />` : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
           <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name || 'Signed in'}</div>
-            <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email || ''}</div>
+            <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name || (isAuthenticated() ? 'Signed in' : 'Guest User')}</div>
+            <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email || (isAuthenticated() ? '' : 'Local-only mode')}</div>
           </div>
         </div>
         <div class="divider"></div>
         <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
-          <button class="btn btn-primary btn-full" id="account-exit-btn" style="margin-bottom:10px;">💾 Save & Exit App</button>
-          <button class="btn btn-secondary btn-full" id="signout-btn">Sign out of Google</button>
+          ${!isAuthenticated() ? `
+            <button class="btn btn-primary btn-full" id="signin-google-btn" style="margin-bottom:10px;">👤 Sign in to Google Drive</button>
+            <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:0 8px;">
+               Enable Cloud Sync and Family Sharing by signing in.
+            </div>
+          ` : `
+            <button class="btn btn-primary btn-full" id="account-exit-btn" style="margin-bottom:10px;">💾 Save & Exit App</button>
+            <button class="btn btn-secondary btn-full" id="signout-btn" style="margin-bottom:12px;">Sign out of Google</button>
+            
+            <div style="border-top:1px dashed var(--border); margin:12px 0;"></div>
+            
+            <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--primary);">👨‍👩‍👧 Family Sharing</div>
+            <button class="btn btn-secondary btn-full" id="find-shared-btn">🔗 Connect Shared Family Vault</button>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
+               Search for databases shared with you by other members.
+            </div>
+          `}
         </div>
       </div>
 
@@ -836,10 +852,56 @@ export async function renderSettings(container, params = {}) {
       }
     });
 
-    document.getElementById('signout-btn').addEventListener('click', () => {
+    document.getElementById('signout-btn')?.addEventListener('click', () => {
       if (confirm('Sign out? You will need to re-authenticate to sync data.')) {
         clearAuth();
         window.location.reload();
+      }
+    });
+
+    document.getElementById('signin-google-btn')?.addEventListener('click', () => {
+      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
+    });
+
+    document.getElementById('find-shared-btn')?.addEventListener('click', async () => {
+      try {
+        showToast('Searching for shared databases…', 'info');
+        const files = await findSharedDatabases('finance');
+        if (!files.length) {
+          showToast('No shared databases found. Ensure your family has shared the file with you.', 'warning', 6000);
+          return;
+        }
+
+        const choices = files.map(f => ({
+          id: f.id,
+          label: `${f.name} (Shared by ${f.owners[0].displayName})`
+        }));
+
+        const result = await showConfirmModal('🔗 Shared Databases Found', `
+          <div style="font-size:13px; margin-bottom:12px;">The following databases were found. Choose one to connect <b>instead</b> of your own:</div>
+          ${choices.map((c, i) => `
+            <button class="list-row shared-choice" data-id="${c.id}" style="width:100%; text-align:left; border-radius:var(--radius-md); margin-bottom:8px; border:1px solid var(--border);">
+               <div style="flex:1;">
+                 <div style="font-size:14px; font-weight:600;">${c.label}</div>
+                 <div style="font-size:11px; color:var(--text-muted);">Database ID: ${c.id.slice(0, 12)}...</div>
+               </div>
+               <span style="color:var(--primary); font-weight:700;">Connect</span>
+            </button>
+          `).join('')}
+        `, { confirmText: '', cancelText: 'Cancel' });
+
+        // showConfirmModal is used as a generic container here. We listen for internal clicks.
+        document.querySelectorAll('.shared-choice').forEach(btn => {
+          btn.onclick = async () => {
+            const id = btn.dataset.id;
+            const name = btn.querySelector('div div').textContent;
+            if (confirm(`Switch to shared database: ${name}?\n\nThis will stop syncing with your own database.`)) {
+              await connectSharedDatabase('finance', id);
+            }
+          };
+        });
+      } catch (err) {
+        showToast('Search failed: ' + err.message, 'error');
       }
     });
   }
