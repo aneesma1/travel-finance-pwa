@@ -8,6 +8,10 @@ on:
     paths:
       - 'Travel-Vault_Android/Personal_vault/**' # Isolated trigger path
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
