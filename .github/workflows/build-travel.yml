@@ -42,7 +42,7 @@ jobs:
         working-directory: Travel-Vault_Android/Travel_app
         run: |
           npm install -D @capacitor/assets
-          npx @capacitor/assets generate --iconBackgroundColor '#3730A3' --iconBackgroundColorDark '#3730A3' --android --resourceDir resources
+          npx @capacitor/assets generate --iconBackgroundColor '#3730A3' --iconBackgroundColorDark '#3730A3' --android
 
       - name: Sync Capacitor
         working-directory: Travel-Vault_Android/Travel_app
