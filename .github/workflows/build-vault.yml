@@ -82,7 +82,9 @@ jobs:
 
       - name: Sync Capacitor
         working-directory: Travel-Vault_Android/Personal_vault
-        run: npx cap sync android
+        run: |
+          chmod +x node_modules/.bin/cap
+          node_modules/.bin/cap sync android
 
       - name: Build Android Release APK (Gradle)
         working-directory: Travel-Vault_Android/Personal_vault/android
