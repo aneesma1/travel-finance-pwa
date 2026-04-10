@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -44,7 +44,9 @@ jobs:
 
       - name: Build Android Release APK (Gradle)
         working-directory: Travel-Vault_Android/Travel_app/android
-        run: ./gradlew assembleRelease
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
 
       - name: Align and Sign release APK
         working-directory: Travel-Vault_Android/Travel_app/android/app/build/outputs/apk/release
