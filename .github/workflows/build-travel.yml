@@ -11,6 +11,8 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -58,4 +60,4 @@ jobs:
         with:
           name: travel-app-release-signed-apk
           path: Travel-Vault_Android/Travel_app/android/app/build/outputs/apk/release/travel-app-release-signed.apk
-          retention-days: 7
+          retention-days: 3
