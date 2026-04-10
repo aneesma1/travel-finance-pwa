@@ -38,7 +38,22 @@ jobs:
           else
             npm install
           fi
-          npx cap sync android
+      - name: Transform ES Modules to Standard Scripts
+        working-directory: Travel-Vault_Android/Personal_vault
+        run: |
+          # 1. Strip all imports (including multi-line blocks starting with import and ending with ;)
+          find src -name "*.js" -exec sed -i '/^import /,/;/d' {} +
+          # 2. Strip standard single-line imports that might have been missed
+          find src -name "*.js" -exec sed -i 's/^import .*//g' {} +
+          # 3. Strip 'export' keywords
+          find src -name "*.js" -exec sed -i 's/^export //g' {} +
+          # 4. Strip 'export default' specifically
+          find src -name "*.js" -exec sed -i 's/export default //g' {} +
+        shell: bash
+
+      - name: Sync Capacitor
+        working-directory: Travel-Vault_Android/Personal_vault
+        run: npx cap sync android
 
       - name: Build Android Release APK (Gradle)
         working-directory: Travel-Vault_Android/Personal_vault/android

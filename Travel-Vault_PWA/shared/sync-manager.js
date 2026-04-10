@@ -7,11 +7,8 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData,
-         getCachedFinanceData, setCachedFinanceData,
-         getAppState, setAppState } from './db.js';
-import { writeData, fetchJsonFile, initDriveFolders,
-         initDataFile, downloadLocalBackup, timestampSuffix } from './drive.js';
+import { getCachedTravelData, setCachedTravelData, getCachedFinanceData, setCachedFinanceData, getAppState, setAppState } from './db.js';
+import { writeData, fetchJsonFile, initDriveFolders, initDataFile, downloadLocalBackup, timestampSuffix } from './drive.js';
 import { isOnline, uuidv4, showToast, showConfirmModal } from './utils.js';
 
 // ── Sync status broadcast ─────────────────────────────────────────────────────
