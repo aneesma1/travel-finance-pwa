@@ -78,31 +78,35 @@ export async function startOAuthFlow(clientId, redirectUri) {
   // 🛡️ NATIVE CAPACITOR ENHANCEMENT
   // If running in a native app, use Browser plugin and listen for Deep Link return
   if (window.Capacitor?.isNative) {
-    const { Browser } = await import('@capacitor/browser');
-    const { App }     = await import('@capacitor/app');
+    const { Browser, App } = window.Capacitor.Plugins;
 
-    // Remove any existing listeners to avoid duplicates
-    App.removeAllListeners();
+    if (Browser && App) {
+      // Remove any existing listeners to avoid duplicates
+      App.removeAllListeners();
 
-    // Listen for the app being opened via Deep Link (the redirect)
-    App.addListener('appUrlOpen', async (data) => {
-      const url = new URL(data.url);
-      
-      // If the URL has a hash (where Google puts the token), process it
-      if (url.hash) {
-        // Mock a window.location change so handleOAuthCallback can pick it up
-        window.location.hash = url.hash;
+      // Listen for the app being opened via Deep Link (the redirect)
+      App.addListener('appUrlOpen', async (data) => {
+        const url = new URL(data.url);
         
-        // Close the system browser tab
-        await Browser.close();
-        
-        // Trigger the callback handler
-        window.dispatchEvent(new CustomEvent('oauth:callback_received'));
-      }
-    });
+        // If the URL has a hash (where Google puts the token), process it
+        if (url.hash) {
+          // Mock a window.location change so handleOAuthCallback can pick it up
+          window.location.hash = url.hash;
+          
+          // Close the system browser tab
+          await Browser.close();
+          
+          // Trigger the callback handler
+          window.dispatchEvent(new CustomEvent('oauth:callback_received'));
+        }
+      });
 
-    // Open the login page in the system browser
-    await Browser.open({ url: authUrl, windowName: '_self' });
+      // Open the login page in the system browser
+      await Browser.open({ url: authUrl, windowName: '_self' });
+    } else {
+      console.error('Capacitor Plugins (Browser/App) not found in native environment');
+      window.location.href = authUrl;
+    }
   } else {
     // Normal Web PWA flow
     window.location.href = authUrl;
