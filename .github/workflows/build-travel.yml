@@ -1,0 +1,68 @@
+name: Build Travel App (Android)
+
+on:
+  workflow_dispatch: # Allows manual trigger from the GitHub UI to save minutes!
+  push:
+    branches:
+      - main
+    paths:
+      - 'Travel-Vault_Android/Travel_app/**' # Only trigger if Travel App files change
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Dependencies & Wrap with Capacitor
+        working-directory: Travel-Vault_Android/Travel_app
+        run: |
+          # If no package.json exists yet, safely init an ad-hoc build environment
+          if [ ! -f package.json ]; then
+            npm init -y
+            npm install @capacitor/core @capacitor/android
+            npm install -D @capacitor/cli
+            npx cap init "Travel App" "com.antigravity.travel" --web-dir src
+            npx cap add android
+          else
+            npm install
+          fi
+          # Sync web assets into the native container
+          npx cap sync android
+
+      - name: Build Android Release APK (Gradle)
+        working-directory: Travel-Vault_Android/Travel_app/android
+        run: ./gradlew assembleRelease
+
+      - name: Align and Sign release APK
+        working-directory: Travel-Vault_Android/Travel_app/android/app/build/outputs/apk/release
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEY_STORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > temp-keystore.jks
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_SDK_ROOT/build-tools/* | tail -1)
+          $BUILD_TOOLS_DIR/zipalign -v -p 4 app-release-unsigned.apk travel-app-release-signed.apk
+          $BUILD_TOOLS_DIR/apksigner sign --ks temp-keystore.jks --ks-key-alias "$KEY_ALIAS" --ks-pass "pass:$KEYSTORE_PASS" --key-pass "pass:$KEY_PASS" travel-app-release-signed.apk
+          rm temp-keystore.jks
+
+      - name: Upload Signed APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: travel-app-release-signed-apk
+          path: Travel-Vault_Android/Travel_app/android/app/build/outputs/apk/release/travel-app-release-signed.apk
+          retention-days: 7
