@@ -58,6 +58,7 @@ jobs:
           # 1. Read Version & Time
           export APP_VER=$(cat VERSION)
           export BUILD_TIME=$(date +"%Y-%m-%d %H:%M")
+          echo "APP_VER=$APP_VER" >> $GITHUB_ENV
           echo "Building Personal Vault v$APP_VER ($BUILD_TIME)"
 
           # 2. Inject into index.html
@@ -100,7 +101,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          APP_VER=$(cat ../../../../../VERSION)
+          APP_VER=${{ env.APP_VER }}
           RUN_NUM=${{ github.run_number }}
           echo "$KEYSTORE_B64" | base64 --decode > temp-keystore.jks
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_SDK_ROOT/build-tools/* | tail -1)
