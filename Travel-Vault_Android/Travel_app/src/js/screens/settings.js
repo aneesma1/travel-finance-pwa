@@ -504,9 +504,12 @@ function renderAccountTab(data, members, user, container) {
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-muted);">Family Hub v5.0.0 · 2026-04-10 · Native</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.0 · Offline-First Android Native Suite</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
+      <div class="card-body" style="font-size:12px;color:var(--text-muted);display:flex;flex-direction:column;gap:4px;">
+      <div>Version: ${window.APP_VERSION || 'v5.4.1'}</div>
+      <div>Build: ${window.BUILD_TIME || 'Personal Build'}</div>
+      <div>Platform: Native Android (Capacitor)</div>
+    </div>
+Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin() ? '👑 Admin' : '👁 Viewer'} · ${user?.email || 'Not signed in'}</div>
       
 

@@ -280,6 +280,11 @@ export async function renderSettings(container, params = {}) {
             </select>
           </div>
         </div>
+        <div class="card-body" style="font-size:12px;color:var(--text-muted);display:flex;flex-direction:column;gap:4px;">
+      <div>Version: ${window.APP_VERSION || 'v5.4.1'}</div>
+      <div>Build: ${window.BUILD_TIME || 'Personal Build'}</div>
+      <div>Platform: Native Android (Capacitor)</div>
+    </div>
         <div id="export-count" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;"></div>
       </div>
 

@@ -53,15 +53,27 @@ jobs:
           find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|['\"]../shared/|'./shared/|g" {} +
           find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|/shared/|./shared/|g" {} +
 
-          # 2. Transform ES Modules to Standard Scripts (Robust Stripping)
-          # Strip all imports (including multi-line blocks starting with import and ending with ;)
+      - name: Transform ES Modules to Standard Scripts
+        working-directory: Travel-Vault_Android/Travel_app
+        run: |
+          # 1. Read Version & Time
+          export APP_VER=$(cat VERSION)
+          export BUILD_TIME=$(date +"%Y-%m-%d %H:%M")
+          echo "Building Travel Hub v$APP_VER ($BUILD_TIME)"
+
+          # 2. Inject into index.html (before the closing </head> or start of scripts)
+          sed -i "s|window.APP_VERSION = '.*'|window.APP_VERSION = '$APP_VER'|g" src/index.html
+          sed -i "s|window.BUILD_TIME = '.*'|window.BUILD_TIME = '$BUILD_TIME'|g" src/index.html
+
+          # 3. Strip all imports (including multi-line blocks starting with import and ending with ;)
           find src -name "*.js" -exec sed -i '/^import /,/;/d' {} +
-          # Strip standard single-line imports that might have been missed
+          # 4. Strip standard single-line imports that might have been missed
           find src -name "*.js" -exec sed -i 's/^import .*//g' {} +
-          # Strip 'export' keywords
+          # 5. Strip 'export' keywords
           find src -name "*.js" -exec sed -i 's/^export //g' {} +
-          # Strip 'export default' specifically
+          # 6. Strip 'export default' specifically
           find src -name "*.js" -exec sed -i 's/export default //g' {} +
+        shell: bash
           
       - name: Generate App Icons
         working-directory: Travel-Vault_Android/Travel_app
@@ -71,9 +83,7 @@ jobs:
 
       - name: Sync Capacitor
         working-directory: Travel-Vault_Android/Travel_app
-        run: |
-          chmod +x node_modules/.bin/cap
-          node_modules/.bin/cap sync android
+        run: npx cap sync android
 
       - name: Build Android Release APK (Gradle)
         working-directory: Travel-Vault_Android/Travel_app/android
@@ -89,15 +99,17 @@ jobs:
           KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
+          APP_VER=$(cat ../../../../../VERSION)
+          RUN_NUM=${{ github.run_number }}
           echo "$KEYSTORE_B64" | base64 --decode > temp-keystore.jks
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_SDK_ROOT/build-tools/* | tail -1)
-          $BUILD_TOOLS_DIR/zipalign -v -p 4 app-release-unsigned.apk travel-app-release-signed.apk
-          $BUILD_TOOLS_DIR/apksigner sign --ks temp-keystore.jks --ks-key-alias "$KEY_ALIAS" --ks-pass "pass:$KEYSTORE_PASS" --key-pass "pass:$KEY_PASS" travel-app-release-signed.apk
+          $BUILD_TOOLS_DIR/zipalign -v -p 4 app-release-unsigned.apk "TravelHub_v${APP_VER}_b${RUN_NUM}.apk"
+          $BUILD_TOOLS_DIR/apksigner sign --ks temp-keystore.jks --ks-key-alias "$KEY_ALIAS" --ks-pass "pass:$KEYSTORE_PASS" --key-pass "pass:$KEY_PASS" "TravelHub_v${APP_VER}_b${RUN_NUM}.apk"
           rm temp-keystore.jks
 
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: travel-app-release-signed-apk
-          path: Travel-Vault_Android/Travel_app/android/app/build/outputs/apk/release/travel-app-release-signed.apk
+          path: Travel-Vault_Android/Travel_app/android/app/build/outputs/apk/release/TravelHub_v*.apk
           retention-days: 3

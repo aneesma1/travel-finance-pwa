@@ -349,6 +349,11 @@
       }
     }).catch(() => {});
 
+    // --- Versioning & Build Tracking ---
+    window.APP_VERSION = 'v5.4.1'; // Injected by CI
+    window.BUILD_TIME  = '';       // Injected by CI
+
+    // Check if deep link token is present
     // ── Security: check if this session has been revoked ────────────
     setInterval(() => checkRevocation().then(revoked => {
       if (revoked) {

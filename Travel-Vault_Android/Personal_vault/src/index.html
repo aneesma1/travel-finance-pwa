@@ -187,6 +187,9 @@
   async function boot() {
     try {
       // 🛡️ NATIVE CALLBACK LISTENER
+      // --- Versioning & Build Tracking ---
+      window.APP_VERSION = 'v5.4.1'; // Injected by CI
+      window.BUILD_TIME  = '';       // Injected by CI
       // When the native app captures an OAuth token via Deep Link, it triggers this event.
       window.addEventListener('oauth:callback_received', async () => {
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
