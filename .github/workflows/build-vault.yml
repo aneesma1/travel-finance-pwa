@@ -55,7 +55,7 @@ jobs:
           
           # Also fix any remaining hardcoded '../shared/' paths in non-JS files (like HTML/CSS)
           find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|['\"]../shared/|'./shared/|g" {} +
-          find src -type f \( -index -name "*.html" -o -name "*.css" \) -exec sed -i "s|/shared/|./shared/|g" {} +
+          find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|/shared/|./shared/|g" {} +
 
       - name: Generate App Icons
         working-directory: Travel-Vault_Android/Personal_vault
