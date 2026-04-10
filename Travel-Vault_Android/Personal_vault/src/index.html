@@ -77,68 +77,77 @@
 
 </div><!-- #app -->
 
-<!-- ── App bootstrap ──────────────────────────────────────────────── -->
-<script type="module">
-  import { handleOAuthCallback, isAuthenticated, startOAuthFlow } from '../shared/auth.js';
-  import { initDriveFolders, initDataFile, initMirrorFile, readData, writeData } from '../shared/drive.js';
-  import { initSyncManager, runBootIntegrityCheck, processDriveQueue, watchConnectivity as watchSync } from '../shared/sync-manager.js';
-  import { restorePinFromDrive, syncPinToDrive } from './js/app-config.js';
-  import { registerSession, logActivity, startHeartbeat, getUnseenHighRiskEvents } from '../shared/security-log.js';
-  import { syncPinHashToDrive, restorePinHashFromDrive } from '../shared/app-config.js';
-  import { setCachedFinanceData, getCachedFinanceData, openDB } from '../shared/db.js';
-  import { navigate, initNav } from './js/router.js';
-  import { isPinSet, verifyPin } from './js/pin.js';
-  import { isOnline, onNetworkChange, showToast } from '../shared/utils.js';
-  import { CLIENT_ID, REDIRECT_URI } from './js/auth-config.js';
+<!-- ── App bootstrap (v5.3.0 Standard Script Model) ─────────────────── -->
+<!-- We load these in order because they are no longer ES Modules -->
+<script src="shared/utils.js"></script>
+<script src="shared/auth.js"></script>
+<script src="shared/db.js"></script>
+<script src="shared/sync-queue.js"></script>
+<script src="shared/sync-manager.js"></script>
+<script src="shared/drive.js"></script>
+<script src="shared/security-log.js"></script>
+<script src="shared/app-config.js"></script>
+<script src="js/auth-config.js"></script>
+<script src="js/app-config.js"></script>
+<script src="js/router.js"></script>
+<script src="js/pin.js"></script>
 
-  import { watchConnectivity } from '../shared/sync-queue.js';
+<script>
+  // 🛡️ NATIVE BOOTSTRAPPER
+  async function bootApp() {
+    try {
+      console.log('App: Booting in standard mode...');
+      
+      // Handle OAuth callback (Listener)
+      window.addEventListener('oauth:callback_received', async () => {
+        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+        location.reload(); 
+      });
 
-  // ── Background sync registration (Removed: Handled by Native App) ──
+      // 1. Initial Auth Check
+      if (typeof handleOAuthCallback === 'function') {
+        const urlHash = window.location.hash;
+        if (urlHash.includes('access_token')) {
+          await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+        }
+      }
 
-  // ── Offline banner logic (Removed) ─────────────────────────────────
-  onNetworkChange((online) => {
-    if (online) showToast('Back online — syncing...', 'success');
-  });
+      if (!isAuthenticated()) {
+        if (typeof showLogin === 'function') showLogin();
+        return;
+      }
 
-  // ── PIN timeout — configurable, default 5 min ─────────────────────
-  let lockTimer = null;
-  let appUnlocked = false;
-  const LOCK_TIMEOUT_KEY = 'vault_lock_timeout_ms';
+      // 2. Database & Data
+      await openDB();
+      const cached = await getCachedFinanceData();
+      if (cached) {
+        window._financeData = cached;
+        if (typeof showApp === 'function') showApp(cached);
+      }
 
-  function getLockTimeout() {
-    const stored = localStorage.getItem(LOCK_TIMEOUT_KEY);
-    if (stored === '0') return 0; // Never lock
-    return Number(stored) || (5 * 60 * 1000); // Default 5 min
+      // 3. Background Sync & Integrity
+      runBootIntegrityCheck('finance').catch(console.error);
+      initSyncManager();
+      watchSync();
+
+    } catch (err) {
+      console.error('Boot Error:', err);
+      if (window.onerror) window.onerror(err.message, 'boot.js', 0);
+    }
   }
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      const timeout = getLockTimeout();
-      if (timeout === 0) return; // Never lock option
-      lockTimer = setTimeout(() => {
-        appUnlocked = false;
-        showPinLock();
-      }, timeout);
-    } else {
-      clearTimeout(lockTimer);
+  // Execute boot when everything is loaded
+  window.addEventListener('load', bootApp);
+
+  // 🛡️ 404 CATCHER (Detects missing files in the APK)
+  window.addEventListener('error', function(e) {
+    if (e.target.tagName === 'SCRIPT') {
+      const fileName = e.target.src.split('/').pop();
+      const msg = `Critical Asset Missing: ${fileName}. Please check build bundle.`;
+      if (window.onerror) window.onerror(msg, e.target.src, 0);
     }
-  });
-
-  // ── Boot ────────────────────────────────────────────────────────────
-  boot();
-
-  // ── Native Android Exit Hooks (Capacitor) ───────────────────────────
-  setTimeout(async () => {
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
-      const { App } = window.Capacitor.Plugins;
-      App.addListener('backButton', async ({ canGoBack }) => {
-        const pending = await getPendingCount();
-        if (pending > 0) {
-          if (confirm('⚠️ You have unsynced local data! Are you sure you want to exit without backing up to Drive?')) {
-            App.exitApp();
-          }
-        } else {
-          // Normal behavior
+  }, true);
+</script>
           if (!canGoBack) {
             App.exitApp();
           } else {

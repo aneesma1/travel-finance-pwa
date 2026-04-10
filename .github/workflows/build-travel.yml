@@ -46,11 +46,16 @@ jobs:
             exit 1
           fi
 
-          # Rewrite '../shared/' → './shared/' in all bundled JS/HTML
-          # Handles both single and double quotes, and recursive files
-          find src -type f \( -name "*.js" -o -name "*.html" \) -exec sed -i "s|['\"]../shared/|'./shared/|g" {} +
-          # Also handle absolute-style imports if any (unlikely but safe)
-          find src -type f \( -name "*.js" -o -name "*.html" \) -exec sed -i "s|/shared/|./shared/|g" {} +
+          # ── NATIVE STABILITY PIVOT (v5.3.0) ──
+          # Strip 'export' and 'import' from all shared and internal JS files
+          # This converts them from ES Modules to Standard Scripts
+          find src -type f -name "*.js" -exec sed -i 's/^export //g' {} +
+          find src -type f -name "*.js" -exec sed -i 's/^import.*from.*//g' {} +
+          find src -type f -name "*.js" -exec sed -i "s|import(.*)||g" {} +
+          
+          # Also fix any remaining hardcoded '../shared/' paths in non-JS files (like HTML/CSS)
+          find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|['\"]../shared/|'./shared/|g" {} +
+          find src -type f \( -index -name "*.html" -o -name "*.css" \) -exec sed -i "s|/shared/|./shared/|g" {} +
 
       - name: Generate App Icons
         working-directory: Travel-Vault_Android/Travel_app

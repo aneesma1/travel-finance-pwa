@@ -113,49 +113,75 @@
     }
   });
 
-  // ── Auth + boot sequence ───────────────────────────────────────────
-  async function boot() {
+<!-- ── App bootstrap (v5.3.0 Standard Script Model) ─────────────────── -->
+<!-- We load these in order because they are no longer ES Modules -->
+<script src="shared/utils.js"></script>
+<script src="shared/auth.js"></script>
+<script src="shared/db.js"></script>
+<script src="shared/sync-queue.js"></script>
+<script src="shared/sync-manager.js"></script>
+<script src="shared/drive.js"></script>
+<script src="shared/security-log.js"></script>
+<script src="shared/app-config.js"></script>
+<script src="js/auth-config.js"></script>
+<script src="js/router.js"></script>
+
+<script>
+  // 🛡️ NATIVE BOOTSTRAPPER
+  async function bootApp() {
     try {
-      // 🛡️ NATIVE CALLBACK LISTENER
-      // When the native app captures an OAuth token via Deep Link, it triggers this event.
+      console.log('App: Booting in standard mode...');
+      
+      // Handle OAuth callback (Listener)
       window.addEventListener('oauth:callback_received', async () => {
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        boot(); 
+        location.reload(); 
       });
-      // 1. Handle OAuth callback — implicit flow returns token in URL hash
-      const urlHash    = window.location.hash;
-      const urlSearch  = window.location.search;
-      const isCallback = urlHash.includes('access_token') || 
-                         urlSearch.includes('error') ||
-                         urlHash.includes('error');
 
-      console.log('Boot: hash:', urlHash.slice(0,60));
-      console.log('Boot: isCallback:', isCallback);
-
-      if (isCallback) {
-        console.log('Boot: handling OAuth callback...');
-        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        console.log('Boot: callback done, isAuthenticated:', isAuthenticated());
+      // 1. Initial Auth Check
+      if (typeof handleOAuthCallback === 'function') {
+        const urlHash = window.location.hash;
+        if (urlHash.includes('access_token')) {
+          await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+        }
       }
+
       if (!isAuthenticated()) {
-        showLogin();
+        if (typeof showLogin === 'function') showLogin();
         return;
       }
 
-      // 3. Open IndexedDB
+      // 2. Database & Data
       await openDB();
-
-      // 4. Show cached data immediately (dashboard-first)
       const cached = await getCachedTravelData();
       if (cached) {
         window._travelData = cached;
-        showApp(cached);
-        // Run integrity checks in background after showing cached data
-        runBootIntegrityCheck('travel').then(issues => {
-          issues.forEach(issue => {
-            if (issue.type === 'interrupted_write') {
-              showToast('⚠️ Last save was interrupted. Check your data.', 'warning', 5000);
-            } else if (issue.type === 'suspicious_drop') {
+        if (typeof showApp === 'function') showApp(cached);
+      }
+
+      // 3. Background Sync & Integrity
+      runBootIntegrityCheck('travel').catch(console.error);
+      initSyncManager();
+      watchSync();
+
+    } catch (err) {
+      console.error('Boot Error:', err);
+      if (window.onerror) window.onerror(err.message, 'boot.js', 0);
+    }
+  }
+
+  // Execute boot when everything is loaded
+  window.addEventListener('load', bootApp);
+
+  // 🛡️ 404 CATCHER (Detects missing files in the APK)
+  window.addEventListener('error', function(e) {
+    if (e.target.tagName === 'SCRIPT') {
+      const fileName = e.target.src.split('/').pop();
+      const msg = `Critical Asset Missing: ${fileName}. Please check build bundle.`;
+      if (window.onerror) window.onerror(msg, e.target.src, 0);
+    }
+  }, true);
+</script>
               showToast('⚠️ ' + issue.message, 'warning', 6000);
             }
           });
