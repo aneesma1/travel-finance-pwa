@@ -104,6 +104,12 @@
   // ── Auth + boot sequence ───────────────────────────────────────────
   async function boot() {
     try {
+      // 🛡️ NATIVE CALLBACK LISTENER
+      // When the native app captures an OAuth token via Deep Link, it triggers this event.
+      window.addEventListener('oauth:callback_received', async () => {
+        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+        boot(); 
+      });
       // 1. Handle OAuth callback — implicit flow returns token in URL hash
       const urlHash    = window.location.hash;
       const urlSearch  = window.location.search;

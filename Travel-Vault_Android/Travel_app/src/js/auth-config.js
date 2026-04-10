@@ -33,9 +33,9 @@ export const CLIENT_ID = '36787254386-n0ee36r22mhr3g5620q10ob4phe6i59o.apps.goog
 
 // Auto-detects current origin + path -- works regardless of where folder is moved
 function detectRedirectUri() {
-  // Native Android Capacitor WebView — use GitHub Pages as OAuth redirect
+  // Native Android Capacitor WebView — use the OAuth Bridge for deep link handoff
   if (window.Capacitor?.isNative) {
-    return 'https://aneesma1.github.io/travel-finance-pwa/';
+    return 'https://aneesma1.github.io/travel-finance-pwa/oauth/';
   }
   const loc = window.location;
   const pathParts = loc.pathname.split('/');

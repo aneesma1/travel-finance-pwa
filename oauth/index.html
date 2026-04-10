@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Authenticating...</title>
+  <style>
+    body { font-family: system-ui; text-align: center; padding: 50px; background: #f9fafb; color: #111827; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h2>Returning to app...</h2>
+  <p>If you are not redirected automatically, <a id="manual-link" href="#">click here</a>.</p>
+
+  <script>
+    (function() {
+      const hash = window.location.hash;
+      const params = new URLSearchParams(hash.slice(1));
+      const state = params.get('state') || '';
+      
+      // Identify target app from state prefix
+      let scheme = 'com.antigravity.vault';
+      if (state.startsWith('travel_')) {
+        scheme = 'com.antigravity.travel';
+      }
+
+      const deepLink = `${scheme}://oauth${hash}`;
+      
+      // Update manual link just in case
+      document.getElementById('manual-link').href = deepLink;
+
+      // Primary redirect
+      window.location.href = deepLink;
+
+      // Close tab fallback (for some in-app browsers)
+      setTimeout(() => {
+        window.close();
+      }, 3000);
+    })();
+  </script>
+</body>
+</html>

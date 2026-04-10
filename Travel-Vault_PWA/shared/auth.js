@@ -56,9 +56,11 @@ export function isAuthenticated() {
 
 // ── Start OAuth implicit flow ─────────────────────────────────────────────────
 export async function startOAuthFlow(clientId, redirectUri) {
-  // Generate random state to prevent CSRF
-  const state = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+  // Generate random state to prevent CSRF + Identify target app for native bridge
+  const appTag = window.location.pathname.includes('vault') ? 'vault' : 'travel';
+  const randomStr = Array.from(crypto.getRandomValues(new Uint8Array(12)))
     .map(b => b.toString(16).padStart(2,'0')).join('');
+  const state = `${appTag}_${randomStr}`;
   localStorage.setItem(STATE_KEY, state);
 
   const params = new URLSearchParams({
@@ -71,7 +73,40 @@ export async function startOAuthFlow(clientId, redirectUri) {
     include_granted_scopes: 'true'
   });
 
-  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+
+  // 🛡️ NATIVE CAPACITOR ENHANCEMENT
+  // If running in a native app, use Browser plugin and listen for Deep Link return
+  if (window.Capacitor?.isNative) {
+    const { Browser } = await import('@capacitor/browser');
+    const { App }     = await import('@capacitor/app');
+
+    // Remove any existing listeners to avoid duplicates
+    App.removeAllListeners();
+
+    // Listen for the app being opened via Deep Link (the redirect)
+    App.addListener('appUrlOpen', async (data) => {
+      const url = new URL(data.url);
+      
+      // If the URL has a hash (where Google puts the token), process it
+      if (url.hash) {
+        // Mock a window.location change so handleOAuthCallback can pick it up
+        window.location.hash = url.hash;
+        
+        // Close the system browser tab
+        await Browser.close();
+        
+        // Trigger the callback handler
+        window.dispatchEvent(new CustomEvent('oauth:callback_received'));
+      }
+    });
+
+    // Open the login page in the system browser
+    await Browser.open({ url: authUrl, windowName: '_self' });
+  } else {
+    // Normal Web PWA flow
+    window.location.href = authUrl;
+  }
 }
 
 // ── Handle OAuth callback (reads token from URL hash) ─────────────────────────
