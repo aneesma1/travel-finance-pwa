@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Install Dependencies & Sync with Capacitor
         working-directory: Travel-Vault_Android/Travel_app
