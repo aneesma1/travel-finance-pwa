@@ -45,18 +45,21 @@ jobs:
             echo "Critical Error: src/shared/auth.js not found after copy!"
             exit 1
           fi
-
-          # ── NATIVE STABILITY PIVOT (v5.3.0) ──
-          # Strip 'export' and 'import' from all shared and internal JS files
-          # This converts them from ES Modules to Standard Scripts
-          find src -type f -name "*.js" -exec sed -i 's/^export //g' {} +
-          find src -type f -name "*.js" -exec sed -i 's/^import.*from.*//g' {} +
-          find src -type f -name "*.js" -exec sed -i "s|import(.*)||g" {} +
-          
-          # Also fix any remaining hardcoded '../shared/' paths in non-JS files (like HTML/CSS)
+          # ── NATIVE STABILITY PIVOT (v5.4.0) ──
+          # 1. Fix any hardcoded '../shared/' paths in HTML/CSS
           find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|['\"]../shared/|'./shared/|g" {} +
           find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|/shared/|./shared/|g" {} +
 
+          # 2. Transform ES Modules to Standard Scripts (Robust Stripping)
+          # Strip all imports (including multi-line blocks starting with import and ending with ;)
+          find src -name "*.js" -exec sed -i '/^import /,/;/d' {} +
+          # Strip standard single-line imports that might have been missed
+          find src -name "*.js" -exec sed -i 's/^import .*//g' {} +
+          # Strip 'export' keywords
+          find src -name "*.js" -exec sed -i 's/^export //g' {} +
+          # Strip 'export default' specifically
+          find src -name "*.js" -exec sed -i 's/export default //g' {} +
+          
       - name: Generate App Icons
         working-directory: Travel-Vault_Android/Personal_vault
         run: |
