@@ -1,103 +1,106 @@
-// v3.5.5 — 2026-03-22
+// v5.4.2 — 2026-04-11 — Fixed critical syntax errors for native build
 
 // ─── shared/sync-manager.js ──────────────────────────────────────────────────
 // Core of Phase 3 -- Local-first architecture
 // Handles: sequential Drive writes, pending queue, write-ahead safety,
 //          boot integrity checks, sync status broadcasting
+//
+// ⚠️ NATIVE BUILD NOTE: This file uses NO import/export statements.
+// All dependencies (authFetch, isOnline, etc.) must be global (loaded via <script> tags).
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData,
-         getCachedFinanceData, setCachedFinanceData,
-         getAppState, setAppState } from './db.js';
-import { writeData, fetchJsonFile, initDriveFolders,
-         initDataFile, downloadLocalBackup, timestampSuffix } from './drive.js';
-import { isOnline, uuidv4, showToast, showConfirmModal } from './utils.js';
-
 // ── Sync status broadcast ─────────────────────────────────────────────────────
-// Screens listen for 'sync:status' events on window
-function broadcastStatus(status, detail = '') {
-  window.dispatchEvent(new CustomEvent('sync:status', { detail: { status, detail } }));
+function broadcastStatus(status, detail) {
+  detail = detail || '';
+  window.dispatchEvent(new CustomEvent('sync:status', { detail: { status: status, detail: detail } }));
 }
 
 // ── Operation queue (in-memory, persisted to appState) ────────────────────────
-let _queue    = [];   // { id, appName, mergeFn, queuedAt, status }
-let _running  = false;
+var _queue   = [];   // { id, appName, mergeFn, queuedAt, status }
+var _running = false;
 
 async function loadQueue() {
   try {
-    const stored = await getAppState('syncQueue');
-    if (stored && stored.length > 0) {
+    var stored = await getAppState('syncQueue');
+    if (stored && Array.isArray(stored) && stored.length > 0) {
       _queue = stored;
     } else {
-      // IndexedDB empty (possibly cleared) -- try Drive-side queue
-      const driveQueue = await readDriveQueue().catch(() => null);
-      _queue = driveQueue || [];
-      if (_queue.length > 0) {
-        // Restore to IndexedDB
-        await setAppState('syncQueue', _queue);
-      }
+      _queue = [];
     }
-  } catch { _queue = []; }
+  } catch (e) { _queue = []; }
 }
 
 async function saveQueue() {
   try {
-    const serialisable = _queue.map(({ id, appName, queuedAt, status, dataSnapshot }) =>
-      ({ id, appName, queuedAt, status, dataSnapshot }));
-    await setAppState('syncQueue', serialisable);
-  } catch { /* non-blocking */ }
+    var serialisable = _queue.map(function(item) {
+      return { id: item.id, appName: item.appName, queuedAt: item.queuedAt, status: item.status, dataSnapshot: item.dataSnapshot };
+    });
+    await setAppStatePrim('syncQueue', serialisable);
+  } catch (e) { /* non-blocking */ }
 }
 
-// ── Drive-side pending queue removed for pure native architecture ─────────────
-export async function clearDriveQueue() {
+// ── Primitive-safe state setters (avoids object-spread bug for arrays/primitives) ──
+async function setAppStatePrim(key, value) {
+  try {
+    var db = await openDB();
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('app_state', 'readwrite');
+      var req = tx.objectStore('app_state').put({ key: key, value: value });
+      req.onsuccess = function() { resolve(); };
+      req.onerror   = function() { reject(req.error); };
+    });
+  } catch (e) { /* silent */ }
+}
+
+// ── Drive-side pending queue cleared ─────────────────────────────────────────
+async function clearDriveQueue() {
   _queue = [];
-  await setAppState('syncQueue', []);
+  await setAppStatePrim('syncQueue', []);
 }
 
 // ── Public: enqueue a local-first save ───────────────────────────────────────
-// Call this instead of writeData() directly from screens
-export async function localSave(appName, mergeFn) {
+async function localSave(appName, mergeFn) {
   // ① Write to IndexedDB immediately -- user sees result in <10ms
-  const current = appName === 'travel'
+  var current = appName === 'travel'
     ? await getCachedTravelData()
     : await getCachedFinanceData();
 
-  const merged = await mergeFn(current || getEmptyData(appName));
+  var merged = await mergeFn(current || getEmptyData(appName));
   merged.lastModifiedLocal = new Date().toISOString();
 
   if (appName === 'travel') await setCachedTravelData(merged);
   else await setCachedFinanceData(merged);
 
   // ② Add to drive sync queue
-  const op = {
+  var op = {
     id:           uuidv4(),
-    appName,
+    appName:      appName,
     queuedAt:     new Date().toISOString(),
     status:       'pending',
-    dataSnapshot: merged,   // Store full data snapshot for recovery
-    mergeFn,                // Keep in memory for current session
+    dataSnapshot: merged,
   };
   _queue.push(op);
   await saveQueue();
 
-  broadcastStatus('pending', `${_queue.filter(q=>q.status==='pending').length} pending`);
+  broadcastStatus('pending', _queue.filter(function(q){ return q.status === 'pending'; }).length + ' pending');
 
-  // ③ Background sync is DISABLED in Android Native app mode. User MUST sync manually.
-  // processDriveQueue().catch(() => {});
+  // ③ Background sync is DISABLED in Android Native. User MUST sync manually.
 
   return merged;
 }
 
 // ── Sequential Drive queue processor ─────────────────────────────────────────
-export async function processDriveQueue() {
+async function processDriveQueue() {
   if (_running || !isOnline()) return;
-  if (!_queue.some(q => q.status === 'pending')) return;
+  if (!_queue.some(function(q){ return q.status === 'pending'; })) return;
 
   _running = true;
   broadcastStatus('syncing', 'Syncing…');
 
-  for (const op of _queue.filter(q => q.status === 'pending')) {
+  var pendingOps = _queue.filter(function(q){ return q.status === 'pending'; });
+  for (var i = 0; i < pendingOps.length; i++) {
+    var op = pendingOps[i];
     op.status = 'syncing';
     await saveQueue();
 
@@ -106,32 +109,34 @@ export async function processDriveQueue() {
       await writeSafeSnapshot(op.appName, op.dataSnapshot);
 
       // Drive write -- use snapshot directly (already merged locally)
-      const newData = await writeData(op.appName, async (driveData) => {
-        const localData = op.dataSnapshot;
-        const localCount = (localData.trips?.length || 0) + (localData.transactions?.length || 0);
-        const driveCount = (driveData?.trips?.length || 0) + (driveData?.transactions?.length || 0);
+      var newData = await writeData(op.appName, async function(driveData) {
+        var localData  = op.dataSnapshot;
+        var localCount = (localData.trips ? localData.trips.length : 0) + (localData.transactions ? localData.transactions.length : 0);
+        var driveCount = (driveData && driveData.trips ? driveData.trips.length : 0) + (driveData && driveData.transactions ? driveData.transactions.length : 0);
 
         // SAFETY INTERLOCK: If local is empty but cloud has data, BLOCK the push.
         if (localCount === 0 && driveCount > 0) {
           console.error('SYNC BLOCK: Attempted to overwrite cloud data with empty local state.');
           throw new Error('Zero-Data Interlock: Cloud data preserved. Please "Restore from Cloud" first.');
+        }
+
         // Bi-Directional Merge (Conflict Resolution)
-        const mergedData = { ...localData };
+        var mergedData = Object.assign({}, localData);
         if (op.appName === 'travel') {
-          ['trips', 'passengers', 'documents'].forEach(key => {
-             const localIds = new Set((localData[key] || []).map(x => x.id));
-             const missing = (driveData[key] || []).filter(x => x.id && !localIds.has(x.id));
-             if (missing.length > 0) {
-                mergedData[key] = [...(localData[key] || []), ...missing];
-             }
+          ['trips', 'passengers', 'documents'].forEach(function(key) {
+            var localIds = new Set((localData[key] || []).map(function(x){ return x.id; }));
+            var missing  = (driveData[key] || []).filter(function(x){ return x.id && !localIds.has(x.id); });
+            if (missing.length > 0) {
+              mergedData[key] = (localData[key] || []).concat(missing);
+            }
           });
         } else if (op.appName === 'finance') {
-          ['transactions', 'categories', 'accounts'].forEach(key => {
-             const localIds = new Set((localData[key] || []).map(x => x.id));
-             const missing = (driveData[key] || []).filter(x => x.id && !localIds.has(x.id));
-             if (missing.length > 0) {
-                mergedData[key] = [...(localData[key] || []), ...missing];
-             }
+          ['transactions', 'categories', 'accounts'].forEach(function(key) {
+            var localIds = new Set((localData[key] || []).map(function(x){ return x.id; }));
+            var missing  = (driveData[key] || []).filter(function(x){ return x.id && !localIds.has(x.id); });
+            if (missing.length > 0) {
+              mergedData[key] = (localData[key] || []).concat(missing);
+            }
           });
         }
         return mergedData;
@@ -158,142 +163,144 @@ export async function processDriveQueue() {
   }
 
   // Prune done items
-  _queue = _queue.filter(q => q.status !== 'done');
+  _queue = _queue.filter(function(q){ return q.status !== 'done'; });
   await saveQueue();
 
   _running = false;
-  const stillPending = _queue.filter(q => q.status === 'pending').length;
+  var stillPending = _queue.filter(function(q){ return q.status === 'pending'; }).length;
   if (stillPending > 0) {
-    broadcastStatus('pending', `${stillPending} pending`);
+    broadcastStatus('pending', stillPending + ' pending');
   } else {
     broadcastStatus('synced', 'All saved');
   }
 }
 
 // ── Write-ahead safe snapshot ─────────────────────────────────────────────────
-const SAFE_KEY = {
+var SAFE_KEY = {
   travel:  'safe_snapshot_travel',
   finance: 'safe_snapshot_finance',
 };
 
 async function writeSafeSnapshot(appName, data) {
   try {
-    await setAppState(SAFE_KEY[appName], {
-      data,
+    await setAppStatePrim(SAFE_KEY[appName], {
+      data: data,
       writtenAt: new Date().toISOString()
     });
-  } catch { /* non-blocking */ }
+  } catch (e) { /* non-blocking */ }
 }
 
 async function clearSafeSnapshot(appName) {
-  try { await setAppState(SAFE_KEY[appName], null); }
-  catch { /* non-blocking */ }
+  try { await setAppStatePrim(SAFE_KEY[appName], null); }
+  catch (e) { /* non-blocking */ }
 }
 
-export async function getSafeSnapshot(appName) {
-  try { return await getAppState(SAFE_KEY[appName]); }
-  catch { return null; }
+async function getSafeSnapshot(appName) {
+  try {
+    return await getAppState(SAFE_KEY[appName]);
+  } catch (e) { return null; }
 }
 
 // ── Boot integrity check ──────────────────────────────────────────────────────
-export async function runBootIntegrityCheck(appName) {
-  const issues = [];
+async function runBootIntegrityCheck(appName) {
+  var issues = [];
 
   // Check 1: Interrupted write detected?
-  const safe = await getSafeSnapshot(appName);
-  if (safe) {
+  var safe = await getSafeSnapshot(appName);
+  if (safe && safe.writtenAt) {
     issues.push({
       type:    'interrupted_write',
       message: 'Last session ended unexpectedly during a save.',
-      detail:  `Safe snapshot from ${new Date(safe.writtenAt).toLocaleString()}`,
+      detail:  'Safe snapshot from ' + new Date(safe.writtenAt).toLocaleString(),
       data:    safe.data,
     });
   }
 
   // Check 2: Pending queue from previous session?
   await loadQueue();
-  const stuck = _queue.filter(q => q.status === 'syncing');
-  stuck.forEach(op => { op.status = 'pending'; }); // Reset stuck syncing items
+  var stuck = _queue.filter(function(q){ return q.status === 'syncing'; });
+  stuck.forEach(function(op){ op.status = 'pending'; });
   if (stuck.length) await saveQueue();
 
-  const pending = _queue.filter(q => q.status === 'pending' || q.status === 'failed');
+  var pending = _queue.filter(function(q){ return q.status === 'pending' || q.status === 'failed'; });
   if (pending.length) {
     issues.push({
       type:    'pending_queue',
-      message: `${pending.length} change${pending.length > 1 ? 's' : ''} not yet synced to Drive.`,
+      message: pending.length + ' change' + (pending.length > 1 ? 's' : '') + ' not yet synced to Drive.',
       detail:  'Will sync automatically when online.',
       autoFix: true,
     });
   }
 
-  // Check 3: Record count sanity (compare cached vs last known count)
-  const cached = appName === 'travel'
+  // Check 3: Record count sanity
+  var cached = appName === 'travel'
     ? await getCachedTravelData()
     : await getCachedFinanceData();
 
   if (cached) {
-    const lastCount = await getAppState(`lastKnownCount_${appName}`);
-    const currentCount = appName === 'travel'
-      ? (cached.trips?.length || 0)
-      : (cached.transactions?.length || 0);
+    var lastCount    = await getAppState('lastKnownCount_' + appName);
+    var currentCount = appName === 'travel'
+      ? (cached.trips ? cached.trips.length : 0)
+      : (cached.transactions ? cached.transactions.length : 0);
 
     if (lastCount && currentCount < lastCount * 0.8 && lastCount > 5) {
       issues.push({
         type:    'suspicious_drop',
-        message: `Record count dropped significantly (${lastCount} → ${currentCount}).`,
+        message: 'Record count dropped significantly (' + lastCount + ' → ' + currentCount + ').',
         detail:  'This may indicate data loss. Check your records before continuing.',
       });
     }
 
-    // Check 4: Smart Etag Check (Auto-Pull Hook)
-    if (isOnline()) {
+    // Check 4: Smart ETag Check (only if authenticated & online)
+    if (isOnline() && typeof authFetch === 'function' && typeof getToken === 'function' && getToken()) {
       try {
-        const fileKey = appName === 'travel' ? 'drive_travel_file_id' : 'drive_finance_file_id';
-        const fileId = localStorage.getItem(fileKey);
+        var fileKey = appName === 'travel' ? 'drive_travel_file_id' : 'drive_finance_file_id';
+        var fileId  = localStorage.getItem(fileKey);
         if (fileId) {
-           const { authFetch } = await import('./auth.js');
-           const metaRes = await authFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`, { method: 'GET' });
-           if (metaRes.ok) {
-              const meta = await metaRes.json();
-              const cloudTime = new Date(meta.modifiedTime).getTime();
-              const localSync = new Date(cached.lastSync || 0).getTime();
-              if (cloudTime > localSync + 60000) { // 1 min buffer
-                 issues.push({
-                   type: 'cloud_newer',
-                   message: 'Newer data is available on Google Drive',
-                   detail: 'Tap Settings -> Data -> Restore from Cloud to download the newest changes.',
-                   autoFix: false
-                 });
-              }
-           }
+          var metaRes = await authFetch(
+            'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=modifiedTime',
+            { method: 'GET' }
+          );
+          if (metaRes.ok) {
+            var meta      = await metaRes.json();
+            var cloudTime = new Date(meta.modifiedTime).getTime();
+            var localSync = new Date(cached.lastSync || 0).getTime();
+            if (cloudTime > localSync + 60000) {
+              issues.push({
+                type:    'cloud_newer',
+                message: 'Newer data is available on Google Drive',
+                detail:  'Tap Settings → Data → Restore from Cloud to download the newest changes.',
+                autoFix: false,
+              });
+            }
+          }
         }
       } catch (err) { console.error('ETag Check Failed', err); }
     }
-    
+
     // Update last known count
-    await setAppState(`lastKnownCount_${appName}`, currentCount);
+    await setAppStatePrim('lastKnownCount_' + appName, currentCount);
   }
 
   return issues;
 }
 
 // ── Retry failed/pending queue items ─────────────────────────────────────────
-export async function retryQueue() {
-  _queue.filter(q => q.status === 'failed').forEach(q => { q.status = 'pending'; });
+async function retryQueue() {
+  _queue.filter(function(q){ return q.status === 'failed'; }).forEach(function(q){ q.status = 'pending'; });
   await saveQueue();
   return processDriveQueue();
 }
 
 // ── Sync status helpers ───────────────────────────────────────────────────────
-export async function getPendingCount() {
+async function getPendingCount() {
   await loadQueue();
-  return _queue.filter(q => q.status === 'pending' || q.status === 'failed').length;
+  return _queue.filter(function(q){ return q.status === 'pending' || q.status === 'failed'; }).length;
 }
 
-export function watchConnectivity() {
-  window.addEventListener('online', () => {
-    // showToast('Back online -- syncing…', 'success', 2000);
-    // processDriveQueue().catch(() => {}); // Removed auto-sync
+function watchSync() {
+  window.addEventListener('online', function() {
+    // Auto-sync is DISABLED. User MUST trigger manually.
   });
 }
 
@@ -307,9 +314,8 @@ function getEmptyData(appName) {
 }
 
 // ── Initialise ────────────────────────────────────────────────────────────────
-export async function initSyncManager() {
+async function initSyncManager() {
   await loadQueue();
-  // Reset any operations stuck in 'syncing' from a previous crash
-  _queue.filter(q => q.status === 'syncing').forEach(q => { q.status = 'pending'; });
+  _queue.filter(function(q){ return q.status === 'syncing'; }).forEach(function(q){ q.status = 'pending'; });
   await saveQueue();
 }

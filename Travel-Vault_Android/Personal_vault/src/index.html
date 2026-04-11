@@ -1,11 +1,10 @@
-<!-- v3.5.11 — 2026-03-28 -->
-<!-- version: v3.5.11 — 2026-03-28 -->
+<!-- Private Vault — v5.4.2 — 2026-04-11 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="referrer" content="no-referrer" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor://localhost https://localhost; script-src 'self' 'unsafe-inline' capacitor://localhost https://localhost cdnjs.cloudflare.com fonts.googleapis.com; connect-src 'self' capacitor://localhost https://localhost https://*.googleapis.com https://accounts.google.com https://nominatim.openstreetmap.org https://www.openstreetmap.org; font-src 'self' fonts.gstatic.com data:; frame-src https://www.openstreetmap.org; img-src 'self' data: blob: https://*.openstreetmap.org https://*.googleapis.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor://localhost https://localhost; script-src 'self' 'unsafe-inline' capacitor://localhost https://localhost cdnjs.cloudflare.com fonts.googleapis.com; connect-src 'self' capacitor://localhost https://localhost https://*.googleapis.com https://accounts.google.com; font-src 'self' fonts.gstatic.com data:; img-src 'self' data: blob: https://*.googleapis.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#065F46" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -22,22 +21,20 @@
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
+
+<!-- 🛡️ EMERGENCY ERROR CATCHER (v5.4.2) -->
 <script>
-  // 🛡️ EMERGENCY ERROR CATCHER (v5.2.1)
   window.onerror = function(msg, url, lineNo, columnNo, error) {
-    const detail = `[Error] ${msg} at ${url}:${lineNo}`;
-    console.error(detail);
-    const errDiv = document.createElement('div');
-    errDiv.style = "position:fixed;top:60px;left:10px;right:10px;z-index:9999;padding:15px;background:#F87171;color:#fff;font-size:12px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);";
-    errDiv.innerHTML = `<strong>⚠️ App Crash:</strong><br>${msg}<br><small>${url.split('/').pop()}:${lineNo}</small><br><button onclick="location.reload()" style="margin-top:8px;padding:4px 8px;border:none;background:#fff;color:#F87171;font-weight:700;border-radius:4px;">Retry</button>`;
+    console.error('[Error] ' + msg + ' at ' + (url || '') + ':' + lineNo);
+    var errDiv = document.createElement('div');
+    errDiv.style.cssText = 'position:fixed;top:60px;left:10px;right:10px;z-index:9999;padding:15px;background:#F87171;color:#fff;font-size:12px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    errDiv.innerHTML = '<strong>⚠️ App Crash:</strong><br>' + msg + '<br><small>' + (url ? url.split('/').pop() : '') + ':' + lineNo + '</small><br><button onclick="location.reload()" style="margin-top:8px;padding:4px 8px;border:none;background:#fff;color:#F87171;font-weight:700;border-radius:4px;">Retry</button>';
     document.body.appendChild(errDiv);
     return false;
   };
 </script>
 
 <div id="app">
-
-  <!-- Offline banner removed (redundant in Native) -->
 
   <!-- ── Main screen container ─────────────────────────────────────── -->
   <main id="screen" role="main" aria-live="polite">
@@ -77,8 +74,8 @@
 
 </div><!-- #app -->
 
-<!-- ── App bootstrap (v5.4.0 Local-First Model) ─────────────────── -->
-<!-- We load these in order because they are no longer ES Modules -->
+<!-- ── App bootstrap (v5.4.2 Local-First / No ES Modules) ───────────── -->
+<!-- Scripts loaded in dependency order. No import/export used. -->
 <script src="shared/utils.js"></script>
 <script src="shared/auth.js"></script>
 <script src="shared/db.js"></script>
@@ -91,174 +88,158 @@
 <script src="js/app-config.js"></script>
 <script src="js/router.js"></script>
 <script src="js/pin.js"></script>
+<script src="js/screens/pin-lock.js"></script>
 
 <script>
-  // 🛡️ NATIVE BOOTSTRAPPER (v5.4.0)
-  async function bootApp() {
-    try {
-      console.log('App: Booting in Local-First mode...');
-      
-      // Update Sync Badge UI
-      updateSyncStatusBadge();
+  // --- Versioning & Build Tracking (injected by CI) ---
+  window.APP_VERSION = 'v5.4.1';
+  window.BUILD_TIME  = '';
 
-      // Handle OAuth callback (Listener)
-      window.addEventListener('oauth:callback_received', async () => {
-        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        location.reload(); 
-      });
+  // ── App state ─────────────────────────────────────────────────────
+  var appUnlocked = false;
 
-      // 1. Initial Auth Check (Discovery)
-      const urlHash = window.location.hash;
-      if (urlHash.includes('access_token')) {
-        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-      }
-
-      // 2. Database & Data (Load Local cache first)
-      await openDB();
-      const cached = await getCachedFinanceData();
-      if (cached) {
-        window._financeData = cached;
-        if (typeof showApp === 'function') showApp(cached);
-      } else {
-        // If no data AND no auth, show a special "Welcome" or Login screen
-        if (!isAuthenticated() && typeof showLogin === 'function') {
-           showLogin(); 
-        }
-      }
-
-      // 3. Cloud Provisioning (Only if authenticated)
-      if (isAuthenticated()) {
-        try {
-          await initDriveFolders();
-          await initDataFile('finance');
-        } catch (err) {
-          console.warn('Cloud Sync initialization failed:', err);
-          showToast('⚠️ Cloud Sync unavailable', 'warning');
-        }
-      }
-
-      // 4. Background Sync & Integrity
-      runBootIntegrityCheck('finance').catch(console.error);
-      initSyncManager();
-      watchSync();
-
-    } catch (err) {
-      console.error('Boot Error:', err);
-      if (window.onerror) window.onerror(err.message, 'boot.js', 0);
-    }
-  }
-
-  function updateSyncStatusBadge() {
-    const isAuth = isAuthenticated();
-    const badge = document.getElementById('sync-status-badge');
-    if (!badge) return;
-    
-    if (isAuth) {
-      badge.innerHTML = '<span style="color:#10B981">●</span> Cloud Sync Active';
-      badge.style.background = 'rgba(16, 185, 129, 0.1)';
+  // ── Sync indicator wiring ─────────────────────────────────────────
+  window.addEventListener('sync:status', function(e) {
+    var status = e.detail.status;
+    var el = document.getElementById('sync-indicator');
+    if (!el) return;
+    var configs = {
+      synced:  { text: '✅ All data backed up',              show: false, bg: 'transparent' },
+      syncing: { text: '🔄 Syncing to Drive…',              show: true,  bg: '#EEF2FF'     },
+      pending: { text: '⚠️ Unsaved Local Data — Tap to Backup', show: true,  bg: '#FEF3C7'     },
+      failed:  { text: '❌ Sync failed — Tap to retry',     show: true,  bg: '#FEE2E2'     },
+    };
+    var cfg = configs[status] || configs.synced;
+    el.textContent = cfg.text;
+    el.style.background = cfg.bg;
+    el.style.color = '#000';
+    el.classList.toggle('hidden', !cfg.show);
+    if (status === 'pending' || status === 'failed') {
+      el.onclick = function() { processDriveQueue(); el.textContent = '🔄 Starting Backup…'; };
     } else {
-      badge.innerHTML = '<span style="color:#94A3B8">○</span> Offline/Guest Mode';
-      badge.style.background = 'rgba(148, 163, 184, 0.1)';
+      el.onclick = null;
     }
-  }
+  });
 
-  // Execute boot when everything is loaded
-  window.addEventListener('load', bootApp);
+  // ── Auth event listener ─────────────────────────────────────────────
+  window.addEventListener('auth:required', function() {
+    appUnlocked = false;
+    document.getElementById('bottom-nav').classList.add('hidden');
+    showLogin();
+  });
 
-  // 🛡️ 404 CATCHER
+  // ── 404 Script error catcher ────────────────────────────────────────
   window.addEventListener('error', function(e) {
-    if (e.target.tagName === 'SCRIPT') {
-      const fileName = e.target.src.split('/').pop();
-      const msg = `Critical Asset Missing: ${fileName}. Please check build bundle.`;
+    if (e.target && e.target.tagName === 'SCRIPT') {
+      var fileName = e.target.src ? e.target.src.split('/').pop() : 'unknown';
+      var msg = 'Critical Asset Missing: ' + fileName + '. Please check build bundle.';
       if (window.onerror) window.onerror(msg, e.target.src, 0);
     }
   }, true);
-</script>
-          if (!canGoBack) {
-            App.exitApp();
-          } else {
-            window.history.back();
-          }
+
+  // ── UI screens ──────────────────────────────────────────────────────
+  function showLogin() {
+    var screen = document.getElementById('screen');
+    screen.innerHTML = '<div class="login-screen fade-in">'
+      + '<div class="login-logo">🔐</div>'
+      + '<h1 class="login-title">Private Vault</h1>'
+      + '<p class="login-subtitle">Your personal finance tracker<br>Private, secure, PIN-protected</p>'
+      + '<button class="google-signin-btn" id="signin-btn">'
+      + '<svg width="20" height="20" viewBox="0 0 24 24">'
+      + '<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>'
+      + '<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>'
+      + '<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>'
+      + '<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>'
+      + '</svg>'
+      + ' Sign in with Google'
+      + '</button>'
+      + '</div>';
+    document.getElementById('signin-btn').addEventListener('click', function() {
+      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
+    });
+  }
+
+  function showError(msg) {
+    document.getElementById('screen').innerHTML = '<div class="login-screen">'
+      + '<div style="font-size:48px;margin-bottom:16px;">⚠️</div>'
+      + '<p style="color:var(--danger);font-weight:600;text-align:center;padding:0 24px;">' + msg + '</p>'
+      + '<button class="btn btn-primary" style="margin-top:24px;" onclick="window.location.reload()">Retry</button>'
+      + '</div>';
+  }
+
+  function showPinLock() {
+    // renderPinLock is loaded via <script src="js/screens/pin-lock.js">
+    renderPinLock(document.getElementById('screen'), {
+      onSuccess: async function() {
+        appUnlocked = true;
+        await loadAndShowApp();
+      },
+      onForgot: function() { showForgotPin(); }
+    });
+  }
+
+  function showPinSetup() {
+    // renderPinSetup is loaded via <script src="js/screens/pin-lock.js">
+    renderPinSetup(document.getElementById('screen'), {
+      onComplete: async function() {
+        appUnlocked = true;
+        syncPinToDrive().catch(function() {});
+        await loadAndShowApp();
+      }
+    });
+  }
+
+  function showForgotPin() {
+    var screen = document.getElementById('screen');
+    screen.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:var(--bg);">'
+      + '<div style="font-size:48px;margin-bottom:16px;">🔑</div>'
+      + '<div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px;">Forgot PIN?</div>'
+      + '<div style="font-size:14px;color:var(--text-secondary);text-align:center;margin-bottom:32px;line-height:1.6;">Choose how to verify your identity and reset your PIN.</div>'
+      + '<div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;">'
+      + '<button id="forgot-google-btn" class="btn btn-primary" style="padding:16px;font-size:15px;">🔐 Sign in with Google</button>'
+      + '<button id="forgot-back-btn" style="background:none;border:none;font-size:14px;color:var(--text-muted);cursor:pointer;padding:8px;">← Back to PIN</button>'
+      + '</div>'
+      + '</div>';
+    document.getElementById('forgot-back-btn').addEventListener('click', showPinLock);
+    document.getElementById('forgot-google-btn').addEventListener('click', function() { showLogin(); });
+  }
+
+  // ── Show app ─────────────────────────────────────────────────────────
+  function showApp() {
+    document.getElementById('bottom-nav').classList.remove('hidden');
+
+    initSyncManager().catch(function() {});
+    watchSync();
+
+    runBootIntegrityCheck('finance').then(function(issues) {
+      issues.forEach(function(issue) {
+        if (issue.type === 'interrupted_write') {
+          showToast('⚠️ Last save was interrupted. Check your data.', 'warning', 5000);
+        } else if (issue.type === 'suspicious_drop') {
+          showToast('⚠️ ' + issue.message, 'warning', 6000);
         }
       });
-    }
-  }, 2000);
+    }).catch(function() {});
 
-  async function boot() {
-    try {
-      // 🛡️ NATIVE CALLBACK LISTENER
-      // --- Versioning & Build Tracking ---
-      window.APP_VERSION = 'v5.4.1'; // Injected by CI
-      window.BUILD_TIME  = '';       // Injected by CI
-      // When the native app captures an OAuth token via Deep Link, it triggers this event.
-      window.addEventListener('oauth:callback_received', async () => {
-        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        appUnlocked = false; // Force PIN setup/lock after login
-        boot(); 
-      });
+    initNav();
+    navigate('dashboard');
 
-      // Handle OAuth callback — implicit flow returns token in URL hash
-      const urlHash    = window.location.hash;
-      const urlSearch  = window.location.search;
-      const isCallback = urlHash.includes('access_token') ||
-                         urlSearch.includes('error') ||
-                         urlHash.includes('error');
-      if (isCallback) {
-        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-      }
+    if (typeof registerSession === 'function') registerSession('App B').catch(function() {});
+    if (typeof startHeartbeat === 'function') startHeartbeat();
+    if (typeof logActivity === 'function') logActivity('App B', 'SIGN_IN', 'Session started').catch(function() {});
 
-      await openDB();
-
-      // Restore PIN from Drive if cleared locally
-      if (!isPinSet() && isAuthenticated()) {
-        const restored = await restorePinFromDrive().catch(() => false);
-        if (restored) {
-          // PIN restored silently — continue to PIN lock
+    if (typeof getUnseenHighRiskEvents === 'function') {
+      getUnseenHighRiskEvents().then(function(events) {
+        if (events && events.length > 0) {
+          showToast('🔴 ' + events.length + ' security alert' + (events.length > 1 ? 's' : '') + ' — check Settings → Security', 'error', 8000);
         }
-      }
-
-      // ── Distinguish: locked app vs genuinely not signed in ──────────
-      // If token expired but we have cached data + PIN → show PIN lock
-      // Only show Google sign-in if truly no session exists
-      if (!isAuthenticated()) {
-        const cached = await getCachedFinanceData().catch(() => null);
-        if (cached && isPinSet()) {
-          // Token expired while app was locked — show PIN, not Google
-          // Token will refresh silently after unlock
-          appUnlocked = false;
-          showPinLock();
-          return;
-        }
-        showLogin();
-        return;
-      }
-
-      // Show PIN lock or setup
-      if (!isPinSet()) {
-        showPinSetup();
-        return;
-      }
-
-      if (!appUnlocked) {
-        showPinLock();
-        return;
-      }
-
-      await loadAndShowApp();
-
-    } catch (err) {
-      console.error('Boot error:', err);
-      // Even on error, if PIN is set show PIN lock not Google
-      try {
-        const cached = await getCachedFinanceData().catch(() => null);
-        if (cached && isPinSet()) { showPinLock(); return; }
-      } catch {}
-      showLogin();
+      }).catch(function() {});
     }
   }
 
+  // ── Load data and show app ──────────────────────────────────────────
   async function loadAndShowApp() {
-    const cached = await getCachedFinanceData();
+    var cached = await getCachedFinanceData();
     if (cached) showApp();
 
     if (isOnline()) {
@@ -266,21 +247,24 @@
         await initDriveFolders();
         await initDataFile('finance');
         await initMirrorFile('finance');
-        const { data } = await readData('finance');
+        var result = await readData('finance');
+        var data = result.data;
+
         // Sanitise bad dates (e.g. Excel import producing 1899)
-        if (data?.transactions) {
-          let dirty = false;
-          data.transactions = data.transactions.map(t => {
+        if (data && data.transactions) {
+          var dirty = false;
+          data.transactions = data.transactions.map(function(t) {
             if (!t.date) return t;
-            const yr = Number(t.date.slice(0,4));
-            if (yr < 2000 || yr > 2100) { dirty = true; return { ...t, date: '' }; }
+            var yr = Number(t.date.slice(0,4));
+            if (yr < 2000 || yr > 2100) { dirty = true; return Object.assign({}, t, { date: '' }); }
             return t;
           });
-          if (dirty) await writeData('finance', () => data);
+          if (dirty) await writeData('finance', function() { return data; });
         }
+
         await setCachedFinanceData(data);
         window.dispatchEvent(new Event('finance-data-ready'));
-        showApp();
+        if (!cached) showApp();
       } catch (err) {
         if (err.message === 'Authentication required') {
           showLogin();
@@ -295,349 +279,95 @@
     }
   }
 
-  function showForgotPinRecovery() {
-    const screen = document.getElementById('screen');
-    const user   = getUser();
-    const email  = user?.email || '';
+  // ── Main boot function ──────────────────────────────────────────────
+  async function boot() {
+    try {
+      console.log('Private Vault: Booting in Local-First mode v5.4.2…');
 
-    // Generate a 6-digit code and store it with 10-min expiry
-    const code    = String(Math.floor(100000 + Math.random() * 900000));
-    const expiry  = Date.now() + 10 * 60 * 1000; // 10 minutes
-    localStorage.setItem('vault_recovery_code', code);
-    localStorage.setItem('vault_recovery_expiry', String(expiry));
-
-    screen.innerHTML = `
-      <div class="pin-screen">
-        <div style="font-size:40px;margin-bottom:8px;">🔑</div>
-        <h2 style="color:#fff;font-size:20px;font-weight:700;margin-bottom:8px;">Forgot PIN</h2>
-        <p style="color:rgba(255,255,255,0.7);font-size:14px;text-align:center;line-height:1.6;max-width:280px;margin-bottom:24px;">
-          Choose how to verify your identity and reset your PIN
-        </p>
-
-        <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:12px;">
-          ${email ? `
-          <button id="email-code-btn" style="padding:14px 20px;border-radius:var(--radius-lg);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:15px;font-weight:600;cursor:pointer;text-align:left;">
-            📧 Send recovery code to email
-            <div style="font-size:12px;font-weight:400;opacity:0.7;margin-top:2px;">${email}</div>
-          </button>
-          ` : ''}
-          <button id="google-reauth-btn" style="padding:14px 20px;border-radius:var(--radius-lg);background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:15px;font-weight:600;cursor:pointer;text-align:left;">
-            🔐 Sign in with Google again
-            <div style="font-size:12px;font-weight:400;opacity:0.7;margin-top:2px;">Verify identity then set new PIN</div>
-          </button>
-        </div>
-
-        <button id="back-to-pin" style="margin-top:28px;background:none;border:none;color:rgba(255,255,255,0.5);font-size:13px;cursor:pointer;text-decoration:underline;">← Back to PIN</button>
-      </div>
-    `;
-
-    document.getElementById('back-to-pin')?.addEventListener('click', () => showPinLock());
-    document.getElementById('google-reauth-btn')?.addEventListener('click', () => showLogin());
-
-    if (email) {
-      document.getElementById('email-code-btn')?.addEventListener('click', () => {
-        // Open email app with recovery code via mailto
-        const subject = encodeURIComponent('Private Vault — PIN Recovery Code');
-        const body = encodeURIComponent(
-          `Your PIN recovery code is:
-
-${code}
-
-This code expires in 10 minutes.
-
-If you did not request this, ignore this message.`
-        );
-        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
-        // Show code entry screen after brief delay
-        setTimeout(() => showCodeEntry(email), 1500);
+      // Handle deep-link OAuth callback (Capacitor fires this event)
+      window.addEventListener('oauth:callback_received', async function() {
+        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+        appUnlocked = false;
+        boot();
       });
+
+      // Handle browser hash OAuth callback
+      var urlHash   = window.location.hash;
+      var urlSearch = window.location.search;
+      var isCallback = urlHash.includes('access_token') || urlSearch.includes('error') || urlHash.includes('error');
+      if (isCallback) {
+        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
+      }
+
+      // Open DB
+      await openDB();
+
+      // Restore PIN from Drive if cleared locally
+      if (!isPinSet() && isAuthenticated()) {
+        await restorePinFromDrive().catch(function() {});
+      }
+
+      // Not authenticated at all → show login
+      if (!isAuthenticated()) {
+        var cached = await getCachedFinanceData().catch(function() { return null; });
+        if (cached && isPinSet()) {
+          // Token expired while locked — show PIN not Google
+          appUnlocked = false;
+          showPinLock();
+          return;
+        }
+        showLogin();
+        return;
+      }
+
+      // Show PIN setup if not set
+      if (!isPinSet()) {
+        showPinSetup();
+        return;
+      }
+
+      // Show PIN lock if not unlocked
+      if (!appUnlocked) {
+        showPinLock();
+        return;
+      }
+
+      await loadAndShowApp();
+
+    } catch (err) {
+      console.error('Boot error:', err);
+      try {
+        var cached2 = await getCachedFinanceData().catch(function() { return null; });
+        if (cached2 && isPinSet()) { showPinLock(); return; }
+      } catch(e2) {}
+      showLogin();
     }
   }
 
-  function showCodeEntry(email) {
-    const screen = document.getElementById('screen');
-    let inputCode = '';
-
-    screen.innerHTML = `
-      <div class="pin-screen">
-        <div style="font-size:40px;margin-bottom:8px;">📧</div>
-        <h2 style="color:#fff;font-size:18px;font-weight:700;margin-bottom:4px;">Enter Recovery Code</h2>
-        <p style="color:rgba(255,255,255,0.7);font-size:13px;text-align:center;margin-bottom:20px;">
-          Check your email (${email}) and enter the 6-digit code
-        </p>
-        <input id="recovery-input" type="number" inputmode="numeric" maxlength="6"
-          style="width:200px;text-align:center;font-size:28px;letter-spacing:8px;padding:12px;border-radius:var(--radius-lg);border:2px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:#fff;margin-bottom:12px;"
-          placeholder="______" />
-        <div id="code-error" style="color:#FCA5A5;font-size:13px;min-height:20px;margin-bottom:16px;"></div>
-        <button id="verify-code-btn" style="padding:13px 32px;border-radius:var(--radius-lg);background:var(--primary);border:none;color:#fff;font-size:15px;font-weight:700;cursor:pointer;width:200px;">Verify Code</button>
-        <button id="resend-btn" style="margin-top:16px;background:none;border:none;color:rgba(255,255,255,0.5);font-size:12px;cursor:pointer;text-decoration:underline;">Didn't receive it?</button>
-        <button id="back-to-options" style="margin-top:8px;background:none;border:none;color:rgba(255,255,255,0.4);font-size:12px;cursor:pointer;">← Back</button>
-      </div>
-    `;
-
-    document.getElementById('back-to-options')?.addEventListener('click', () => showForgotPinRecovery());
-    document.getElementById('resend-btn')?.addEventListener('click', () => showForgotPinRecovery());
-
-    document.getElementById('verify-code-btn')?.addEventListener('click', () => {
-      const entered = document.getElementById('recovery-input').value.trim();
-      const stored  = localStorage.getItem('vault_recovery_code');
-      const expiry  = Number(localStorage.getItem('vault_recovery_expiry') || 0);
-      const errEl   = document.getElementById('code-error');
-
-      if (Date.now() > expiry) {
-        errEl.textContent = 'Code expired. Please start again.';
-        return;
-      }
-      if (entered !== stored) {
-        errEl.textContent = 'Incorrect code. Try again.';
-        return;
-      }
-      // Code correct — clear it and show PIN setup
-      localStorage.removeItem('vault_recovery_code');
-      localStorage.removeItem('vault_recovery_expiry');
-      localStorage.removeItem('vault_pin_hash');
-      localStorage.removeItem('vault_pin_salt');
-      showToast('Identity verified! Set your new PIN.', 'success');
-      showPinSetup();
-    });
-  }
-
-  function showLogin() {
-    const screen = document.getElementById('screen');
-    screen.innerHTML = `
-      <div class="login-screen fade-in">
-        <div class="login-logo">🔐</div>
-        <h1 class="login-title">Private Vault</h1>
-        <p class="login-subtitle">Your personal finance tracker<br>Private, secure, PIN-protected</p>
-        <button class="google-signin-btn" id="signin-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v3.4h5.71c-.25 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-          </svg>
-          Sign in with Google
-        </button>
-      </div>
-    `;
-    document.getElementById('signin-btn').addEventListener('click', () => {
-      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
-    });
-  }
-
-  function showPinLock() {
-    import('./js/screens/pin-lock.js').then(m => {
-      m.renderPinLock(document.getElementById('screen'), {
-        onSuccess: async () => {
-          appUnlocked = true;
-          await loadAndShowApp();
-        },
-        onForgot: () => showForgotPin()
-      });
-    });
-  }
-
-  function showForgotPin() {
-    const screen = document.getElementById('screen');
-    screen.innerHTML = `
-      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:var(--bg);">
-        <div style="font-size:48px;margin-bottom:16px;">🔑</div>
-        <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px;">Forgot PIN?</div>
-        <div style="font-size:14px;color:var(--text-secondary);text-align:center;margin-bottom:32px;line-height:1.6;">
-          Choose how to verify your identity and reset your PIN.
-        </div>
-        <div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;">
-          <button id="forgot-google-btn" class="btn btn-primary" style="padding:16px;font-size:15px;">
-            🔐 Sign in with Google
-          </button>
-          <button id="forgot-email-btn" class="btn btn-secondary" style="padding:16px;font-size:15px;">
-            📧 Send recovery code to Gmail
-          </button>
-          <button id="forgot-back-btn" style="background:none;border:none;font-size:14px;color:var(--text-muted);cursor:pointer;padding:8px;">
-            ← Back to PIN
-          </button>
-        </div>
-        <div id="recovery-status" style="margin-top:20px;font-size:13px;color:var(--text-secondary);text-align:center;min-height:40px;max-width:320px;"></div>
-        <div id="code-entry" class="hidden" style="margin-top:16px;width:100%;max-width:340px;">
-          <div style="font-size:14px;font-weight:600;margin-bottom:8px;">Enter 6-digit code</div>
-          <input id="recovery-code-input" type="text" inputmode="numeric" maxlength="6"
-            style="width:100%;padding:14px;font-size:24px;text-align:center;letter-spacing:12px;border:2px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);color:var(--text);"
-            placeholder="••••••" />
-          <button id="verify-code-btn" class="btn btn-primary" style="width:100%;margin-top:12px;padding:14px;">Verify Code</button>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('forgot-back-btn').addEventListener('click', showPinLock);
-
-    document.getElementById('forgot-google-btn').addEventListener('click', () => {
-      showLogin(); // Will redirect back to PIN setup after re-auth
-    });
-
-    let _recoveryCode = null;
-    let _recoveryExpiry = null;
-
-    document.getElementById('forgot-email-btn').addEventListener('click', async () => {
-      const status = document.getElementById('recovery-status');
-      const user = (await import('../shared/auth.js')).getUser();
-      if (!user?.email) {
-        status.textContent = 'Please sign in with Google first.';
-        return;
-      }
-      // Generate 6-digit code
-      _recoveryCode  = String(Math.floor(100000 + Math.random() * 900000));
-      _recoveryExpiry = Date.now() + 10 * 60 * 1000; // 10 min
-
-      // Store hashed code locally
-      const encoder = new TextEncoder();
-      const data    = encoder.encode('recovery_' + _recoveryCode);
-      const hash    = await crypto.subtle.digest('SHA-256', data);
-      const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
-      localStorage.setItem('vault_recovery_hash',   hashHex);
-      localStorage.setItem('vault_recovery_expiry', String(_recoveryExpiry));
-
-      // Open Gmail compose with code in body
-      const subject = encodeURIComponent('Private Vault — PIN Recovery Code');
-      const body    = encodeURIComponent(
-        `Your PIN recovery code is:
-
-${_recoveryCode}
-
-This code expires in 10 minutes.
-
-If you did not request this, ignore this message.`
-      );
-      window.open(`mailto:${user.email}?subject=${subject}&body=${body}`, '_blank');
-
-      status.innerHTML = `Recovery code sent to <strong>${user.email}</strong><br>Check your inbox and enter the code below.`;
-      document.getElementById('code-entry').classList.remove('hidden');
-    });
-
-    document.getElementById('verify-code-btn')?.addEventListener('click', async () => {
-      const status = document.getElementById('recovery-status');
-      const entered = document.getElementById('recovery-code-input').value.trim();
-      if (entered.length !== 6) { status.textContent = 'Please enter the 6-digit code.'; return; }
-
-      const storedHash   = localStorage.getItem('vault_recovery_hash');
-      const storedExpiry = Number(localStorage.getItem('vault_recovery_expiry') || 0);
-
-      if (Date.now() > storedExpiry) {
-        status.textContent = '⏰ Code has expired. Please request a new one.';
-        return;
-      }
-
-      const encoder = new TextEncoder();
-      const data    = encoder.encode('recovery_' + entered);
-      const hash    = await crypto.subtle.digest('SHA-256', data);
-      const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
-
-      if (hashHex !== storedHash) {
-        status.textContent = '❌ Incorrect code. Please try again.';
-        return;
-      }
-
-      // Code verified — clear and go to PIN setup
-      localStorage.removeItem('vault_recovery_hash');
-      localStorage.removeItem('vault_recovery_expiry');
-      localStorage.removeItem('vault_pin_hash');
-      localStorage.removeItem('vault_pin_salt');
-      status.textContent = '✅ Identity verified! Setting new PIN…';
-      setTimeout(() => showPinSetup(), 800);
-    });
-  }
-
-  function showPinSetup() {
-    import('./js/screens/pin-lock.js').then(m => {
-      m.renderPinSetup(document.getElementById('screen'), {
-        onComplete: async () => {
-          appUnlocked = true;
-          syncPinHashToDrive().catch(() => {}); // sync to Drive in background
-          await loadAndShowApp();
+  // ── Native Android back button hook (Capacitor) ─────────────────────
+  setTimeout(function() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+      var CapApp = window.Capacitor.Plugins.App;
+      CapApp.addListener('backButton', async function(ref) {
+        var canGoBack = ref.canGoBack;
+        var pending = await getPendingCount();
+        if (pending > 0) {
+          if (confirm('⚠️ You have unsynced local data! Exit without backing up to Drive?')) {
+            CapApp.exitApp();
+          }
+        } else {
+          if (!canGoBack) {
+            CapApp.exitApp();
+          } else {
+            window.history.back();
+          }
         }
       });
-    });
-  }
-
-  // ── Sync status listener ──────────────────────────────────────────
-  window.addEventListener('sync:status', (e) => {
-    const { status, detail } = e.detail;
-    const el = document.getElementById('sync-indicator');
-    if (!el) return;
-    const configs = {
-      synced:  { text: '✅ All data backed up',           bg: 'transparent', show: false },
-      syncing: { text: '🔄 Syncing to Drive…',          bg: '#EEF2FF',     show: true  },
-      pending: { text: `⚠️ Unsaved Local Data — Tap to Backup`,         bg: '#FEF3C7',     show: true  },
-      failed:  { text: `❌ Sync failed — Tap to retry`, bg: '#FEE2E2', show: true },
-    };
-    const cfg = configs[status] || configs.synced;
-    el.textContent = cfg.text;
-    el.style.background = cfg.bg;
-    el.style.color = '#000';
-    el.classList.toggle('hidden', !cfg.show);
-    
-    // Manual sync override
-    if (status === 'pending' || status === 'failed') {
-      el.onclick = () => { processDriveQueue(); el.textContent = '🔄 Starting Backup…'; };
-    } else {
-      el.onclick = null;
     }
-  });
+  }, 2000);
 
-  function showApp() {
-    document.getElementById('bottom-nav').classList.remove('hidden');
-
-    // ── Sync manager + integrity checks ───────────────────────────
-    initSyncManager().catch(() => {});
-    watchSync();
-    runBootIntegrityCheck('finance').then(issues => {
-      issues.forEach(issue => {
-        if (issue.type === 'interrupted_write') {
-          showToast('⚠️ Last save was interrupted. Check your data.', 'warning', 5000);
-        } else if (issue.type === 'suspicious_drop') {
-          showToast('⚠️ ' + issue.message, 'warning', 6000);
-        }
-      });
-    }).catch(() => {});
-
-    initNav();
-    navigate('dashboard');
-
-    // ── Security: register session + heartbeat ─────────────────────
-    registerSession('App B').catch(() => {});
-    startHeartbeat();
-    logActivity('App B', 'SIGN_IN', 'Session started').catch(() => {});
-
-    // ── Security: check for high-risk events since last visit ───────
-    getUnseenHighRiskEvents().then(events => {
-      if (events && events.length > 0) {
-        showToast(`🔴 ${events.length} security alert${events.length > 1 ? 's' : ''} — check Settings → Security`, 'error', 8000);
-      }
-    }).catch(() => {});
-
-
-    watchConnectivity(({ processed, failed }) => {
-      if (processed > 0) showToast(`Synced ${processed} pending change${processed > 1 ? 's' : ''}`, 'success');
-      if (failed   > 0) showToast(`${failed} change${failed > 1 ? 's' : ''} failed to sync`, 'error');
-    });
-  }
-
-  function showError(msg) {
-    document.getElementById('screen').innerHTML = `
-      <div class="login-screen">
-        <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
-        <p style="color:var(--danger);font-weight:600;text-align:center;padding:0 24px;">${msg}</p>
-        <button class="btn btn-primary" style="margin-top:24px;" onclick="window.location.reload()">Retry</button>
-      </div>
-    `;
-  }
-
-  window.addEventListener('auth:required', () => {
-    appUnlocked = false;
-    document.getElementById('bottom-nav').classList.add('hidden');
-    showLogin();
-  });
-
-  boot();
+  // ── Execute boot ────────────────────────────────────────────────────
+  window.addEventListener('load', boot);
 </script>
 
 </body>

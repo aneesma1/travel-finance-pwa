@@ -147,16 +147,11 @@ export async function copyToClipboard(text) {
 }
 
 // ── Toast notification ────────────────────────────────────────────────────────
-export function showToast(message, type = 'info', duration = 3000) {
+function showToast(message, type, duration) {
   // type: 'info' | 'success' | 'error' | 'warning'
+  type = type || 'info';
+  duration = (duration !== undefined) ? duration : 3000;
   const existing = document.getElementById('app-toast');
-  document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Vault Drive? This will trash both root clutter and backups for deleted transactions.')) return;
-    showToast('Scanning & Purging…', 'info');
-    const { purgeOrphanedFiles } = await import('../../shared/drive.js');
-    const count = await purgeOrphanedFiles('finance', data);
-    showToast(`Cleaned ${count} orphaned files`, 'success');
-  });
   if (existing) existing.remove();
 
   const colors = {
@@ -322,14 +317,14 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
   });
 }
 
-// ── App State Manager (Simplified) ───────────────────────────────────────────
-// These functions are used for persisting UI settings (like Lock Updates).
-export function getAppState(key, defaultVal = false) {
-  const v = localStorage.getItem(`app_state_${key}`);
+// ── Local Storage App State (UI prefs only — do NOT use for data) ────────────
+function getLocalPref(key, defaultVal) {
+  defaultVal = (defaultVal !== undefined) ? defaultVal : false;
+  const v = localStorage.getItem('app_pref_' + key);
   if (v === null) return defaultVal;
   try { return JSON.parse(v); } catch { return v; }
 }
 
-export async function setAppState(key, val) {
-  localStorage.setItem(`app_state_${key}`, JSON.stringify(val));
+function setLocalPref(key, val) {
+  localStorage.setItem('app_pref_' + key, JSON.stringify(val));
 }

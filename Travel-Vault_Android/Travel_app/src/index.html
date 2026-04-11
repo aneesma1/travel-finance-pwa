@@ -1,5 +1,4 @@
-<!-- v3.5.9 — 2026-03-28 -->
-<!-- version: v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 -->
+<!-- Travel Hub — v5.4.2 — 2026-04-11 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,14 +21,14 @@
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
+
+<!-- 🛡️ EMERGENCY ERROR CATCHER (v5.4.2) -->
 <script>
-  // 🛡️ EMERGENCY ERROR CATCHER (v5.2.1)
   window.onerror = function(msg, url, lineNo, columnNo, error) {
-    const detail = `[Error] ${msg} at ${url}:${lineNo}`;
-    console.error(detail);
-    const errDiv = document.createElement('div');
-    errDiv.style = "position:fixed;top:60px;left:10px;right:10px;z-index:9999;padding:15px;background:#F87171;color:#fff;font-size:12px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);";
-    errDiv.innerHTML = `<strong>⚠️ App Crash:</strong><br>${msg}<br><small>${url.split('/').pop()}:${lineNo}</small><br><button onclick="location.reload()" style="margin-top:8px;padding:4px 8px;border:none;background:#fff;color:#F87171;font-weight:700;border-radius:4px;">Retry</button>`;
+    console.error('[Error] ' + msg + ' at ' + url + ':' + lineNo);
+    var errDiv = document.createElement('div');
+    errDiv.style.cssText = 'position:fixed;top:60px;left:10px;right:10px;z-index:9999;padding:15px;background:#F87171;color:#fff;font-size:12px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    errDiv.innerHTML = '<strong>⚠️ App Crash:</strong><br>' + msg + '<br><small>' + (url ? url.split('/').pop() : '') + ':' + lineNo + '</small><br><button onclick="location.reload()" style="margin-top:8px;padding:4px 8px;border:none;background:#fff;color:#F87171;font-weight:700;border-radius:4px;">Retry</button>';
     document.body.appendChild(errDiv);
     return false;
   };
@@ -37,23 +36,20 @@
 
 <div id="app">
 
-  <!-- Offline banner removed (redundant in Native) -->
-
   <!-- ── Main screen container ─────────────────────────────────────── -->
   <main id="screen" role="main" aria-live="polite">
-    <!-- Screens rendered here by router.js -->
     <div class="login-screen" id="initial-loader">
       <div class="spinner"></div>
     </div>
   </main>
 
-  <!-- ── Sync status indicator ─────────────────────────────────────── -->
-  <!-- Modal overlay (used by settings, people, etc.) -->
+  <!-- ── Modal overlay (used by settings, people, etc.) ─────────────── -->
   <div id="member-modal" class="modal-overlay hidden" style="
     position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;
     display:flex;align-items:flex-end;justify-content:center;
   "></div>
 
+  <!-- ── Sync status indicator ─────────────────────────────────────── -->
   <div id="sync-indicator" class="hidden" style="
     position:fixed;top:0;left:0;right:0;z-index:500;
     display:flex;align-items:center;justify-content:center;
@@ -88,33 +84,8 @@
 
 </div><!-- #app -->
 
-<!-- ── App bootstrap ──────────────────────────────────────────────── -->
-<script type="module">
-  import { handleOAuthCallback, isAuthenticated, startOAuthFlow, getUser, clearAuth } from '../shared/auth.js';
-  import { initDriveFolders, initDataFile, initMirrorFile, readData } from '../shared/drive.js';
-  import { setCachedTravelData, getCachedTravelData, openDB } from '../shared/db.js';
-  import { navigate, initNav } from './js/router.js';
-  import { isOnline, onNetworkChange, showToast } from '../shared/utils.js';
-  import { CLIENT_ID, REDIRECT_URI } from './js/auth-config.js';
-  import { resolveRole, setCurrentRole, applyRoleRestrictions } from './js/roles.js';
-  import { registerSession, logActivity, startHeartbeat, getUnseenHighRiskEvents, checkRevocation } from '../shared/security-log.js';
-  import { runExpiryCheck } from './js/expiry-checker.js';
-  import { initInstallPrompt, showIOSInstallHint } from '../shared/pwa-install.js';
-  import { initSyncManager, runBootIntegrityCheck, processDriveQueue, watchConnectivity as watchSync } from '../shared/sync-manager.js';
-  import { watchConnectivity } from '../shared/sync-queue.js';
-
-  // ── Service Worker registration (Removed: Handled by Capacitor) ───
-
-  // ── Offline banner logic (Removed) ─────────────────────────────────
-  onNetworkChange((online) => {
-    if (online) {
-      showToast('Back online — syncing...', 'success');
-      syncFromQueue();
-    }
-  });
-
-<!-- ── App bootstrap (v5.4.0 Local-First Model) ─────────────────── -->
-<!-- We load these in order because they are no longer ES Modules -->
+<!-- ── App bootstrap (v5.4.2 Local-First / No ES Modules) ───────────── -->
+<!-- Scripts loaded in dependency order. No import/export used. -->
 <script src="shared/utils.js"></script>
 <script src="shared/auth.js"></script>
 <script src="shared/db.js"></script>
@@ -127,53 +98,179 @@
 <script src="js/router.js"></script>
 
 <script>
-  // 🛡️ NATIVE BOOTSTRAPPER (v5.4.0)
-  async function bootApp() {
-    try {
-      console.log('App: Booting in Local-First mode...');
-      
-      // Update Sync Badge UI
-      updateSyncStatusBadge();
+  // --- Versioning & Build Tracking (injected by CI) ---
+  window.APP_VERSION = 'v5.4.1';
+  window.BUILD_TIME  = '';
 
-      // Handle OAuth callback (Listener)
-      window.addEventListener('oauth:callback_received', async () => {
+  // ── Sync indicator wiring ─────────────────────────────────────────
+  window.addEventListener('sync:status', function(e) {
+    var status = e.detail.status;
+    var el = document.getElementById('sync-indicator');
+    if (!el) return;
+    var configs = {
+      synced:  { text: '✅ All data backed up',              show: false, bg: 'transparent' },
+      syncing: { text: '🔄 Syncing to Drive…',              show: true,  bg: '#EEF2FF'     },
+      pending: { text: '⚠️ Unsaved Local Data — Tap to Backup', show: true,  bg: '#FEF3C7'     },
+      failed:  { text: '❌ Sync failed — Tap to retry',     show: true,  bg: '#FEE2E2'     },
+    };
+    var cfg = configs[status] || configs.synced;
+    el.textContent = cfg.text;
+    el.style.background = cfg.bg;
+    el.style.color = '#000';
+    el.classList.toggle('hidden', !cfg.show);
+    if (status === 'pending' || status === 'failed') {
+      el.onclick = function() { processDriveQueue(); el.textContent = '🔄 Starting Backup…'; };
+    } else {
+      el.onclick = null;
+    }
+  });
+
+  // ── Auth event listener ─────────────────────────────────────────────
+  window.addEventListener('auth:required', function() {
+    document.getElementById('bottom-nav').classList.add('hidden');
+    showLogin();
+  });
+
+  // ── 404 Script error catcher ────────────────────────────────────────
+  window.addEventListener('error', function(e) {
+    if (e.target && e.target.tagName === 'SCRIPT') {
+      var fileName = e.target.src ? e.target.src.split('/').pop() : 'unknown';
+      var msg = 'Critical Asset Missing: ' + fileName + '. Please check build bundle.';
+      if (window.onerror) window.onerror(msg, e.target.src, 0);
+    }
+  }, true);
+
+  // ── Login / Error screens ───────────────────────────────────────────
+  function showLogin() {
+    var screen = document.getElementById('screen');
+    screen.innerHTML = '<div class="login-screen fade-in">'
+      + '<div class="login-logo">✈️</div>'
+      + '<h1 class="login-title">Family Hub</h1>'
+      + '<p class="login-subtitle">Track your family\'s travel cycles<br>and document expiry dates</p>'
+      + '<button class="google-signin-btn" id="signin-btn">'
+      + '<svg width="20" height="20" viewBox="0 0 24 24">'
+      + '<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>'
+      + '<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>'
+      + '<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>'
+      + '<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>'
+      + '</svg>'
+      + ' Sign in with Google'
+      + '</button>'
+      + '<p style="margin-top:32px;font-size:12px;color:var(--text-muted);text-align:center;line-height:1.6;">'
+      + 'Your data is stored in your<br>own Google Drive — private &amp; secure'
+      + '</p>'
+      + '</div>';
+    document.getElementById('signin-btn').addEventListener('click', function() {
+      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
+    });
+  }
+
+  function showError(msg) {
+    document.getElementById('screen').innerHTML = '<div class="login-screen">'
+      + '<div style="font-size:48px;margin-bottom:16px;">⚠️</div>'
+      + '<p style="color:var(--danger);font-weight:600;text-align:center;">' + msg + '</p>'
+      + '<button class="btn btn-primary" style="margin-top:24px;" onclick="window.location.reload()">Retry</button>'
+      + '</div>';
+  }
+
+  // ── Show app after auth ─────────────────────────────────────────────
+  function showApp(data) {
+    document.getElementById('bottom-nav').classList.remove('hidden');
+
+    // Sync manager
+    initSyncManager().catch(function() {});
+    watchSync();
+
+    // Run boot integrity check and show any warnings
+    runBootIntegrityCheck('travel').then(function(issues) {
+      issues.forEach(function(issue) {
+        if (issue.type === 'interrupted_write') {
+          showToast('⚠️ Last save was interrupted. Check your data.', 'warning', 5000);
+        } else if (issue.type === 'suspicious_drop') {
+          showToast('⚠️ ' + issue.message, 'warning', 6000);
+        }
+      });
+    }).catch(function() {});
+
+    initNav();
+    var currentHash = window.location.hash;
+    if (!currentHash || currentHash === '#dashboard') {
+      navigate('dashboard');
+    }
+
+    // Security
+    if (typeof registerSession === 'function') registerSession('App A').catch(function() {});
+    if (typeof startHeartbeat === 'function') startHeartbeat();
+
+    if (typeof getUnseenHighRiskEvents === 'function') {
+      getUnseenHighRiskEvents().then(function(events) {
+        if (events && events.length > 0) {
+          showToast('🔴 ' + events.length + ' security alert' + (events.length > 1 ? 's' : '') + ' since last visit — check Settings → Security', 'error', 8000);
+        }
+      }).catch(function() {});
+    }
+
+    // Session revocation check
+    if (typeof checkRevocation === 'function') {
+      setInterval(function() {
+        checkRevocation().then(function(revoked) {
+          if (revoked) {
+            showToast('Your session was revoked. Signing out…', 'error', 3000);
+            setTimeout(function() { clearAuth(); window.location.reload(); }, 3000);
+          }
+        }).catch(function() {});
+      }, 5 * 60 * 1000);
+    }
+
+    // Expiry check
+    if (typeof runExpiryCheck === 'function') {
+      setTimeout(function() { runExpiryCheck().catch(function() {}); }, 1500);
+    }
+  }
+
+  // ── Main boot function ──────────────────────────────────────────────
+  async function boot() {
+    try {
+      console.log('Family Hub: Booting in Local-First mode v5.4.2…');
+
+      // Handle deep-link OAuth callback (Capacitor fires this event)
+      window.addEventListener('oauth:callback_received', async function() {
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        location.reload(); 
+        location.reload();
       });
 
-      // 1. Initial Auth Check (Discovery)
-      const urlHash = window.location.hash;
-      if (urlHash.includes('access_token')) {
+      // Handle browser hash OAuth callback
+      if (window.location.hash.includes('access_token')) {
         await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
       }
 
-      // 2. Database & Data (Load Local cache first)
+      // Open DB
       await openDB();
-      const cached = await getCachedTravelData();
+
+      // Load cached data first (works offline)
+      var cached = await getCachedTravelData();
       if (cached) {
         window._travelData = cached;
-        if (typeof showApp === 'function') showApp(cached);
-      } else {
-        // If no data AND no auth, show a special "Welcome" or Login screen
-        if (!isAuthenticated() && typeof showLogin === 'function') {
-           showLogin(); 
-        }
+        showApp(cached);
+      } else if (!isAuthenticated()) {
+        showLogin();
+        return;
       }
 
-      // 3. Cloud Provisioning (Only if authenticated)
+      // Cloud provisioning (only if authenticated)
       if (isAuthenticated()) {
         try {
           await initDriveFolders();
           await initDataFile('travel');
         } catch (err) {
-          console.warn('Cloud Sync initialization failed:', err);
-          showToast('⚠️ Cloud Sync unavailable', 'warning');
+          console.warn('Cloud Sync init failed:', err);
+          if (!cached) showError('Cloud connection failed. Please retry.');
         }
       }
 
-      // 4. Background Sync & Integrity
+      // Background integrity check (non-blocking)
       runBootIntegrityCheck('travel').catch(console.error);
-      initSyncManager();
+      await initSyncManager();
       watchSync();
 
     } catch (err) {
@@ -182,235 +279,20 @@
     }
   }
 
-  function updateSyncStatusBadge() {
-    const isAuth = isAuthenticated();
-    const badge = document.getElementById('sync-status-badge');
-    if (!badge) return;
-    
-    if (isAuth) {
-      badge.innerHTML = '<span style="color:#10B981">●</span> Cloud Sync Active';
-      badge.style.background = 'rgba(16, 185, 129, 0.1)';
-    } else {
-      badge.innerHTML = '<span style="color:#94A3B8">○</span> Offline/Guest Mode';
-      badge.style.background = 'rgba(148, 163, 184, 0.1)';
-    }
-  }
-
-  // Execute boot when everything is loaded
-  window.addEventListener('load', bootApp);
-
-  // 🛡️ 404 CATCHER
-  window.addEventListener('error', function(e) {
-    if (e.target.tagName === 'SCRIPT') {
-      const fileName = e.target.src.split('/').pop();
-      const msg = `Critical Asset Missing: ${fileName}. Please check build bundle.`;
-      if (window.onerror) window.onerror(msg, e.target.src, 0);
-    }
-  }, true);
-</script>
-              showToast('⚠️ ' + issue.message, 'warning', 6000);
-            }
-          });
-        }).catch(() => {});
-      } else {
-        showLoading();
-      }
-
-      // 5. Init Drive in background (non-blocking for UX)
-      if (isOnline()) {
-        try {
-          await initDriveFolders();
-          await initDataFile('travel');
-          await initMirrorFile('travel');
-          const { data } = await readData('travel');
-          await setCachedTravelData(data);
-          window._travelData = data;
-          showApp(data);
-        } catch (err) {
-          if (err.message === 'Authentication required') {
-            showLogin();
-          } else if (cached) {
-            showToast('Using cached data — Drive sync failed', 'warning');
-          } else {
-            showError(err.message);
-          }
-        }
-      } else if (!cached) {
-        showError('No cached data available offline. Please connect to the internet first.');
-      }
-
-    } catch (err) {
-      console.error('Boot error:', err);
-      console.error('Boot error message:', err.message);
-      console.error('Boot error stack:', err.stack);
-      showLogin();
-    }
-  }
-
-  function showLogin() {
-    const screen = document.getElementById('screen');
-    screen.innerHTML = `
-      <div class="login-screen fade-in">
-        <div class="login-logo">✈️</div>
-        <h1 class="login-title">Family Hub</h1>
-        <p class="login-subtitle">Track your family's travel cycles<br>and document expiry dates</p>
-        <button class="google-signin-btn" id="signin-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 1.37-1.04 2.53-2.21 3.31v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v3.4.2 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-22 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 — 2026-03-21 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-          </svg>
-          Sign in with Google
-        </button>
-        <p style="margin-top:32px;font-size:12px;color:var(--text-muted);text-align:center;line-height:1.6;">
-          Your data is stored in your<br>own Google Drive — private & secure
-        </p>
-      </div>
-    `;
-    document.getElementById('signin-btn').addEventListener('click', () => {
-      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
-    });
-  }
-
-  function showLoading() {
-    document.getElementById('screen').innerHTML = `
-      <div class="login-screen">
-        <div class="spinner"></div>
-        <p style="margin-top:16px;color:var(--text-muted);font-size:14px;">Loading your data…</p>
-      </div>
-    `;
-  }
-
-  function showError(msg) {
-    document.getElementById('screen').innerHTML = `
-      <div class="login-screen">
-        <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
-        <p style="color:var(--danger);font-weight:600;text-align:center;">${msg}</p>
-        <button class="btn btn-primary" style="margin-top:24px;" onclick="window.location.reload()">
-          Retry
-        </button>
-      </div>
-    `;
-  }
-
-  // ── Sync status listener ──────────────────────────────────────────
-  window.addEventListener('sync:status', (e) => {
-    const { status, detail } = e.detail;
-    const el = document.getElementById('sync-indicator');
-    if (!el) return;
-    const configs = {
-      synced:  { text: '✅ All data backed up',           bg: 'transparent', show: false },
-      syncing: { text: '🔄 Syncing to Drive…',          bg: '#EEF2FF',     show: true  },
-      pending: { text: `⚠️ Unsaved Local Data — Tap to Backup`,         bg: '#FEF3C7',     show: true  },
-      failed:  { text: `❌ Sync failed — Tap to retry`, bg: '#FEE2E2', show: true },
-    };
-    const cfg = configs[status] || configs.synced;
-    el.textContent = cfg.text;
-    el.style.background = cfg.bg;
-    el.style.color = '#000';
-    el.classList.toggle('hidden', !cfg.show);
-    
-    // Manual sync override
-    if (status === 'pending' || status === 'failed') {
-      el.onclick = () => { processDriveQueue(); el.textContent = '🔄 Starting Backup…'; };
-    } else {
-      el.onclick = null;
-    }
-  });
-
-  function showApp(data) {
-    document.getElementById('bottom-nav').classList.remove('hidden');
-
-    // ── Resolve admin/viewer role ────────────────────────────────────
-    const userEmail = getUser()?.email || '';
-    const role = resolveRole(data, userEmail);
-    setCurrentRole(role);
-
-    // ── Sync manager ────────────────────────────────────────────────
-    initSyncManager().catch(() => {});
-    watchSync();
-
-    initNav();
-    // Only auto-navigate to dashboard if we are at the root or already on dashboard
-    const currentHash = window.location.hash;
-    if (!currentHash || currentHash === '#dashboard') {
-      navigate('dashboard');
-    }
-
-    // ── Security: register session + start heartbeat ───────────────
-    registerSession('App A').catch(() => {});
-    startHeartbeat();
-
-    // ── Security: check for high-risk events since last visit ───────
-    getUnseenHighRiskEvents().then(events => {
-      if (events && events.length > 0) {
-        showToast(`🔴 ${events.length} security alert${events.length > 1 ? 's' : ''} since last visit — check Settings → Security`, 'error', 8000);
-      }
-    }).catch(() => {});
-
-    // --- Versioning & Build Tracking ---
-    window.APP_VERSION = 'v5.4.1'; // Injected by CI
-    window.BUILD_TIME  = '';       // Injected by CI
-
-    // Check if deep link token is present
-    // ── Security: check if this session has been revoked ────────────
-    setInterval(() => checkRevocation().then(revoked => {
-      if (revoked) {
-        showToast('Your session was revoked. Signing out…', 'error', 3000);
-        setTimeout(() => { clearAuth(); window.location.reload(); }, 3000);
-      }
-    }).catch(() => {}), 5 * 60 * 1000); // check every 5 min
-
-    // Run expiry check after UI is ready (non-blocking)
-    setTimeout(() => runExpiryCheck().catch(() => {}), 1500);
-
-    // Watch for connectivity to flush offline queue
-    watchConnectivity(({ processed, failed }) => {
-      if (processed > 0) showToast(`Synced ${processed} pending change${processed > 1 ? 's' : ''}`, 'success');
-      if (failed   > 0) showToast(`${failed} change${failed > 1 ? 's' : ''} failed to sync`, 'error');
-    });
-  }
-
-  // ── Auth event listener ────────────────────────────────────────────
-  window.addEventListener('auth:required', () => {
-    document.getElementById('bottom-nav').classList.add('hidden');
-    showLogin();
-  });
-
-  // ── Mirror sync (triggered by SW) ──────────────────────────────────
-  async function performMirrorSync() {
-    if (!isOnline() || !isAuthenticated()) return;
-    try {
-      const { writeMirrorSnapshot } = await import('../shared/drive.js');
-      const cached = await getCachedTravelData();
-      if (cached) await writeMirrorSnapshot('travel', cached);
-    } catch { /* silent */ }
-  }
-
-  // ── Offline sync queue processor ───────────────────────────────────
-  async function syncFromQueue() {
-    // TODO: Phase 3 — process queued writes when coming back online
-  }
-
-  // ── Boot ────────────────────────────────────────────────────────────
-  boot();
-
-  // ── Native Android Exit Hooks (Capacitor) ───────────────────────────
-  import { getPendingCount } from '../shared/sync-manager.js';
-  setTimeout(async () => {
+  // ── Native Android back button hook (Capacitor) ─────────────────────
+  setTimeout(function() {
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
-      const { App } = window.Capacitor.Plugins;
-      App.addListener('backButton', async ({ canGoBack }) => {
-        const pending = await getPendingCount();
+      var CapApp = window.Capacitor.Plugins.App;
+      CapApp.addListener('backButton', async function(ref) {
+        var canGoBack = ref.canGoBack;
+        var pending = await getPendingCount();
         if (pending > 0) {
-          if (confirm('⚠️ You have unsynced local data! Are you sure you want to exit without backing up to Drive?')) {
-            App.exitApp();
+          if (confirm('⚠️ You have unsynced local data! Exit without backing up to Drive?')) {
+            CapApp.exitApp();
           }
         } else {
-          // Normal behavior
           if (!canGoBack) {
-            App.exitApp();
+            CapApp.exitApp();
           } else {
             window.history.back();
           }
@@ -418,6 +300,9 @@
       });
     }
   }, 2000);
+
+  // ── Execute boot ────────────────────────────────────────────────────
+  window.addEventListener('load', boot);
 </script>
 
 </body>

@@ -167,13 +167,17 @@ export async function removeSyncItem(id) {
 }
 
 // ── App state ─────────────────────────────────────────────────────────────────
-export async function getAppState(appName) {
-  return dbGet(STORES.appState, appName) || {};
+export async function getAppState(key) {
+  const val = await dbGet(STORES.appState, key);
+  return (val !== null && val !== undefined) ? val : null;
 }
 
-export async function setAppState(appName, state) {
-  const current = await getAppState(appName);
-  return dbSet(STORES.appState, appName, { ...current, ...state });
+export async function setAppState(key, value) {
+  // Store value directly (supports arrays, objects, primitives, null)
+  if (value === null) {
+    return dbDelete(STORES.appState, key);
+  }
+  return dbSet(STORES.appState, key, value);
 }
 
 // ── Security Logging ──────────────────────────────────────────────────────────
