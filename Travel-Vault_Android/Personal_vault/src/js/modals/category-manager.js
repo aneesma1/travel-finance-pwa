@@ -2,10 +2,10 @@
 // ─── app-b-private-vault/js/modals/category-manager.js ───────────────────────
 // Category Manager Modal: Multi-select, Rename, Merge, Delete
 
-import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
-import { showToast, uuidv4 } from '../../../shared/utils.js';
-import { SmartInput } from '../../../shared/smart-input.js';
+import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
+import { showToast, uuidv4 } from '../../shared/utils.js';
+import { SmartInput } from '../../shared/smart-input.js';
 
 export async function openCategoryManager(containerEl) {
   const data = await getCachedFinanceData();
@@ -155,7 +155,7 @@ export async function openCategoryManager(containerEl) {
       msg += `<br/><br/><b style="color:var(--danger)">Warning:</b> ${totalUsage} transactions use these categories. They will be left blank.`;
     }
 
-    const { showConfirmModal } = await import('../../../shared/utils.js');
+    const { showConfirmModal } = await import('../../shared/utils.js');
     const ok = await showConfirmModal('Delete Categories', msg, { confirmText: 'Delete', danger: true });
     if (!ok) return;
 
@@ -187,7 +187,7 @@ export async function openCategoryManager(containerEl) {
       return;
     }
 
-    const { showInputModal, showConfirmModal } = await import('../../../shared/utils.js');
+    const { showInputModal, showConfirmModal } = await import('../../shared/utils.js');
     const target = await showInputModal('Merge Categories', `Merge ${items.length} items into:`, others[0], { suggestions: others });
     if (!target) return;
     
@@ -218,7 +218,7 @@ export async function openCategoryManager(containerEl) {
   }
 
   async function promptRename(oldName) {
-    const { showInputModal } = await import('../../../shared/utils.js');
+    const { showInputModal } = await import('../../shared/utils.js');
     const val = await showInputModal('Rename Category', 'New name for "' + oldName + '":', oldName);
     if (!val || val === oldName) return;
     

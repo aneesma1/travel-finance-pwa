@@ -4,17 +4,17 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData, clearAllCachedData, getSecurityLogs, clearSecurityLogs } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedTravelData, setCachedTravelData, clearAllCachedData, getSecurityLogs, clearSecurityLogs } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
-import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
-import { uuidv4, formatDisplayDate, showToast, toISODate, showConfirmModal, showInputModal, getAppState, setAppState } from '../../../shared/utils.js';
-import { renderImportTool } from '../../../shared/import-tool.js';
-import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
+import { getActiveSessions, getActivityLog } from '../../shared/security-log.js';
+import { uuidv4, formatDisplayDate, showToast, toISODate, showConfirmModal, showInputModal, getAppState, setAppState } from '../../shared/utils.js';
+import { renderImportTool } from '../../shared/import-tool.js';
+import { downloadRecoveryBundle, runRestoreWizard } from '../../shared/recovery.js';
 import { openPersonManage } from './person-manage.js';
-import { exitApp } from '../../../shared/app-utils.js';
-import { exportEncryptedBackup, importEncryptedBackup } from '../../../shared/backup-engine.js';
+import { exitApp } from '../../shared/app-utils.js';
+import { exportEncryptedBackup, importEncryptedBackup } from '../../shared/backup-engine.js';
 
 const MEMBER_EMOJIS = ['👤', '👨', '👩', '🧑', '👦', '👧', '🧔', '👱', '🧒'];
 const MEMBER_COLORS = ['#EEF2FF', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#E0F2FE', '#F3E8FF'];

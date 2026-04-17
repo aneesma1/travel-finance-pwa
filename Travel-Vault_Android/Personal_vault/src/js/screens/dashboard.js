@@ -7,13 +7,13 @@
 
 'use strict';
 
-import { getCachedFinanceData } from '../../../shared/db.js';
+import { getCachedFinanceData } from '../../shared/db.js';
 import { navigate } from '../router.js';
 import {
   formatAmount, currentMonth, currentYear,
   getHashParams, setHashParams, clearHashParams,
   showToast, copyToClipboard, today
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CURRENCIES = ['QAR','INR','USD'];

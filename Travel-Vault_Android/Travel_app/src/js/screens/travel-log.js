@@ -5,15 +5,15 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { openTravelExportSheet } from './travel-export.js';
 import {
   formatDisplayDate, daysBetween, today, currentYear,
   getHashParams, setHashParams,
   showToast, copyToClipboard
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 
 // Helper to extract a 4-digit year from any raw date string
 function extractYear(val) {

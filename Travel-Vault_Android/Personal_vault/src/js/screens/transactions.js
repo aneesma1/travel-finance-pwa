@@ -5,15 +5,15 @@
 
 'use strict';
 
-import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { txnRow } from './dashboard.js';
 import {
   formatAmount, currentMonth, currentYear,
   getHashParams, setHashParams, clearHashParams,
   showToast
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 
 const MONTHS    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CURRENCIES = ['QAR','INR','USD'];

@@ -5,12 +5,12 @@
 
 'use strict';
 
-import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
-import { writeData } from '../../../shared/drive.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
+import { writeData } from '../../shared/drive.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
-import { formatDisplayDate, formatAmount, showToast, showConfirmModal, showInputModal } from '../../../shared/utils.js';
-import { renderPhotoThumbnails } from '../../../shared/photo-picker.js';
+import { formatDisplayDate, formatAmount, showToast, showConfirmModal, showInputModal } from '../../shared/utils.js';
+import { renderPhotoThumbnails } from '../../shared/photo-picker.js';
 
 export async function renderTransactionView(container, params = {}) {
   const { txnId } = params;
@@ -105,7 +105,7 @@ export async function renderTransactionView(container, params = {}) {
   if (t.photos?.filter(Boolean).length) {
     const photoContainer = document.getElementById('txn-view-photos');
     if (photoContainer) {
-      const { renderPhotoThumbnails } = await import('../../../shared/photo-picker.js');
+      const { renderPhotoThumbnails } = await import('../../shared/photo-picker.js');
       renderPhotoThumbnails(photoContainer, t.photos);
     }
   }

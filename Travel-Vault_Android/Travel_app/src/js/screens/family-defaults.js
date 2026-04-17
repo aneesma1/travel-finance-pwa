@@ -6,15 +6,15 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
-import { uuidv4, showToast, copyToClipboard } from '../../../shared/utils.js';
+import { uuidv4, showToast, copyToClipboard } from '../../shared/utils.js';
 import {
   RELATIONS, addRelation, removeRelation, getMemberRelations,
   resolveReverse, buildRelationEmergencyContacts, layoutFamilyTree
 } from '../relation-engine.js';
-import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
+import { renderPhotoSlots, renderPhotoThumbnails } from '../../shared/photo-picker.js';
 
 const RELATIONSHIPS_EC = ['Spouse','Father','Mother','Brother','Sister','Son','Daughter','Friend','Doctor','Colleague','Other'];
 

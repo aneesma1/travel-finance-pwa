@@ -5,9 +5,9 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
-import { showToast } from '../../../shared/utils.js';
+import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
+import { showToast } from '../../shared/utils.js';
 
 // ── Levenshtein distance for duplicate detection ─────────────────────────────
 function levenshtein(a, b) {

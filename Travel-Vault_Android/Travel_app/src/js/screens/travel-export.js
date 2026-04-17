@@ -6,8 +6,8 @@
 
 'use strict';
 
-import { timestampSuffix } from '../../../shared/drive.js';
-import { copyToClipboard, showToast, formatDisplayDate, daysBetween, today } from '../../../shared/utils.js';
+import { timestampSuffix } from '../../shared/drive.js';
+import { copyToClipboard, showToast, formatDisplayDate, daysBetween, today } from '../../shared/utils.js';
 
 // ── Entry point -- opens the export bottom sheet ───────────────────────────────
 export function openTravelExportSheet(persons, trips, documents) {

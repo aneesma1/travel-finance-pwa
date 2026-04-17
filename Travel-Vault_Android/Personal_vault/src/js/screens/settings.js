@@ -5,26 +5,26 @@
 
 'use strict';
 
-import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '../../../shared/db.js';
-import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
-import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
+import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '../../shared/db.js';
+import { getActiveSessions, getActivityLog } from '../../shared/security-log.js';
+import { openSecurityDashboard } from '../../shared/security-dashboard.js';
 import {
   currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard,
   showConfirmModal, getAppState, setAppState
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 import {
   downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
   getMirrorSnapshots, restoreFromMirror
-} from '../../../shared/drive.js';
-import { getSecurityLogs, clearSecurityLogs } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+} from '../../shared/drive.js';
+import { getSecurityLogs, clearSecurityLogs } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
-import { renderImportTool } from '../../../shared/import-tool.js';
+import { renderImportTool } from '../../shared/import-tool.js';
 import { openCategoryManager } from '../modals/category-manager.js';
-import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
-import { exportEncryptedBackup, importEncryptedBackup } from '../../../shared/backup-engine.js';
-import { exitApp } from '../../../shared/app-utils.js';
+import { downloadRecoveryBundle, runRestoreWizard } from '../../shared/recovery.js';
+import { exportEncryptedBackup, importEncryptedBackup } from '../../shared/backup-engine.js';
+import { exitApp } from '../../shared/app-utils.js';
 
 const CACHE_NAME = 'vault v4.11.0';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

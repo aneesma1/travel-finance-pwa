@@ -6,11 +6,11 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
-import { uuidv4, showToast, copyToClipboard, today, daysFromToday, expiryStatus, expiryStatusColor } from '../../../shared/utils.js';
-import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
+import { uuidv4, showToast, copyToClipboard, today, daysFromToday, expiryStatus, expiryStatusColor } from '../../shared/utils.js';
+import { renderPhotoSlots, renderPhotoThumbnails } from '../../shared/photo-picker.js';
 
 const BLOOD_GROUPS    = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
 const RELATIONSHIPS   = ['Spouse','Father','Mother','Brother','Sister','Son','Daughter','Friend','Doctor','Colleague','Other'];
@@ -1231,7 +1231,7 @@ export async function renderPersonProfile(container, params = {}) {
 
   // ── Share profile as WhatsApp text ──────────────────────────────────────────
   async function shareProfileText() {
-    const data2 = await import('../../../shared/db.js').then(m => m.getCachedTravelData());
+    const data2 = await import('../../shared/db.js').then(m => m.getCachedTravelData());
     const docs = (data2?.documents || []).filter(d => d.personId === draft.id);
     const trips = (data2?.trips || []).filter(t => t.personId === draft.id);
     const totalDays = trips.reduce((s, t) => s + (t.daysInQatar || 0), 0);
@@ -1283,7 +1283,7 @@ export async function renderPersonProfile(container, params = {}) {
     lines.push('_Shared from Family Hub_');
 
     const text = lines.join('\n');
-    const { copyToClipboard } = await import('../../../shared/utils.js');
+    const { copyToClipboard } = await import('../../shared/utils.js');
     showTextShareSheet(text, draft.name + ' Profile');
   }
 

@@ -5,13 +5,13 @@
 
 'use strict';
 
-import { getCachedTravelData } from '../../../shared/db.js';
+import { getCachedTravelData } from '../../shared/db.js';
 import { navigate } from '../router.js';
-import { renderPhotoThumbnails } from '../../../shared/photo-picker.js';
+import { renderPhotoThumbnails } from '../../shared/photo-picker.js';
 import {
   daysFromToday, formatDisplayDate,
   expiryStatus, expiryStatusColor, expiryLifePercent
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 
 export async function renderDocuments(container) {
   container.innerHTML = `

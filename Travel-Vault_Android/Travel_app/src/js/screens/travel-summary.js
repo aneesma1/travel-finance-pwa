@@ -8,7 +8,7 @@
 import { 
   formatDisplayDate, daysBetween, copyToClipboard, showToast,
   today
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 
 export function renderTravelSummarySheet(uniquePassengers, trips, defaultYear, defaultPassenger) {
   let sheet = document.getElementById('travel-summary-sheet');

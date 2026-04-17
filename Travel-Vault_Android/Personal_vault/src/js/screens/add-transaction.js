@@ -5,13 +5,13 @@
 
 'use strict';
 
-import { getCachedFinanceData, setCachedFinanceData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
-import { PillSelect }  from '../../../shared/pill-select.js';
-import { renderPhotoSlots } from '../../../shared/photo-picker.js';
-import { SmartInput }  from '../../../shared/smart-input.js';
-import { uuidv4, today, showToast, formatAmount, showConfirmModal, showInputModal } from '../../../shared/utils.js';
+import { PillSelect }  from '../../shared/pill-select.js';
+import { renderPhotoSlots } from '../../shared/photo-picker.js';
+import { SmartInput }  from '../../shared/smart-input.js';
+import { uuidv4, today, showToast, formatAmount, showConfirmModal, showInputModal } from '../../shared/utils.js';
 
 export async function renderAddTransaction(container, params = {}) {
   const { txnId, mode } = params;

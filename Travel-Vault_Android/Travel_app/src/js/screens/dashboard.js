@@ -6,14 +6,14 @@
 
 'use strict';
 
-import { getCachedTravelData } from '../../../shared/db.js';
+import { getCachedTravelData } from '../../shared/db.js';
 import { navigate } from '../router.js';
 import {
   formatDisplayDate, daysFromToday, daysBetween,
   expiryStatus, expiryStatusColor, today,
   getHashParams, setHashParams, clearHashParams,
   showToast, copyToClipboard
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 import { buildFamilyGroups, getMemberRelations } from '../relation-engine.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -183,3 +183,27 @@ This document tracks coding activity strictly for the `Travel-Vault_Android` dir
 **Blueprint V2 Compliance Audit:** 52/52 checks PASSED.
 
 **Expected Result:** Next build → `TravelHub_v5.5.0_b{N}.apk` + `PersonalVault_v5.5.0_b{N}.apk`
+
+---
+
+### Session 7: Native Asset Resolution Fix (2026-04-17)
+**Context:** Both apps were crashing on Android due to `SyntaxError` and "missing export" errors for `db.js` and `pin.js`.
+
+**Root Cause:** The `shared/` utility folder was located outside of the `src/` web root. While this works in a standard PWA, Capacitor only serves assets within the `webDir` (`src`). This caused imports like `./shared/db.js` to return 404/index.html instead of the JavaScript module.
+
+**Work Completed:**
+- **Directory Restructuring**: Moved the `shared` module into the web root for both applications.
+  - `Personal_vault/shared/` → `Personal_vault/src/shared/`
+  - `Travel_app/shared/` → `Travel_app/src/shared/`
+- **Import Path Audit**: Recursively updated all JavaScript screens to point to the new relative path.
+  - Changed `../../../shared/` to `../../shared/` across all `src/js/screens/*.js` and `src/js/modals/*.js`.
+- **Version Bump**: Incremented both app versions to `5.5.1`.
+
+**Files Changed (30+):**
+- `Personal_vault/shared` (MOVED)
+- `Travel_app/shared` (MOVED)
+- `Personal_vault/VERSION` (5.5.1)
+- `Travel_app/VERSION` (5.5.1)
+- Multiple JS files in `src/js/` (import updates).
+
+**Expected Result:** APK build #24+ will successfully boot and resolve all internal module exports.

@@ -5,17 +5,17 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
-import { PillSelect }  from '../../../shared/pill-select.js';
-import { SmartInput }  from '../../../shared/smart-input.js';
-import { MultiSmartInput } from '../../../shared/multi-smart-input.js';
+import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
+import { PillSelect }  from '../../shared/pill-select.js';
+import { SmartInput }  from '../../shared/smart-input.js';
+import { MultiSmartInput } from '../../shared/multi-smart-input.js';
 import {
   uuidv4, today, toISODate, daysBetween, formatDisplayDate, showToast,
   showConfirmModal, showInputModal
-} from '../../../shared/utils.js';
+} from '../../shared/utils.js';
 import { navigate } from '../router.js';
-import { renderPhotoSlots, renderPhotoThumbnails } from '../../../shared/photo-picker.js';
+import { renderPhotoSlots, renderPhotoThumbnails } from '../../shared/photo-picker.js';
 
 const STEPS = ['Passenger', 'Dates', 'Flights', 'Reason', 'Photos', 'Review'];
 
@@ -147,7 +147,7 @@ export async function renderAddTrip(container, params = {}) {
     if (navigator.share) {
       await navigator.share({ title: `Travel Details - ${member?.name}`, text }).catch(() => {});
     } else {
-      const { copyToClipboard } = await import('../../../shared/utils.js');
+      const { copyToClipboard } = await import('../../shared/utils.js');
       const ok = await copyToClipboard(text);
       showToast(ok ? 'Details copied to clipboard!' : 'Failed to copy', ok ? 'success' : 'error');
     }

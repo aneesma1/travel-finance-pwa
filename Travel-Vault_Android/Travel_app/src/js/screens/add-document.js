@@ -5,13 +5,13 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../../shared/db.js';
-import { localSave } from '../../../shared/sync-manager.js';
+import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
+import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
-import { PillSelect } from '../../../shared/pill-select.js';
-import { renderPhotoSlots } from '../../../shared/photo-picker.js';
-import { SmartInput } from '../../../shared/smart-input.js';
-import { uuidv4, today, daysFromToday, expiryStatus, showToast } from '../../../shared/utils.js';
+import { PillSelect } from '../../shared/pill-select.js';
+import { renderPhotoSlots } from '../../shared/photo-picker.js';
+import { SmartInput } from '../../shared/smart-input.js';
+import { uuidv4, today, daysFromToday, expiryStatus, showToast } from '../../shared/utils.js';
 import { syncDocumentAlerts, deleteAllDocumentAlerts } from '../calendar.js';
 
 const DOC_TYPES_DEFAULT = ['Passport','QID','Visa','Driving Licence'];
