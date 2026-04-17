@@ -198,6 +198,7 @@ This document tracks coding activity strictly for the `Travel-Vault_Android` dir
 - **Import Path Audit**: Recursively updated all JavaScript screens to point to the new relative path.
   - Changed `../../../shared/` to `../../shared/` across all `src/js/screens/*.js` and `src/js/modals/*.js`.
 - **Version Bump**: Incremented both app versions to `5.5.1`.
+- **CI/CD Pipeline Fix**: Updated `.github/workflows/` to remove the obsolete `cp shared src/shared` step, as files are now checked into Git in their correct final locations.
 
 **Files Changed (30+):**
 - `Personal_vault/shared` (MOVED)

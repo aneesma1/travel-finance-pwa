@@ -38,9 +38,7 @@ jobs:
         working-directory: Travel-Vault_Android/Personal_vault
         run: |
           npm install
-          # Capacitor only bundles webDir (src/). Copy shared/ in so imports resolve.
-          rm -rf src/shared
-          cp -r shared src/shared
+          # Capacitor only bundles webDir (src/).
           
           # Verify shared folder is not empty
           if [ ! -f src/shared/sync-manager.js ]; then
