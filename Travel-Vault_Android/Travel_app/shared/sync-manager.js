@@ -72,7 +72,10 @@ async function localSave(appName, mergeFn) {
   if (appName === 'travel') await setCachedTravelData(merged);
   else await setCachedFinanceData(merged);
 
-  // ② Add to drive sync queue
+  // ② Write a daily local device backup + prune old backups (instant, no background)
+  try { await writeAndPruneLocalBackup(appName, merged); } catch (e) { /* non-blocking */ }
+
+  // ③ Add to drive sync queue
   var op = {
     id:           uuidv4(),
     appName:      appName,
@@ -85,10 +88,61 @@ async function localSave(appName, mergeFn) {
 
   broadcastStatus('pending', _queue.filter(function(q){ return q.status === 'pending'; }).length + ' pending');
 
-  // ③ Background sync is DISABLED in Android Native. User MUST sync manually.
+  // ④ Background sync is DISABLED in Android Native. User MUST sync manually.
 
   return merged;
 }
+
+// ── Instant Local Backup + 15-Day Prune ──────────────────────────────────────
+// Fires synchronously inside localSave(). Zero background processes, zero battery drain.
+// Uses Capacitor Filesystem if available; silently skips on Web/PWA.
+async function writeAndPruneLocalBackup(appName, data) {
+  if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.Filesystem) return;
+
+  var Filesystem = window.Capacitor.Plugins.Filesystem;
+  var dir = 'DOCUMENTS'; // Android: /storage/emulated/0/Documents/
+  var prefix = appName === 'travel' ? 'TravelHub_Backup_' : 'Vault_Backup_';
+  var ext = appName === 'travel' ? '.travelbox' : '.vaultbox';
+
+  // Write today's backup (unencrypted JSON, one file per day)
+  var today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  var fileName = prefix + today + ext;
+
+  await Filesystem.writeFile({
+    path: fileName,
+    data: JSON.stringify(data),
+    directory: dir,
+    encoding: 'utf8',
+    recursive: true
+  });
+
+  // Prune any backup files older than 15 days
+  var cutoffMs = 15 * 24 * 60 * 60 * 1000;
+  var now = Date.now();
+
+  try {
+    var listResult = await Filesystem.readdir({ path: '', directory: dir });
+    var files = (listResult.files || []);
+
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      var name = f.name || f; // Capacitor returns object or string depending on version
+      if (typeof name !== 'string' || !name.startsWith(prefix) || !name.endsWith(ext)) continue;
+
+      // Extract date from filename: PREFIX_YYYY-MM-DD.ext
+      var datePart = name.replace(prefix, '').replace(ext, '');
+      var fileDate = new Date(datePart).getTime();
+      if (isNaN(fileDate)) continue;
+
+      if (now - fileDate > cutoffMs) {
+        try {
+          await Filesystem.deleteFile({ path: name, directory: dir });
+        } catch (delErr) { /* non-blocking */ }
+      }
+    }
+  } catch (listErr) { /* non-blocking -- directory may not exist yet */ }
+}
+
 
 // ── Sequential Drive queue processor ─────────────────────────────────────────
 async function processDriveQueue() {

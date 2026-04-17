@@ -5,20 +5,16 @@
 'use strict';
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData, getSecurityLogs, clearSecurityLogs } from '../../../shared/db.js';
-import { downloadLocalBackup, restoreFromLocalFile, getMirrorSnapshots, restoreFromMirror, writeData, getBackupHealthReport, purgeOrphanedFiles } from '../../../shared/drive.js';
-import { localSave, clearDriveQueue } from '../../../shared/sync-manager.js';
-import { clearAuth, getUser, isAuthenticated, startOAuthFlow } from '../../../shared/auth.js';
+import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
-import { uuidv4, formatDisplayDate, showToast, isOnline, toISODate, showConfirmModal, showInputModal, getAppState, setAppState } from '../../../shared/utils.js';
-import { authFetch } from '../../../shared/auth.js';
+import { uuidv4, formatDisplayDate, showToast, toISODate, showConfirmModal, showInputModal, getAppState, setAppState } from '../../../shared/utils.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
 import { openPersonManage } from './person-manage.js';
 import { exitApp } from '../../../shared/app-utils.js';
-import { CLIENT_ID, REDIRECT_URI } from '../auth-config.js';
-import { findSharedDatabases, connectSharedDatabase } from '../../../shared/drive.js';
+import { exportEncryptedBackup, importEncryptedBackup } from '../../../shared/backup-engine.js';
 
 const MEMBER_EMOJIS = ['👤', '👨', '👩', '🧑', '👦', '👧', '🧔', '👱', '🧒'];
 const MEMBER_COLORS = ['#EEF2FF', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#E0F2FE', '#F3E8FF'];
@@ -28,9 +24,8 @@ export async function renderSettings(container, params = {}) {
   const { tab: activeTab = 'people' } = params;
   const data = await getCachedTravelData();
   const { members = [] } = data || {};
-  const user = getUser();
 
-  const tabs = ['people', 'data', 'security', 'account'];
+  const tabs = ['people', 'data', 'account'];
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">⚙️ Settings</span>
@@ -43,7 +38,7 @@ export async function renderSettings(container, params = {}) {
             color:${activeTab === id ? 'var(--primary)' : 'var(--text-muted)'};
             border-bottom:2px solid ${activeTab === id ? 'var(--primary)' : 'transparent'};
             transition:all 0.15s;">
-          ${id === 'people' ? '👥 People' : id === 'data' ? '💾 Data' : id === 'security' ? '🔐 Security' : '👤 Account'}
+          ${id === 'people' ? '👥 People' : id === 'data' ? '💾 Data' : '👤 Account'}
         </button>`).join('')}
     </div>
     <div id="tab-content" style="padding-bottom:32px;"></div>
@@ -61,10 +56,9 @@ export async function renderSettings(container, params = {}) {
     btn.addEventListener('click', () => renderSettings(container, { tab: btn.dataset.tab }));
   });
 
-  if (activeTab === 'people') renderPeopleTab(container, data, members, user);
+  if (activeTab === 'people') renderPeopleTab(container, data, members, null);
   else if (activeTab === 'data') renderDataTab(data, members, container);
-  else if (activeTab === 'security') renderSecurityTab();
-  else if (activeTab === 'account') renderAccountTab(data, members, user, container);
+  else if (activeTab === 'account') renderAccountTab(data, members, null, container);
 }
 
 // ── PEOPLE TAB ────────────────────────────────────────────────────────────────
@@ -191,24 +185,9 @@ function renderDataTab(data, members, container) {
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Restore from Local Backup</div><div style="font-size:12px;color:var(--text-muted);">Pick a downloaded backup file</div></div>
         <span style="color:var(--text-muted);">›</span>
       </div>
-      <div class="list-row" id="restore-mirror-btn">
-        <span style="font-size:20px;">☁️</span>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Restore from Drive Mirror</div><div style="font-size:12px;color:var(--text-muted);">Choose from last 3 snapshots</div></div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-      <div class="list-row" id="import-btn">
-        <span style="font-size:20px;">📥</span>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Import from Excel / CSV</div><div style="font-size:12px;color:var(--text-muted);">Migrate existing travel data</div></div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-      <div class="list-row" id="photo-zip-btn">
+      <div class="list-row" id="photo-zip-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
         <span style="font-size:20px;">📦</span>
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Export All Photos as ZIP</div><div style="font-size:12px;color:var(--text-muted);">Document scans, address photos</div></div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-      <div class="list-row" id="clear-cache-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
-        <span style="font-size:20px;">🗑️</span>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Clear Local Cache</div><div style="font-size:12px;color:var(--text-muted);">Force fresh re-download from Drive</div></div>
         <span style="color:var(--text-muted);">›</span>
       </div>
     </div>
@@ -252,32 +231,8 @@ function renderDataTab(data, members, container) {
     } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
   });
 
-  document.getElementById('restore-mirror-btn').addEventListener('click', async () => {
-    if (!isOnline()) { showToast('Internet required', 'warning'); return; }
-    try {
-      const snaps = await getMirrorSnapshots('travel');
-      if (!snaps.length) { showToast('No snapshots found', 'warning'); return; }
-      showMirrorModal(snaps);
-    } catch { showToast('Could not load snapshots', 'error'); }
-  });
+  // Redundant online button links removed
 
-  document.getElementById('import-btn').addEventListener('click', async () => {
-    const freshData = await getCachedTravelData();
-    const freshPersons = freshData?.travelPersons || [];
-    openImportModal(freshData, freshPersons);
-  });
-
-  document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
-    showToast('Scanning & Purging…', 'info');
-    try {
-      const { purgeOrphanedFiles } = await import('../../shared/drive.js');
-      const count = await purgeOrphanedFiles('travel', data);
-      showToast(`Cleaned ${count} orphaned files`, 'success');
-    } catch (err) {
-      showToast('Purge failed: ' + err.message, 'error');
-    }
-  });
 
   document.getElementById('photo-zip-btn').addEventListener('click', async () => {
     try {
@@ -349,31 +304,10 @@ function renderDataTab(data, members, container) {
         appInfo: { version: 'v4.14.0', lastReset: new Date().toISOString() }
       };
 
-      const fileId = localStorage.getItem('drive_travel_file_id');
-      if (isOnline() && fileId) {
-        // 1. Wipe Cloud Sync Queue (the primary cause of data reappearing)
-        await clearDriveQueue();
-
-        // 2. Wipe main Drive data file
-        await authFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(emptySet, null, 2)
-        });
-      }
-
-      // 3. Wipe local IndexedDB entirely
+      // Removed cloud reset queues, just doing local clear
       await clearAllCachedData();
-
-      // 4. Wipe Service Worker & Cache
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const reg of registrations) await reg.unregister();
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-      }
-
-      // 5. Final Clear-All of LocalStorage (removes file IDs, forcing re-init)
+      
+      // Clear native caches
       localStorage.clear();
       sessionStorage.clear();
 
@@ -388,286 +322,70 @@ function renderDataTab(data, members, container) {
 
 }
 
-// ── SECURITY TAB ──────────────────────────────────────────────────────────────
-function renderSecurityTab() {
-  const tab = document.getElementById('tab-content');
-  tab.innerHTML = `
-    <div class="section-title">Security Dashboard</div>
-    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
-      <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg);">
-        <span style="font-size:20px;">🛡️</span>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;">Security &amp; Access</div>
-          <div style="font-size:12px;color:var(--text-muted);">Sessions · Activity log · Revoke access</div>
-        </div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-    </div>
-    <div class="section-title" style="margin-top:16px;">Session</div>
-    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
-      <div class="list-row" id="safe-exit-btn" style="border-radius:var(--radius-lg);">
-        <span style="font-size:20px;">🚪</span>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;">Save &amp; Exit</div>
-          <div style="font-size:12px;color:var(--text-muted);">Sync data then close cleanly</div>
-        </div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-    </div>
-    </div>`;
+// Security tab removed in favour of complete local architecture.
 
-  document.getElementById('security-dashboard-btn').addEventListener('click', async () => {
-    const modal = document.getElementById('member-modal');
-    modal.classList.remove('hidden');
-    modal.innerHTML = '<div class="modal-sheet" style="max-height:90vh;">' +
-      '<div class="modal-handle"></div>' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;">' +
-      '<span style="font-size:16px;font-weight:700;">🛡️ Security</span>' +
-      '<button id="close-sec" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>' +
-      '</div>' +
-      '<div id="security-content" style="overflow-y:auto;max-height:70vh;padding:0 20px 24px;">' +
-      '<div style="font-size:13px;color:var(--text-muted);">Loading…</div>' +
-      '</div></div>';
-    document.getElementById('close-sec').addEventListener('click', () => modal.classList.add('hidden'));
-    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
-    const [sessions, log] = await Promise.all([
-      getActiveSessions().catch(() => []),
-      getActivityLog(30).catch(() => [])
-    ]);
-    const sc = document.getElementById('security-content');
-    if (!sc) return;
-    const ri = r => r === 'high' ? '🔴' : r === 'medium' ? '🟠' : r === 'low' ? '🟡' : '🟢';
-    sc.innerHTML =
-      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Sessions (' + sessions.length + ')</div>' +
-      (sessions.length ? sessions.map(s =>
-        '<div style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;">' +
-        '<div style="font-size:13px;font-weight:600;">' + s.userEmail + '</div>' +
-        '<div style="font-size:12px;color:var(--text-muted);">' + s.device + ' · ' + new Date(s.lastActive).toLocaleString() + '</div></div>'
-      ).join('') : '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No active sessions logged</div>') +
-      '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;">Activity Log (last 30)</div>' +
-      (log.length ? log.map(e =>
-        '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light);">' +
-        '<span>' + ri(e.risk) + '</span><div><div style="font-size:13px;font-weight:500;">' + e.action + '</div>' +
-        '<div style="font-size:11px;color:var(--text-muted);">' + e.detail + ' · ' + new Date(e.time).toLocaleString() + '</div></div></div>'
-      ).join('') : '<div style="font-size:13px;color:var(--text-muted);">No activity logged yet</div>');
-  });
-
-  document.getElementById('safe-exit-btn').addEventListener('click', async () => {
-    showToast('Syncing before exit…', 'info', 2000);
-    await new Promise(r => setTimeout(r, 1500));
-    await exitApp();
-  });
-
-
-}
 
 // ── ACCOUNT TAB ───────────────────────────────────────────────────────────────
 function renderAccountTab(data, members, user, container) {
   const tab = document.getElementById('tab-content');
   tab.innerHTML = `
-    <div class="section-title">Signed In As</div>
+    <div class="section-title">Account</div>
     <div class="card" style="margin:0 16px;">
-      <div class="card-body" style="display:flex;align-items:center;gap:12px;">
-        ${user?.picture
-      ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />`
-      : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name || (isAuthenticated() ? 'Signed in' : 'Guest User')}</div>
-          <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email || (isAuthenticated() ? '' : 'Local-only mode')}</div>
-        </div>
-      </div>
-      <div class="divider"></div>
       <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
-        ${!isAuthenticated() ? `
-          <button class="btn btn-primary btn-full" id="signin-google-btn" style="margin-bottom:10px;">👤 Sign in to Google Drive</button>
-          <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:0 8px;">
-             Enable Cloud Sync and Family Sharing by signing in.
-          </div>
-        ` : `
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <span style="font-size:13px;color:var(--text-secondary);">Drive sync</span>
-            <span style="font-size:13px;font-weight:600;color:${isOnline() ? 'var(--success)' : 'var(--warning)'};">${isOnline() ? '● Online' : '● Offline'}</span>
-          </div>
-          ${data?.lastSync ? `<div style="font-size:11px;color:var(--text-muted);">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>` : ''}
-          <button class="btn btn-primary btn-full" style="margin-top:16px; margin-bottom:10px;" id="account-exit-btn">💾 Save & Exit App</button>
-          <button class="btn btn-secondary btn-full" id="signout-btn">Sign out of Google</button>
-          
-          <div style="border-top:1px dashed var(--border); margin:16px 0;"></div>
-          
-          <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--primary);">👨‍👩‍👧 Family Sharing</div>
-          <button class="btn btn-secondary btn-full" id="find-shared-btn">🔗 Connect Shared Family Hub</button>
-          <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
-             Search for databases shared with you by other members.
-          </div>
-        `}
+        <div style="font-size:14px; font-weight:700; text-align:center;">Local-First Edition</div>
+        <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:8px;">
+           Your data is securely stored directly on this device.
+        </div>
+        <button class="btn btn-primary btn-full" style="margin-top:8px; margin-bottom:10px;" id="account-exit-btn">💾 Save & Exit App</button>
+        
+        <div style="border-top:1px dashed var(--border); margin:16px 0;"></div>
+        
+        <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--primary);">👨‍👩‍👧 Encrypted Backup Sharing</div>
+        <button class="btn btn-secondary btn-full" id="export-vaultbox-btn">📤 Export Encrypted Travelbox</button>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
+           Generate a secure, password-protected file to share via WhatsApp.
+        </div>
+        
+        <button class="btn btn-secondary btn-full" id="import-vaultbox-btn" style="margin-top:12px; border-style: dashed;">📥 Import Travelbox File</button>
       </div>
     </div>
     <div class="section-title" style="margin-top:16px;">App Info</div>
     <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
       <div class="card-body" style="font-size:12px;color:var(--text-muted);display:flex;flex-direction:column;gap:4px;">
-      <div>Version: ${window.APP_VERSION || 'v5.4.1'}</div>
-      <div>Build: ${window.BUILD_TIME || 'Personal Build'}</div>
-      <div>Platform: Native Android (Capacitor)</div>
+      <div>Version: ${window.APP_VERSION || 'v5.5.0'}</div>
+      <div>Build: ${window.BUILD_TIME || 'Offline Build'}</div>
+      <div>Platform: Native Android</div>
     </div>
 Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data?.documents?.length || 0}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: ${isAdmin() ? '👑 Admin' : '👁 Viewer'} · ${user?.email || 'Not signed in'}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Role: Device Owner</div>
       
-
-        
-        <div style="margin-top:20px; display:flex; gap:12px;">
-          <button id="local-backup-btn" class="btn btn-secondary" style="flex:1;">JSON Backup</button>
-          <button id="local-restore-btn" class="btn btn-secondary" style="flex:1;">Verify & Restore</button>
-        </div>
-        
         <div style="margin-top:12px; display:flex; gap:10px;">
-          <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
-          <button id="backup-health-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">📊 Backup Health</button>
-        </div>
-        <div style="margin-top:12px;">
-          <button id="security-audit-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px;">🛡️ Drive Security Audit</button>
-        </div>
-        <div style="margin-top:12px;">
-          <button id="standalone-deep-clean-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px; color:var(--primary); border-color:var(--primary);">🧹 Drive Deep Clean</button>
+          <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Verify & Repair Data</button>
         </div>
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
-          Maintenance: Repairs records & verifies Drive backup compliance.
+          Maintenance: Removes duplicates and ensures data integrity.
         </div>
       </div>
-
-
     </div>`;
 
   // --- Account Tab Listeners ---
-  document.getElementById('signin-google-btn')?.addEventListener('click', () => {
-    startOAuthFlow(CLIENT_ID, REDIRECT_URI);
+  document.getElementById('account-exit-btn')?.addEventListener('click', async () => {
+    showToast('Saving & exiting…', 'info', 1500);
+    await new Promise(r => setTimeout(r, 1000));
+    await exitApp();
   });
 
-  document.getElementById('signout-btn')?.addEventListener('click', () => {
-    if (confirm('Sign out? You will need to re-authenticate to sync data.')) {
-      clearAuth();
-      window.location.reload();
-    }
+  document.getElementById('export-vaultbox-btn')?.addEventListener('click', async () => {
+    const data = await getCachedTravelData();
+    exportEncryptedBackup('travel', data);
   });
 
-  document.getElementById('find-shared-btn')?.addEventListener('click', async () => {
-    try {
-      showToast('Searching for shared hubs…', 'info');
-      const files = await findSharedDatabases('travel');
-      if (!files.length) {
-        showToast('No shared hubs found. Ensure your family has shared the file with you.', 'warning', 6000);
-        return;
-      }
-
-      const choices = files.map(f => ({
-        id: f.id,
-        label: `${f.name} (Shared by ${f.owners[0].displayName})`
-      }));
-
-      const result = await showConfirmModal('🔗 Shared Hubs Found', `
-        <div style="font-size:13px; margin-bottom:12px;">The following databases were found. Choose one to connect:</div>
-        ${choices.map((c, i) => `
-          <button class="list-row shared-choice" data-id="${c.id}" style="width:100%; text-align:left; border-radius:var(--radius-md); margin-bottom:8px; border:1px solid var(--border);">
-             <div style="flex:1;">
-               <div style="font-size:14px; font-weight:600;">${c.label}</div>
-             </div>
-             <span style="color:var(--primary); font-weight:700;">Connect</span>
-          </button>
-        `).join('')}
-      `, { confirmText: '', cancelText: 'Cancel' });
-
-      document.querySelectorAll('.shared-choice').forEach(btn => {
-        btn.onclick = async () => {
-          const id = btn.dataset.id;
-          const name = btn.querySelector('div div').textContent;
-          if (confirm(`Switch to shared database: ${name}?\n\nThis will replace your current hub data.`)) {
-            await connectSharedDatabase('travel', id);
-          }
-        };
-      });
-    } catch (err) {
-      showToast('Search failed: ' + err.message, 'error');
-    }
-  });
-  document.getElementById('local-backup-btn')?.addEventListener('click', () => downloadLocalBackup('travel', data));
-  document.getElementById('local-restore-btn')?.addEventListener('click', () => document.getElementById('restore-file-input').click());
-  document.getElementById('restore-file-input')?.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const restored = await restoreFromLocalFile(file);
-      await setCachedTravelData(restored);
-      showToast('Restore successful!', 'success');
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
-  });
-
-  document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
-    showToast('Scanning & Purging…', 'info');
-    try {
-      const { purgeOrphanedFiles } = await import('../../shared/drive.js');
-      const count = await purgeOrphanedFiles('travel', data);
-      showToast(`Cleaned ${count} orphaned files`, 'success');
-    } catch (err) {
-      showToast('Purge failed: ' + err.message, 'error');
-    }
-  });
-
-  document.getElementById('security-audit-btn')?.addEventListener('click', async () => {
-    const logs = await getSecurityLogs();
-    if (!logs || logs.length === 0) {
-      showToast('✅ No security incidents recorded.', 'success');
-      return;
-    }
-
-    const logHtml = `
-      <div style="font-size:12px; max-height:300px; overflow-y:auto;">
-        ${logs.reverse().map(l => `
-          <div style="padding:10px; border-bottom:1px solid var(--border-light); background:rgba(255,0,0,0.05); margin-bottom:5px; border-radius:4px;">
-            <b style="color:var(--danger);">${l.action} Blocked</b><br/>
-            <span style="opacity:0.7;">${new Date(l.timestamp).toLocaleString()}</span><br/>
-            <code style="display:block; margin-top:4px; font-size:10px; word-break:break-all;">Target: ${l.targetId || l.url}</code>
-            <div style="font-size:10px; margin-top:4px; color:var(--danger);">Reason: ${l.reason}</div>
-          </div>
-        `).join('')}
-      </div>
-      <button id="clear-security-logs" class="btn btn-secondary" style="width:100%; margin-top:10px; color:var(--text-secondary); border-color:var(--border);">Clear Security Log</button>
-      
-      <div style="margin:16px 0; border-top:1px solid var(--border-light); opacity:0.3;"></div>
-      
-      <div style="padding:16px; background:rgba(var(--primary-rgb), 0.05); border:1px dashed var(--primary); border-radius:12px;">
-        <div style="font-weight:700; color:var(--primary); margin-bottom:4px; font-size:13px;">🛡️ Drive Scrubber (Deep Clean)</div>
-        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px;">
-          Identify and delete orphaned session files in your Google Drive folder for trips you have deleted.
-        </div>
-        <button id="sec-purge-btn" class="btn btn-primary" style="width:100%; border-radius:8px; font-size:12px;">
-          🗑️ Purge Orphaned Files
-        </button>
-      </div>
-    `;
-
-    await showConfirmModal('🛡️ Drive Security Audit', logHtml, { confirmText: 'Done', cancelText: '' });
-    
-    document.getElementById('sec-purge-btn')?.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Drive? This will trash both root clutter and backup files for deleted trips.')) return;
-      showToast('Scanning & Purging…', 'info');
-      const { purgeOrphanedFiles } = await import('../../../shared/drive.js');
-      const count = await purgeOrphanedFiles('travel', data);
-      showToast(`Cleaned ${count} orphaned files`, 'success');
-      document.querySelector('.modal-overlay')?.remove();
-      document.getElementById('security-audit-btn').click();
-    });
-    document.getElementById('clear-security-logs')?.addEventListener('click', async () => {
-      if (confirm('Clear all security audit records?')) {
-        await clearSecurityLogs();
-        showToast('Audit log cleared.', 'success');
-        document.querySelector('.modal-overlay').remove();
-      }
-    });
+  document.getElementById('import-vaultbox-btn')?.addEventListener('click', () => {
+    importEncryptedBackup('travel');
   });
 
   document.getElementById('repair-data-btn')?.addEventListener('click', async () => {
-    const ok = await showConfirmModal('🔍 Scan & Repair Data?', 'This tool will:\n1. Merge exact duplicate entries\n2. Create missing travel records for companions\n\nThis will permanently update your data.', {
+    const ok = await showConfirmModal('🔍 Scan & Repair Data?', 'This tool will:\n1. Merge exact duplicate trip entries\n2. Create missing travel records for companions\n\nThis will permanently update your data.', {
       confirmText: 'Run Health Check'
     });
     if (!ok) return;
@@ -689,162 +407,59 @@ Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data
           const key = `${t.passengerId || t.passengerName}|${d}|${t.destinationCountry}`;
           if (seen.has(key)) {
             mergedCount++;
-            // If the duplicate has photos but the original doesn't, keep the one with photos
             const original = nonDupes.find(x => `${x.passengerId || x.passengerName}|${toISODate(x.dateLeftOrigin || x.dateArrivedDest)}|${x.destinationCountry}` === key);
             if (original && (!original.photos?.length && t.photos?.length)) {
-              const idx = nonDupes.indexOf(original);
-              nonDupes[idx] = t;
+              nonDupes[nonDupes.indexOf(original)] = t;
             }
           } else {
             seen.add(key);
             nonDupes.push(t);
           }
         });
-
         trips = nonDupes;
 
-        // --- 2. Companion Repair (Advanced) ---
         let repairedCount = 0;
         const tripsToAdd = [];
-
-        // First pass: identify missing records
         trips.forEach(t => {
           const tDate = toISODate(t.dateLeftOrigin || t.dateArrivedDest);
           if (!tDate) return;
-
-          // Collect all potential companion names/IDs from both fields
           const companionIdsSet = new Set(Array.isArray(t.travelWith) ? t.travelWith : []);
-
-          // Add from travelWithNames string/array
           const namesStr = Array.isArray(t.travelWithNames) ? t.travelWithNames.join(', ') : String(t.travelWithNames || '');
           namesStr.split(/[,;]+/).forEach(n => {
             const clean = n.trim().toLowerCase();
             if (clean && nameToId[clean]) companionIdsSet.add(nameToId[clean]);
           });
-
-          companionIdsSet.delete(t.passengerId); // Don't duplicate self
-
+          companionIdsSet.delete(t.passengerId);
           companionIdsSet.forEach(cid => {
-            // Check if this companion already has a trip on this normalized date
             const hasTrip = trips.some(other =>
               (other.passengerId === cid || (other.passengerName && nameToId[other.passengerName.toLowerCase().trim()] === cid)) &&
               toISODate(other.dateLeftOrigin || other.dateArrivedDest) === tDate
             );
-
             if (!hasTrip) {
-              // Create missing trip
               const companion = passengers.find(p => p.id === cid);
-              const compTrip = {
-                ...t,
-                id: uuidv4(),
-                passengerId: cid,
-                passengerName: companion?.name || 'Unknown',
-                travelWith: [
-                  t.passengerId,
-                  ...Array.from(companionIdsSet).filter(tid => tid !== cid)
-                ],
-                travelWithNames: [
-                  t.passengerName,
-                  ...Array.from(companionIdsSet).map(tid => passengers.find(p => p.id === tid)?.name).filter(n => n && n !== companion?.name)
-                ].filter(Boolean).join(', '),
+              tripsToAdd.push({
+                ...t, id: uuidv4(),
+                passengerId: cid, passengerName: companion?.name || 'Unknown',
+                travelWith: [t.passengerId, ...Array.from(companionIdsSet).filter(tid => tid !== cid)],
+                travelWithNames: [t.passengerName, ...Array.from(companionIdsSet).map(tid => passengers.find(p => p.id === tid)?.name).filter(n => n && n !== companion?.name)].filter(Boolean).join(', '),
                 timestamp: new Date().toISOString()
-              };
-              tripsToAdd.push(compTrip);
+              });
               repairedCount++;
             }
           });
         });
-
-        const finalTrips = [...trips, ...tripsToAdd];
-
         window._repairSummary = { merged: mergedCount, repaired: repairedCount };
-        return { ...remote, trips: finalTrips };
+        return { ...remote, trips: [...trips, ...tripsToAdd] };
       });
 
       await setCachedTravelData(newData);
       const { merged, repaired } = window._repairSummary || {};
-
-      const summary = `
-        <div style="text-align:left; font-size:14px; line-height:1.6;">
-          • Duplicates Merged: <b>${merged}</b><br/>
-          • Missing Records Created: <b>${repaired}</b><br/>
-          <div style="margin-top:12px; padding:10px; background:var(--primary-bg); border-radius:8px; border-left:4px solid var(--primary); font-size:12px;">
-            ✅ Your database is now synchronized across all participants.
-          </div>
-        </div>
-      `;
-      await showConfirmModal('Trip Data: Doctor Summary', summary, { confirmText: 'Great', cancelText: '' });
+      const summary = `<div style="text-align:left; font-size:14px; line-height:1.6;">• Duplicates Merged: <b>${merged}</b><br/>• Missing Records Created: <b>${repaired}</b><br/><div style="margin-top:12px; padding:10px; background:var(--primary-bg); border-radius:8px; border-left:4px solid var(--primary); font-size:12px;">✅ Your database is now clean and consistent.</div></div>`;
+      await showConfirmModal('✅ Repair Complete', summary, { confirmText: 'Done', cancelText: '' });
       setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       showToast('Repair failed: ' + err.message, 'error');
       console.error(err);
-    }
-  });
-
-  document.getElementById('backup-health-btn')?.addEventListener('click', async () => {
-    try {
-      showToast('Scanning Drive folders…', 'info');
-      const report = await getBackupHealthReport('travel');
-
-      const formatBytes = (b) => {
-        const bytes = Number(b);
-        if (!bytes) return '0 B';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-      };
-
-      const miscCount = report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0);
-
-      const message = `
-        <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
-          <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
-          • Data File: ${report.working.mainFile ? `✅ ${report.working.mainFile.name} (${formatBytes(report.working.mainFile.size)})` : '❌ Missing'}<br/>
-          • Sync Queue: ${report.working.queueActive ? '✅ Active' : '⚪ Empty'}<br/>
-          • Misc Files: ${miscCount} found
-          
-          ${miscCount > 0 ? `
-            <div style="margin-top:8px;">
-              <button id="purge-files-btn" class="btn btn-secondary" style="width:100%; padding:6px; font-size:11px; border-color:var(--danger); color:var(--danger);">
-                🗑️ Purge Orphaned Files
-              </button>
-            </div>
-          ` : ''}
-          
-          <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
-          
-          <b style="color:var(--primary); font-size:14px;">🕒 Mirror System (Historical)</b><br/>
-          • <b>Sessions Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.sessions.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.sessions.count} / ${report.mirror.sessions.target}</span><br/>
-          • <b>Daily Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.daily.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.daily.count} / ${report.mirror.daily.target}</span><br/>
-          • <b>Monthly Tier</b> (Target 3): <span style="font-weight:700; color:${report.mirror.monthly.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.monthly.count} / ${report.mirror.monthly.target}</span>
-          
-          <div style="margin-top:16px; padding:10px; background:var(--primary-bg); border-radius:8px; border-left:4px solid var(--primary);">
-            <div style="font-weight:700; color:var(--primary); font-size:12px;">Compliance Feedback:</div>
-            <div style="font-size:11px; margin-top:4px;">${report.status === 'Healthy' ? '✅ System is correctly mirroring and pruning data to your Google Drive.' : '⌛ System is still initializing first-time snapshots.'}</div>
-          </div>
-        </div>
-      `;
-
-      const modalOk = await showConfirmModal(`Status: ${report.status}`, message, {
-        confirmText: 'Done',
-        cancelText: ''
-      });
-
-      // Special handling for the purge button within the modal
-      const purgeBtn = document.getElementById('purge-files-btn');
-      if (purgeBtn) {
-        purgeBtn.onclick = async () => {
-          if (!confirm('Are you sure you want to move all orphaned backups to the trash? This keeps your drive clean.')) return;
-          showToast('Purging…', 'info');
-          const count = await purgeOrphanedFiles('travel');
-          showToast(`Moved ${count} files to trash`, 'success');
-          // Refresh the modal logic could go here, but a close/re-open is safer
-          document.querySelector('.modal-overlay').remove();
-          document.getElementById('backup-health-btn').click();
-        };
-      }
-    } catch (err) {
-      showToast('Health scan failed: ' + err.message, 'error');
     }
   });
 
@@ -854,20 +469,10 @@ Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data
         const regs = await navigator.serviceWorker.getRegistrations();
         for (const reg of regs) await reg.unregister();
       }
-      await clearAllCachedData(); // CRITICAL: Wipe IndexedDB too
-      localStorage.clear();      // Safe to clear local UI state
+      await clearAllCachedData();
+      localStorage.clear();
       window.location.reload(true);
     }
-  });
-
-  document.getElementById('account-exit-btn')?.addEventListener('click', async () => {
-    showToast('Syncing before exit…', 'info', 2000);
-    await new Promise(r => setTimeout(r, 1500));
-    await exitApp();
-  });
-
-  document.getElementById('signout-btn').addEventListener('click', () => {
-    if (confirm('Sign out?')) { clearAuth(); window.location.reload(); }
   });
 }
 

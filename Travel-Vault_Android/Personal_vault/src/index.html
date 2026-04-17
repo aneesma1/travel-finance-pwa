@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="referrer" content="no-referrer" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor://localhost https://localhost; script-src 'self' 'unsafe-inline' capacitor://localhost https://localhost cdnjs.cloudflare.com fonts.googleapis.com; connect-src 'self' capacitor://localhost https://localhost https://*.googleapis.com https://accounts.google.com; font-src 'self' fonts.gstatic.com data:; img-src 'self' data: blob: https://*.googleapis.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor://localhost https://localhost; script-src 'self' 'unsafe-inline' capacitor://localhost https://localhost cdnjs.cloudflare.com fonts.googleapis.com; connect-src 'self' capacitor://localhost https://localhost; font-src 'self' fonts.gstatic.com data:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' fonts.googleapis.com;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#065F46" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -74,91 +74,48 @@
 
 </div><!-- #app -->
 
-<!-- ── App bootstrap (v5.4.2 Local-First / No ES Modules) ───────────── -->
-<!-- Scripts loaded in dependency order. No import/export used. -->
-<script src="shared/utils.js"></script>
-<script src="shared/auth.js"></script>
-<script src="shared/db.js"></script>
-<script src="shared/sync-queue.js"></script>
-<script src="shared/sync-manager.js"></script>
-<script src="shared/drive.js"></script>
-<script src="shared/security-log.js"></script>
-<script src="shared/app-config.js"></script>
-<script src="js/auth-config.js"></script>
-<script src="js/app-config.js"></script>
-<script src="js/router.js"></script>
-<script src="js/pin.js"></script>
-<script src="js/screens/pin-lock.js"></script>
-
-<script>
+<!-- ── App bootstrap (v5.5.0 Local-First / Encrypted Shared) ───────────── -->
+<script type="module">
   // --- Versioning & Build Tracking (injected by CI) ---
-  window.APP_VERSION = 'v5.4.1';
-  window.BUILD_TIME  = '';
+  window.APP_VERSION = 'v5.5.0';
+  window.BUILD_TIME  = new Date().toISOString();
+
+  // Imports
+  import { openDB, getCachedFinanceData, setCachedFinanceData } from './shared/db.js';
+  import { isPinSet, changePin, setPin } from './js/pin.js';
+  import { renderPinLock, renderPinSetup } from './js/screens/pin-lock.js';
+  import { initNav, navigate } from './js/router.js';
 
   // ── App state ─────────────────────────────────────────────────────
-  var appUnlocked = false;
+  let appUnlocked = false;
 
-  // ── Sync indicator wiring ─────────────────────────────────────────
+  // ── Sync indicator wiring (Simplified for Local Backups) ──────────
   window.addEventListener('sync:status', function(e) {
-    var status = e.detail.status;
-    var el = document.getElementById('sync-indicator');
+    const status = e.detail.status;
+    const el = document.getElementById('sync-indicator');
     if (!el) return;
-    var configs = {
-      synced:  { text: '✅ All data backed up',              show: false, bg: 'transparent' },
-      syncing: { text: '🔄 Syncing to Drive…',              show: true,  bg: '#EEF2FF'     },
-      pending: { text: '⚠️ Unsaved Local Data — Tap to Backup', show: true,  bg: '#FEF3C7'     },
-      failed:  { text: '❌ Sync failed — Tap to retry',     show: true,  bg: '#FEE2E2'     },
-    };
-    var cfg = configs[status] || configs.synced;
-    el.textContent = cfg.text;
-    el.style.background = cfg.bg;
-    el.style.color = '#000';
-    el.classList.toggle('hidden', !cfg.show);
-    if (status === 'pending' || status === 'failed') {
-      el.onclick = function() { processDriveQueue(); el.textContent = '🔄 Starting Backup…'; };
+    
+    // We only show pending local unsaved warnings
+    if (status === 'pending') {
+      el.textContent = '⚠️ Unsaved Local Data';
+      el.style.background = '#FEF3C7';
+      el.style.color = '#000';
+      el.classList.remove('hidden');
     } else {
-      el.onclick = null;
+      el.classList.add('hidden');
     }
-  });
-
-  // ── Auth event listener ─────────────────────────────────────────────
-  window.addEventListener('auth:required', function() {
-    appUnlocked = false;
-    document.getElementById('bottom-nav').classList.add('hidden');
-    showLogin();
   });
 
   // ── 404 Script error catcher ────────────────────────────────────────
   window.addEventListener('error', function(e) {
     if (e.target && e.target.tagName === 'SCRIPT') {
-      var fileName = e.target.src ? e.target.src.split('/').pop() : 'unknown';
-      var msg = 'Critical Asset Missing: ' + fileName + '. Please check build bundle.';
+      const fileName = e.target.src ? e.target.src.split('/').pop() : 'unknown';
+      const msg = 'Critical Asset Missing: ' + fileName + '. Please check build bundle.';
       if (window.onerror) window.onerror(msg, e.target.src, 0);
     }
   }, true);
 
   // ── UI screens ──────────────────────────────────────────────────────
-  function showLogin() {
-    var screen = document.getElementById('screen');
-    screen.innerHTML = '<div class="login-screen fade-in">'
-      + '<div class="login-logo">🔐</div>'
-      + '<h1 class="login-title">Private Vault</h1>'
-      + '<p class="login-subtitle">Your personal finance tracker<br>Private, secure, PIN-protected</p>'
-      + '<button class="google-signin-btn" id="signin-btn">'
-      + '<svg width="20" height="20" viewBox="0 0 24 24">'
-      + '<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>'
-      + '<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>'
-      + '<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>'
-      + '<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>'
-      + '</svg>'
-      + ' Sign in with Google'
-      + '</button>'
-      + '</div>';
-    document.getElementById('signin-btn').addEventListener('click', function() {
-      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
-    });
-  }
-
   function showError(msg) {
     document.getElementById('screen').innerHTML = '<div class="login-screen">'
       + '<div style="font-size:48px;margin-bottom:16px;">⚠️</div>'
@@ -168,7 +125,6 @@
   }
 
   function showPinLock() {
-    // renderPinLock is loaded via <script src="js/screens/pin-lock.js">
     renderPinLock(document.getElementById('screen'), {
       onSuccess: async function() {
         appUnlocked = true;
@@ -179,154 +135,61 @@
   }
 
   function showPinSetup() {
-    // renderPinSetup is loaded via <script src="js/screens/pin-lock.js">
     renderPinSetup(document.getElementById('screen'), {
       onComplete: async function() {
         appUnlocked = true;
-        syncPinToDrive().catch(function() {});
         await loadAndShowApp();
       }
     });
   }
 
   function showForgotPin() {
-    var screen = document.getElementById('screen');
+    const screen = document.getElementById('screen');
     screen.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:var(--bg);">'
       + '<div style="font-size:48px;margin-bottom:16px;">🔑</div>'
       + '<div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px;">Forgot PIN?</div>'
-      + '<div style="font-size:14px;color:var(--text-secondary);text-align:center;margin-bottom:32px;line-height:1.6;">Choose how to verify your identity and reset your PIN.</div>'
+      + '<div style="font-size:14px;color:var(--text-secondary);text-align:center;margin-bottom:32px;line-height:1.6;">If you forgot your PIN, your local data cannot be recovered. You must reset the app and import from your secure vaultbox backup file.</div>'
       + '<div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;">'
-      + '<button id="forgot-google-btn" class="btn btn-primary" style="padding:16px;font-size:15px;">🔐 Sign in with Google</button>'
-      + '<button id="forgot-back-btn" style="background:none;border:none;font-size:14px;color:var(--text-muted);cursor:pointer;padding:8px;">← Back to PIN</button>'
+      + '<button id="forgot-back-btn" class="btn btn-primary" style="padding:16px;font-size:15px;">← Back to PIN</button>'
       + '</div>'
       + '</div>';
     document.getElementById('forgot-back-btn').addEventListener('click', showPinLock);
-    document.getElementById('forgot-google-btn').addEventListener('click', function() { showLogin(); });
   }
 
   // ── Show app ─────────────────────────────────────────────────────────
-  function showApp() {
+  async function showApp() {
     document.getElementById('bottom-nav').classList.remove('hidden');
-
-    initSyncManager().catch(function() {});
-    watchSync();
-
-    runBootIntegrityCheck('finance').then(function(issues) {
-      issues.forEach(function(issue) {
-        if (issue.type === 'interrupted_write') {
-          showToast('⚠️ Last save was interrupted. Check your data.', 'warning', 5000);
-        } else if (issue.type === 'suspicious_drop') {
-          showToast('⚠️ ' + issue.message, 'warning', 6000);
-        }
-      });
-    }).catch(function() {});
-
     initNav();
     navigate('dashboard');
-
-    if (typeof registerSession === 'function') registerSession('App B').catch(function() {});
-    if (typeof startHeartbeat === 'function') startHeartbeat();
-    if (typeof logActivity === 'function') logActivity('App B', 'SIGN_IN', 'Session started').catch(function() {});
-
-    if (typeof getUnseenHighRiskEvents === 'function') {
-      getUnseenHighRiskEvents().then(function(events) {
-        if (events && events.length > 0) {
-          showToast('🔴 ' + events.length + ' security alert' + (events.length > 1 ? 's' : '') + ' — check Settings → Security', 'error', 8000);
-        }
-      }).catch(function() {});
-    }
   }
 
   // ── Load data and show app ──────────────────────────────────────────
   async function loadAndShowApp() {
-    var cached = await getCachedFinanceData();
-    if (cached) showApp();
-
-    if (isOnline()) {
-      try {
-        await initDriveFolders();
-        await initDataFile('finance');
-        await initMirrorFile('finance');
-        var result = await readData('finance');
-        var data = result.data;
-
-        // Sanitise bad dates (e.g. Excel import producing 1899)
-        if (data && data.transactions) {
-          var dirty = false;
-          data.transactions = data.transactions.map(function(t) {
-            if (!t.date) return t;
-            var yr = Number(t.date.slice(0,4));
-            if (yr < 2000 || yr > 2100) { dirty = true; return Object.assign({}, t, { date: '' }); }
-            return t;
-          });
-          if (dirty) await writeData('finance', function() { return data; });
-        }
-
-        await setCachedFinanceData(data);
-        window.dispatchEvent(new Event('finance-data-ready'));
-        if (!cached) showApp();
-      } catch (err) {
-        if (err.message === 'Authentication required') {
-          showLogin();
-        } else if (cached) {
-          showToast('Using cached data', 'warning');
-        } else {
-          showError(err.message);
-        }
-      }
-    } else if (!cached) {
-      showError('No cached data. Please connect to the internet first.');
+    const cached = await getCachedFinanceData();
+    if (cached) {
+      showApp();
+    } else {
+      // Create empty db
+      const emptyDb = { transactions: [], categories: [], accounts: [] };
+      await setCachedFinanceData(emptyDb);
+      showApp();
     }
   }
 
   // ── Main boot function ──────────────────────────────────────────────
   async function boot() {
     try {
-      console.log('Private Vault: Booting in Local-First mode v5.4.2…');
+      console.log('Private Vault: Booting Offline-First Native Engine...');
 
-      // Handle deep-link OAuth callback (Capacitor fires this event)
-      window.addEventListener('oauth:callback_received', async function() {
-        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-        appUnlocked = false;
-        boot();
-      });
-
-      // Handle browser hash OAuth callback
-      var urlHash   = window.location.hash;
-      var urlSearch = window.location.search;
-      var isCallback = urlHash.includes('access_token') || urlSearch.includes('error') || urlHash.includes('error');
-      if (isCallback) {
-        await handleOAuthCallback(CLIENT_ID, REDIRECT_URI);
-      }
-
-      // Open DB
+      // Initial DB access
       await openDB();
 
-      // Restore PIN from Drive if cleared locally
-      if (!isPinSet() && isAuthenticated()) {
-        await restorePinFromDrive().catch(function() {});
-      }
-
-      // Not authenticated at all → show login
-      if (!isAuthenticated()) {
-        var cached = await getCachedFinanceData().catch(function() { return null; });
-        if (cached && isPinSet()) {
-          // Token expired while locked — show PIN not Google
-          appUnlocked = false;
-          showPinLock();
-          return;
-        }
-        showLogin();
-        return;
-      }
-
-      // Show PIN setup if not set
+      // Enforce PIN Lock instantly (bypass any Google logic)
       if (!isPinSet()) {
         showPinSetup();
         return;
       }
 
-      // Show PIN lock if not unlocked
       if (!appUnlocked) {
         showPinLock();
         return;
@@ -336,31 +199,19 @@
 
     } catch (err) {
       console.error('Boot error:', err);
-      try {
-        var cached2 = await getCachedFinanceData().catch(function() { return null; });
-        if (cached2 && isPinSet()) { showPinLock(); return; }
-      } catch(e2) {}
-      showLogin();
+      showError(err.message);
     }
   }
 
   // ── Native Android back button hook (Capacitor) ─────────────────────
   setTimeout(function() {
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
-      var CapApp = window.Capacitor.Plugins.App;
+      const CapApp = window.Capacitor.Plugins.App;
       CapApp.addListener('backButton', async function(ref) {
-        var canGoBack = ref.canGoBack;
-        var pending = await getPendingCount();
-        if (pending > 0) {
-          if (confirm('⚠️ You have unsynced local data! Exit without backing up to Drive?')) {
-            CapApp.exitApp();
-          }
+        if (!ref.canGoBack) {
+          CapApp.exitApp();
         } else {
-          if (!canGoBack) {
-            CapApp.exitApp();
-          } else {
-            window.history.back();
-          }
+          window.history.back();
         }
       });
     }

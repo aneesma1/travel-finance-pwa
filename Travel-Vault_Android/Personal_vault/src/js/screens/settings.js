@@ -8,15 +8,13 @@
 import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '../../../shared/db.js';
 import { getActiveSessions, getActivityLog } from '../../../shared/security-log.js';
 import { openSecurityDashboard } from '../../../shared/security-dashboard.js';
-import { clearAuth, getUser, isAuthenticated, startOAuthFlow } from '../../../shared/auth.js';
 import {
   currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard,
   showConfirmModal, getAppState, setAppState
 } from '../../../shared/utils.js';
 import {
   downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
-  getMirrorSnapshots, restoreFromMirror, getBackupHealthReport,
-  purgeOrphanedFiles, findSharedDatabases, connectSharedDatabase
+  getMirrorSnapshots, restoreFromMirror
 } from '../../../shared/drive.js';
 import { getSecurityLogs, clearSecurityLogs } from '../../../shared/db.js';
 import { localSave } from '../../../shared/sync-manager.js';
@@ -25,8 +23,8 @@ import { navigate } from '../router.js';
 import { renderImportTool } from '../../../shared/import-tool.js';
 import { openCategoryManager } from '../modals/category-manager.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../../shared/recovery.js';
+import { exportEncryptedBackup, importEncryptedBackup } from '../../../shared/backup-engine.js';
 import { exitApp } from '../../../shared/app-utils.js';
-import { CLIENT_ID, REDIRECT_URI } from '../auth-config.js';
 
 const CACHE_NAME = 'vault v4.11.0';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -149,15 +147,14 @@ export async function renderSettings(container, params = {}) {
         </div>
       </div>
 
-      <div class="section-title" style="margin-top:16px;">Sync Status</div>
+      <div class="section-title" style="margin-top:16px;">App Storage</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:13px;color:var(--text-secondary);">Drive sync</span>
-          <span style="font-size:13px;font-weight:600;color:${isOnline() ? 'var(--success)' : 'var(--warning)'};">
-            ${isOnline() ? '● Online' : '● Offline'}
+          <span style="font-size:13px;color:var(--text-secondary);">Local Device Storage</span>
+          <span style="font-size:13px;font-weight:600;color:var(--success);">
+            ● Active
           </span>
         </div>
-        ${data?.lastSync ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Last sync: ${formatDisplayDate(data.lastSync.split('T')[0])}</div>` : ''}
       </div>
 
       <div class="section-title" style="color:var(--danger);margin-top:24px;">⛔ Danger Zone</div>
@@ -590,56 +587,38 @@ export async function renderSettings(container, params = {}) {
   function renderAccountTab(user, data) {
     const tab = document.getElementById('tab-content');
     tab.innerHTML = `
-      <div class="section-title">Signed In As</div>
+      <div class="section-title">Account</div>
       <div class="card" style="margin:0 16px;">
-        <div class="card-body" style="display:flex;align-items:center;gap:12px;">
-          ${user?.picture ? `<img src="${user.picture}" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;" />` : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>'}
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.name || (isAuthenticated() ? 'Signed in' : 'Guest User')}</div>
-            <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user?.email || (isAuthenticated() ? '' : 'Local-only mode')}</div>
-          </div>
-        </div>
-        <div class="divider"></div>
         <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
-          ${!isAuthenticated() ? `
-            <button class="btn btn-primary btn-full" id="signin-google-btn" style="margin-bottom:10px;">👤 Sign in to Google Drive</button>
-            <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:0 8px;">
-               Enable Cloud Sync and Family Sharing by signing in.
-            </div>
-          ` : `
-            <button class="btn btn-primary btn-full" id="account-exit-btn" style="margin-bottom:10px;">💾 Save & Exit App</button>
-            <button class="btn btn-secondary btn-full" id="signout-btn" style="margin-bottom:12px;">Sign out of Google</button>
-            
-            <div style="border-top:1px dashed var(--border); margin:12px 0;"></div>
-            
-            <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--primary);">👨‍👩‍👧 Family Sharing</div>
-            <button class="btn btn-secondary btn-full" id="find-shared-btn">🔗 Connect Shared Family Vault</button>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
-               Search for databases shared with you by other members.
-            </div>
-          `}
+          <div style="font-size:14px; font-weight:700; text-align:center;">Local-First Edition</div>
+          <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:8px;">
+             Your data is securely stored directly on this device.
+          </div>
+          <button class="btn btn-primary btn-full" style="margin-top:8px; margin-bottom:10px;" id="account-exit-btn">💾 Save & Exit App</button>
+          
+          <div style="border-top:1px dashed var(--border); margin:16px 0;"></div>
+          
+          <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--primary);">🔒 Secure Vaultbox Backup</div>
+          <button class="btn btn-secondary btn-full" id="export-vaultbox-btn">📤 Export Encrypted Vaultbox</button>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
+             Generate a secure, password-protected file to share via WhatsApp.
+          </div>
+          
+          <button class="btn btn-secondary btn-full" id="import-vaultbox-btn" style="margin-top:12px; border-style: dashed;">📥 Import Vaultbox File</button>
         </div>
       </div>
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:13px;color:var(--text-muted);">Private Vault v5.0.0 · 2026-04-10 · Native</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v3.0 · Offline-First Android Native Suite</div>
+        <div style="font-size:13px;color:var(--text-muted);">Private Vault ${window.APP_VERSION || 'v5.5.0'} · Native</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v2.0 · Offline-First Array</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions · ${data?.categories?.length || 0} categories</div>
 
-
-          <div style="display:flex; gap:10px;">
+          <div style="display:flex; gap:10px; margin-top:10px">
             <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
-            <button id="backup-health-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">📊 Backup Health</button>
-          </div>
-          <div style="margin-top:10px;">
-            <button id="security-audit-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px;">🛡️ Drive Security Audit</button>
-          </div>
-          <div style="margin-top:10px;">
-            <button id="standalone-deep-clean-btn" class="btn btn-secondary" style="width:100%; padding:10px; font-size:11px; color:var(--primary); border-color:var(--primary);">🧹 Drive Deep Clean</button>
           </div>
           <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
-            Maintenance: Repairs records & verifies Drive backup compliance.
+            Maintenance: Removes duplicates and tests data integrity.
           </div>
         </div>
 
@@ -650,151 +629,14 @@ export async function renderSettings(container, params = {}) {
 
 
 
-    // --- Drive Security Audit ---
-    document.getElementById('security-audit-btn').onclick = async () => {
-      const logs = await getSecurityLogs();
-      if (!logs || logs.length === 0) {
-        showToast('✅ No security incidents recorded.', 'success');
-        return;
-      }
-
-      const logHtml = `
-        <div style="font-size:12px; max-height:300px; overflow-y:auto;">
-          ${logs.reverse().map(l => `
-            <div style="padding:10px; border-bottom:1px solid var(--border-light); background:rgba(255,0,0,0.05); margin-bottom:5px; border-radius:4px;">
-              <b style="color:var(--danger);">${l.action} Blocked</b><br/>
-              <span style="opacity:0.7;">${new Date(l.timestamp).toLocaleString()}</span><br/>
-              <code style="display:block; margin-top:4px; font-size:10px; word-break:break-all;">Target: ${l.targetId || l.url}</code>
-              <div style="font-size:10px; margin-top:4px; color:var(--danger);">Reason: ${l.reason}</div>
-            </div>
-          `).join('')}
-        </div>
-        <button id="clear-security-logs" class="btn btn-secondary" style="width:100%; margin-top:10px; color:var(--danger); border-color:var(--danger);">Clear Log</button>
-      `;
-
-      await showConfirmModal('🛡️ Security Audit Log', logHtml, { confirmText: 'Done', cancelText: '' });
-
-      const clearBtn = document.getElementById('clear-security-logs');
-      if (clearBtn) {
-        clearBtn.onclick = async () => {
-          if (confirm('Clear all security audit records?')) {
-            await clearSecurityLogs();
-            showToast('Audit log cleared.', 'success');
-            document.querySelector('.modal-overlay').remove();
-          }
-        };
-      }
-    };
-
-    document.getElementById('repair-data-btn')?.addEventListener('click', async () => {
-      const ok = await showConfirmModal('🔍 Scan & Repair Data?', 'This tool will:\n1. Identify exact duplicate transactions\n2. Merge identical records from multiple devices\n\nThis will permanently update your data.', {
-        confirmText: 'Run Health Check'
-      });
-      if (!ok) return;
-
-      try {
-        showToast('Scanning financial data…', 'info');
-        const newData = await localSave('finance', (remote) => {
-          let txns = [...(remote.transactions || [])];
-          const seen = new Set();
-          const nonDupes = [];
-          let mergedCount = 0;
-
-          txns.forEach(t => {
-            const key = `${t.date}|${t.amountSpend || 0}|${t.income || 0}|${t.description}|${t.category1}|${t.account}`;
-            if (seen.has(key)) {
-              mergedCount++;
-            } else {
-              seen.add(key);
-              nonDupes.push(t);
-            }
-          });
-
-          window._repairSummary = { merged: mergedCount };
-          return { ...remote, transactions: nonDupes };
-        });
-
-        await setCachedFinanceData(newData);
-        const { merged } = window._repairSummary || {};
-        showToast(`Success! Merged ${merged} duplicates.`, 'success', 5000);
-        setTimeout(() => window.location.reload(), 2000);
-      } catch (err) {
-        showToast('Repair failed: ' + err.message, 'error');
-      }
+    document.getElementById('export-vaultbox-btn')?.addEventListener('click', () => {
+      exportEncryptedBackup('finance');
     });
 
-    // --- Backup Health ---
-    document.getElementById('backup-health-btn')?.addEventListener('click', async () => {
-      try {
-        showToast('Scanning Drive folders…', 'info');
-        const report = await getBackupHealthReport('finance');
-
-        const formatBytes = (b) => {
-          const bytes = Number(b);
-          if (!bytes) return '0 B';
-          if (bytes < 1024) return bytes + ' B';
-          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-          return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        };
-
-        const miscCount = report.working.files - (report.working.mainFile ? 1 : 0) - (report.working.queueActive ? 1 : 0);
-
-        const message = `
-          <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text); max-width:300px;">
-            <b style="color:var(--primary); font-size:14px;">📂 Working Folder (Current)</b><br/>
-            • Data File: ${report.working.mainFile ? `✅ ${report.working.mainFile.name} (${formatBytes(report.working.mainFile.size)})` : '❌ Missing'}<br/>
-            • Sync Queue: ${report.working.queueActive ? '✅ Active' : '⚪ Empty'}<br/>
-            • Misc Files: ${miscCount} found
-            
-            ${miscCount > 0 ? `
-              <div style="margin-top:8px;">
-                <button id="purge-files-btn" class="btn btn-secondary" style="width:100%; padding:6px; font-size:11px; border-color:var(--danger); color:var(--danger);">
-                  🗑️ Purge Orphaned Files
-                </button>
-              </div>
-            ` : ''}
-            
-            <div style="margin:14px 0; border-top:1px solid var(--border-light); opacity:0.5;"></div>
-            
-            <b style="color:var(--primary); font-size:14px;">🕒 Mirror System (Historical)</b><br/>
-            • <b>Sessions Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.sessions.count >= 1 ? 'var(--success)' : 'var(--warning)'}">${report.mirror.sessions.count} / ${report.mirror.sessions.target}</span><br/>
-            • <b>Daily Tier</b> (Target 5): <span style="font-weight:700; color:${report.mirror.daily.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.daily.count} / ${report.mirror.daily.target}</span><br/>
-            • <b>Monthly Tier</b> (Target 3): <span style="font-weight:700; color:${report.mirror.monthly.count >= 1 ? 'var(--success)' : 'var(--primary)'}">${report.mirror.monthly.count} / ${report.mirror.monthly.target}</span>
-            
-            <div style="margin-top:16px; padding:10px; background:var(--primary-bg); border-radius:8px; border-left:4px solid var(--primary);">
-              <div style="font-weight:700; color:var(--primary); font-size:12px;">Compliance Feedback:</div>
-              <div style="font-size:11px; margin-top:4px;">${report.status === 'Healthy' ? '✅ System is correctly mirroring finance data to Drive.' : '⌛ System is still initializing snapshots.'}</div>
-            </div>
-          </div>
-        `;
-
-        const modalOk = await showConfirmModal(`Vault Status: ${report.status}`, message, {
-          confirmText: 'Done',
-          cancelText: ''
-        });
-
-        const purgeBtn = document.getElementById('purge-files-btn');
-        if (purgeBtn) {
-          purgeBtn.onclick = async () => {
-            if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Vault Drive? This will trash both root clutter and backups for deleted transactions.')) return;
-            showToast('Scanning & Purging…', 'info');
-            const count = await purgeOrphanedFiles('finance', data);
-            showToast(`Cleaned ${count} orphaned files`, 'success');
-            document.querySelector('.modal-overlay')?.remove();
-            document.getElementById('backup-health-btn').click();
-          };
-        }
-      } catch (err) {
-        showToast('Vault health scan failed: ' + err.message, 'error');
-      }
+    document.getElementById('import-vaultbox-btn')?.addEventListener('click', () => {
+      importEncryptedBackup('finance');
     });
 
-    document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Vault Drive? This will trash both root clutter and backups for deleted transactions.')) return;
-      showToast('Scanning & Purging…', 'info');
-      const count = await (await import('../../../shared/drive.js')).purgeOrphanedFiles('finance', data);
-      showToast(`Cleaned ${count} orphaned files`, 'success');
-    });
 
     document.getElementById('force-update-btn')?.addEventListener('click', async () => {
       if (confirm('This will unregister the Service Worker and hard-reload the app. Continue?')) {
@@ -857,58 +699,7 @@ export async function renderSettings(container, params = {}) {
       }
     });
 
-    document.getElementById('signout-btn')?.addEventListener('click', () => {
-      if (confirm('Sign out? You will need to re-authenticate to sync data.')) {
-        clearAuth();
-        window.location.reload();
-      }
-    });
-
-    document.getElementById('signin-google-btn')?.addEventListener('click', () => {
-      startOAuthFlow(CLIENT_ID, REDIRECT_URI);
-    });
-
-    document.getElementById('find-shared-btn')?.addEventListener('click', async () => {
-      try {
-        showToast('Searching for shared databases…', 'info');
-        const files = await findSharedDatabases('finance');
-        if (!files.length) {
-          showToast('No shared databases found. Ensure your family has shared the file with you.', 'warning', 6000);
-          return;
-        }
-
-        const choices = files.map(f => ({
-          id: f.id,
-          label: `${f.name} (Shared by ${f.owners[0].displayName})`
-        }));
-
-        const result = await showConfirmModal('🔗 Shared Databases Found', `
-          <div style="font-size:13px; margin-bottom:12px;">The following databases were found. Choose one to connect <b>instead</b> of your own:</div>
-          ${choices.map((c, i) => `
-            <button class="list-row shared-choice" data-id="${c.id}" style="width:100%; text-align:left; border-radius:var(--radius-md); margin-bottom:8px; border:1px solid var(--border);">
-               <div style="flex:1;">
-                 <div style="font-size:14px; font-weight:600;">${c.label}</div>
-                 <div style="font-size:11px; color:var(--text-muted);">Database ID: ${c.id.slice(0, 12)}...</div>
-               </div>
-               <span style="color:var(--primary); font-weight:700;">Connect</span>
-            </button>
-          `).join('')}
-        `, { confirmText: '', cancelText: 'Cancel' });
-
-        // showConfirmModal is used as a generic container here. We listen for internal clicks.
-        document.querySelectorAll('.shared-choice').forEach(btn => {
-          btn.onclick = async () => {
-            const id = btn.dataset.id;
-            const name = btn.querySelector('div div').textContent;
-            if (confirm(`Switch to shared database: ${name}?\n\nThis will stop syncing with your own database.`)) {
-              await connectSharedDatabase('finance', id);
-            }
-          };
-        });
-      } catch (err) {
-        showToast('Search failed: ' + err.message, 'error');
-      }
-    });
+    // Cloud-based sign-in / shared database features removed — Local-first edition
   }
 
   // ── Mirror modal ──────────────────────────────────────────────────────────

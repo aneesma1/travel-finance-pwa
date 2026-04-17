@@ -234,8 +234,9 @@ export function showConfirmModal(title, message, options = {}) {
       <div class="modal-sheet" style="max-width:340px; margin:auto; position:relative; top:50%; transform:translateY(-50%); border-radius:var(--radius-lg);">
         <div style="padding:20px 24px;">
           <div style="font-size:17px; font-weight:700; margin-bottom:8px;">${title}</div>
-          <div style="font-size:13px;color:var(--text-muted);">Private Vault v4.14.0 · 2026-04-04 · 18:45</div>
-          <div style="margin-top:24px; display:flex; gap:12px;">
+          <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">${typeof message === 'string' && !message.startsWith('<') ? message : ''}</div>
+          ${typeof message === 'string' && message.startsWith('<') ? `<div style="font-size:13px; margin-top:8px;">${message}</div>` : ''}
+          <div style="margin-top:16px; display:flex; gap:12px;">
             ${cancelText ? `<button id="modal-cancel" class="btn btn-secondary" style="flex:1;">${cancelText}</button>` : ''}
             <button id="modal-confirm" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" style="flex:1;">${confirmText}</button>
           </div>
@@ -280,9 +281,6 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
             ${datalistId ? `list="${datalistId}"` : ''}
             style="margin-top:4px;" />
           ${datalistHtml}
-        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
-          Maintenance: Repairs records & verifies Drive backup compliance.
-        </div>
           <div style="margin-top:24px; display:flex; gap:12px;">
             <button id="modal-cancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
             <button id="modal-confirm" class="btn btn-primary" style="flex:1;">Save</button>

@@ -4,7 +4,6 @@ const STATIC_ASSETS = [
   './',
   './index.html',
   './css/app.css',
-  './js/auth-config.js',
   './js/router.js',
   './js/pin.js',
   './js/screens/pin-lock.js',
@@ -15,8 +14,6 @@ const STATIC_ASSETS = [
   './js/screens/settings.js',
   './js/modals/category-manager.js',
   '../shared/utils.js',
-  '../shared/auth.js',
-  '../shared/drive.js',
   '../shared/db.js',
   '../shared/smart-input.js',
   '../shared/multi-smart-input.js',
@@ -25,7 +22,6 @@ const STATIC_ASSETS = [
   '../shared/photo-picker.js',
   '../shared/sync-manager.js',
   '../shared/pwa-install.js',
-  '../shared/sync-queue.js',
   'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap',
 ];
 
@@ -81,16 +77,6 @@ self.addEventListener('fetch', (e) => {
       });
     })
   );
-});
-
-self.addEventListener('periodicsync', (e) => {
-  if (e.tag === 'drive-mirror-sync') {
-    e.waitUntil(
-      self.clients.matchAll({ type: 'window' }).then(clients => {
-        clients.forEach(c => c.postMessage({ type: 'MIRROR_SYNC_REQUESTED' }));
-      })
-    );
-  }
 });
 
 self.addEventListener('message', (e) => {
