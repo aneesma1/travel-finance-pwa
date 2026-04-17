@@ -43,8 +43,8 @@ jobs:
           cp -r shared src/shared
           
           # Verify shared folder is not empty
-          if [ ! -f src/shared/auth.js ]; then
-            echo "Critical Error: src/shared/auth.js not found after copy!"
+          if [ ! -f src/shared/sync-manager.js ]; then
+            echo "Critical Error: src/shared/sync-manager.js not found after copy!"
             exit 1
           fi
           # ── NATIVE STABILITY PIVOT (v5.4.0) ──
