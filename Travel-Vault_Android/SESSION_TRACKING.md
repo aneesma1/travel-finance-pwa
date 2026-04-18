@@ -208,3 +208,21 @@ This document tracks coding activity strictly for the `Travel-Vault_Android` dir
 - Multiple JS files in `src/js/` (import updates).
 
 **Expected Result:** APK build #24+ will successfully boot and resolve all internal module exports.
+---
+
+### Session 8: CI/CD Pipeline Logic Restoration (2026-04-18)
+**Context:** App crashes on Android with `SyntaxError: The requested module ... does not provide an export...` after successful builds.
+
+**Root Cause:** The GitHub Actions pipelines were executing an aggressive `sed` command that stripped all `export` keywords from JavaScript files. While intended for an earlier "standard script" migration, it terminally broke the apps' modern ES Module boot system (`type="module"`), leading to runtime module resolution failures.
+
+**Work Completed:**
+- **Pipeline Refactoring**: Removed the destructive Javascript and path stripping logic from both `build-travel.yml` and `build-vault.yml`.
+- **ES Module Preservation**: Restored full support for native ES Module loading on Android (which Capacitor 5+ handles out-of-the-box).
+- **Workflow Optimization**: Renamed the broken "Transform ES Modules" step to **"Inject Version Information"**, focusing solely on updating version strings in `index.html`.
+- **Path Stabilization**: Removed manual `sed` path replacements that were forcefully changing `../shared/` to `./shared/`, as the project structure already correctly resolves relative paths.
+
+**Files Changed (2):**
+- `.github/workflows/build-travel.yml`
+- `.github/workflows/build-vault.yml`
+
+**Expected Result:** Next build will serve valid ES Module code, resolving the boot-time `SyntaxError`.

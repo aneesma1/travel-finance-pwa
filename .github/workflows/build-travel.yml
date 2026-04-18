@@ -47,11 +47,10 @@ jobs:
           fi
 
           # ── NATIVE STABILITY PIVOT (v5.4.0) ──
-          # 1. Fix any hardcoded '../shared/' paths in HTML/CSS
-          find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|['\"]../shared/|'./shared/|g" {} +
-          find src -type f \( -name "*.html" -o -name "*.css" \) -exec sed -i "s|/shared/|./shared/|g" {} +
+          # No longer stripping imports/exports or modifying shared paths.
+          # Capacitor natively supports ES modules.
 
-      - name: Transform ES Modules to Standard Scripts
+      - name: Inject Version Information
         working-directory: Travel-Vault_Android/Travel_app
         run: |
           # 1. Read Version & Time
@@ -60,18 +59,9 @@ jobs:
           echo "APP_VER=$APP_VER" >> $GITHUB_ENV
           echo "Building Travel Hub v$APP_VER ($BUILD_TIME)"
 
-          # 2. Inject into index.html (before the closing </head> or start of scripts)
+          # 2. Inject into index.html
           sed -i "s|window.APP_VERSION = '.*'|window.APP_VERSION = '$APP_VER'|g" src/index.html
           sed -i "s|window.BUILD_TIME = '.*'|window.BUILD_TIME = '$BUILD_TIME'|g" src/index.html
-
-          # 3. Strip all imports (including multi-line blocks starting with import and ending with ;)
-          find src -name "*.js" -exec sed -i '/^import /,/;/d' {} +
-          # 4. Strip standard single-line imports that might have been missed
-          find src -name "*.js" -exec sed -i 's/^import .*//g' {} +
-          # 5. Strip 'export' keywords
-          find src -name "*.js" -exec sed -i 's/^export //g' {} +
-          # 6. Strip 'export default' specifically
-          find src -name "*.js" -exec sed -i 's/export default //g' {} +
         shell: bash
           
       - name: Generate App Icons
