@@ -52,20 +52,25 @@
 
   --nav-height: 64px;
   --header-height: 60px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ── All shared base styles ─────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  padding-top: env(safe-area-inset-top, 0px);
+}
 body {
   font-family: 'DM Sans', -apple-system, sans-serif;
   background: var(--surface-2); color: var(--text);
-  min-height: 100vh; overscroll-behavior: none;
+  min-height: 100dvh; overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
 }
 
-#app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--surface-2); }
-#screen { min-height: 100vh; padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom)); }
+#app { max-width: 480px; margin: 0 auto; min-height: 100dvh; background: var(--surface-2); }
+#screen { min-height: 100dvh; padding-bottom: calc(var(--nav-height) + var(--safe-bottom)); }
 
 .app-header {
   position: sticky; top: 0; z-index: 50;
@@ -84,8 +89,8 @@ body {
 .bottom-nav {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 480px;
-  height: calc(var(--nav-height) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  height: calc(var(--nav-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
   background: var(--surface); border-top: 1px solid var(--border);
   display: flex; align-items: center; z-index: 100;
   box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
@@ -103,7 +108,7 @@ body {
 
 .fab {
   position: fixed;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px);
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 16px);
   right: 20px; width: 56px; height: 56px; border-radius: 50%;
   background: var(--primary); color: #fff; border: none; cursor: pointer;
   font-size: 28px; display: flex; align-items: center; justify-content: center;

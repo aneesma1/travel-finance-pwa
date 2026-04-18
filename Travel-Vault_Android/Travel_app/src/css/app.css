@@ -53,18 +53,25 @@
 
   --nav-height: 64px;
   --header-height: 60px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ── Reset + base ────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  /* Ensure content never goes behind Android status bar */
+  padding-top: env(safe-area-inset-top, 0px);
+}
 
 body {
   font-family: 'DM Sans', -apple-system, sans-serif;
   background: var(--surface-2);
   color: var(--text);
-  min-height: 100vh;
+  min-height: 100dvh;
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -73,16 +80,15 @@ body {
 #app {
   max-width: 480px;
   margin: 0 auto;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--surface-2);
   position: relative;
 }
 
 /* ── Screen container ────────────────────────────────────────────────────────── */
 #screen {
-  min-height: 100vh;
-  padding-bottom: var(--nav-height);
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom));
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────────── */
@@ -112,9 +118,8 @@ body {
 .bottom-nav {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 480px;
-  height: var(--nav-height);
-  height: calc(var(--nav-height) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  height: calc(var(--nav-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: flex; align-items: center;
@@ -136,8 +141,9 @@ body {
 
 /* ── FAB ─────────────────────────────────────────────────────────────────────── */
 .fab {
-  position: fixed; bottom: calc(var(--nav-height) + 16px); right: 20px;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px);
+  position: fixed;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 16px);
+  right: 20px;
   width: 56px; height: 56px; border-radius: 50%;
   background: var(--primary); color: #fff;
   border: none; cursor: pointer; font-size: 28px;

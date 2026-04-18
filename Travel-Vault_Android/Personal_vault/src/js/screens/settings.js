@@ -32,7 +32,6 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export async function renderSettings(container, params = {}) {
   const data = await getCachedFinanceData();
   const { transactions = [], categories: savedCats = [], accounts: savedAccounts = [] } = data || {};
-  const user = getUser();
 
   // Auto-open export tab if navigated with tab param
   const activeTab = params.tab || 'data';
@@ -200,9 +199,9 @@ export async function renderSettings(container, params = {}) {
     });
 
     document.getElementById('import-data').addEventListener('click', () => {
-      // openFinanceImportModal(transactions);
-      showToast('Import tool active', 'info');
+      openFinanceImportModal(transactions);
     });
+
 
     document.getElementById('clear-cache').addEventListener('click', async () => {
       if (!confirm('Clear local cache? Data will be re-downloaded from Drive on next open.')) return;

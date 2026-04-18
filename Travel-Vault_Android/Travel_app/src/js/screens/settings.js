@@ -185,9 +185,19 @@ function renderDataTab(data, members, container) {
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Restore from Local Backup</div><div style="font-size:12px;color:var(--text-muted);">Pick a downloaded backup file</div></div>
         <span style="color:var(--text-muted);">›</span>
       </div>
-      <div class="list-row" id="photo-zip-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
+      <div class="list-row" id="import-excel-btn">
+        <span style="font-size:20px;">📊</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Import from Excel / CSV</div><div style="font-size:12px;color:var(--text-muted);">Import travel history from spreadsheet</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+      <div class="list-row" id="photo-zip-btn">
         <span style="font-size:20px;">📦</span>
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Export All Photos as ZIP</div><div style="font-size:12px;color:var(--text-muted);">Document scans, address photos</div></div>
+        <span style="color:var(--text-muted);">›</span>
+      </div>
+      <div class="list-row" id="clear-cache-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
+        <span style="font-size:20px;">🧹</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Clear Local Cache</div><div style="font-size:12px;color:var(--text-muted);">Force re-download from Drive on next open</div></div>
         <span style="color:var(--text-muted);">›</span>
       </div>
     </div>
@@ -231,8 +241,9 @@ function renderDataTab(data, members, container) {
     } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
   });
 
-  // Redundant online button links removed
-
+  document.getElementById('import-excel-btn').addEventListener('click', () => {
+    openImportModal(data, members);
+  });
 
   document.getElementById('photo-zip-btn').addEventListener('click', async () => {
     try {
@@ -285,37 +296,18 @@ function renderDataTab(data, members, container) {
   });
 
   document.getElementById('reset-db-btn').addEventListener('click', async () => {
-    const doubleConfirm = confirm('☢️ NUCLEAR RESET: This will PERMANENTLY DELETE all local travel data AND your Google Drive cloud records.\n\nProceed to wipe everything?');
+    const doubleConfirm = confirm('☢️ NUCLEAR RESET: This will PERMANENTLY DELETE all local travel data.\n\nProceed to wipe everything?');
     if (!doubleConfirm) return;
     const tripleConfirm = confirm('Are you 100% sure? All history will be lost forever.');
     if (!tripleConfirm) return;
-
     try {
-      showToast('Wiping cloud database clean…', 'info', 5000);
-      const emptySet = {
-        schemaVersion: 1,
-        trips: [],
-        passengers: [],
-        members: [],
-        documents: [],
-        familyDefaults: {},
-        familyRelations: [],
-        customDocTypes: [],
-        appInfo: { version: 'v4.14.0', lastReset: new Date().toISOString() }
-      };
-
-      // Removed cloud reset queues, just doing local clear
       await clearAllCachedData();
-      
-      // Clear native caches
       localStorage.clear();
       sessionStorage.clear();
-
       showToast('☢️ TOTAL WIPE COMPLETE', 'success');
       setTimeout(() => window.location.href = './', 1500);
     } catch (err) {
       showToast('Reset failed: ' + err.message, 'error');
-      console.error('Reset error:', err);
     }
   });
 
