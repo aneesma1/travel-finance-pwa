@@ -60,7 +60,7 @@ async function clearDriveQueue() {
 }
 
 // ── Public: enqueue a local-first save ───────────────────────────────────────
-async function localSave(appName, mergeFn) {
+export async function localSave(appName, mergeFn) {
   // ① Write to IndexedDB immediately -- user sees result in <10ms
   var current = appName === 'travel'
     ? await getCachedTravelData()

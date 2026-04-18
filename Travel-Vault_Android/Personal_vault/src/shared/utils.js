@@ -147,7 +147,7 @@ export async function copyToClipboard(text) {
 }
 
 // ── Toast notification ────────────────────────────────────────────────────────
-function showToast(message, type, duration) {
+export function showToast(message, type, duration) {
   // type: 'info' | 'success' | 'error' | 'warning'
   type = type || 'info';
   duration = (duration !== undefined) ? duration : 3000;
@@ -316,13 +316,13 @@ export function showInputModal(title, label, defaultValue = '', options = {}) {
 }
 
 // ── Local Storage App State (UI prefs only — do NOT use for data) ────────────
-function getLocalPref(key, defaultVal) {
+export function getAppState(key, defaultVal) {
   defaultVal = (defaultVal !== undefined) ? defaultVal : false;
   const v = localStorage.getItem('app_pref_' + key);
   if (v === null) return defaultVal;
   try { return JSON.parse(v); } catch { return v; }
 }
 
-function setLocalPref(key, val) {
+export function setAppState(key, val) {
   localStorage.setItem('app_pref_' + key, JSON.stringify(val));
 }
