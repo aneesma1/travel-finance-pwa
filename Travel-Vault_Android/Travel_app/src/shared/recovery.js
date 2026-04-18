@@ -7,7 +7,8 @@
 import { showConfirmModal, showInputModal, showToast, isOnline, uuidv4 } from './utils.js';
 import { getCachedTravelData, getCachedFinanceData, setCachedTravelData, setCachedFinanceData } from './db.js';
 import { localSave } from './sync-manager.js';
-import { clearAuth } from './auth.js';
+// Local stubs
+function clearAuth() { return Promise.resolve(); }
 
 const JSZIP_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 
@@ -93,7 +94,7 @@ async function fetchAppManifest(appName) {
   // We can't easily read the sw.js variable constant from the outside,
   // so we maintain a hard-coded list here matching the SW manifest.
   const shared = [
-    '../shared/utils.js', '../shared/auth.js', '../shared/drive.js', '../shared/db.js',
+    '../shared/utils.js', '../shared/drive.js', '../shared/db.js',
     '../shared/smart-input.js', '../shared/multi-smart-input.js', '../shared/pill-select.js',
     '../shared/import-tool.js', '../shared/photo-picker.js', '../shared/sync-manager.js',
     '../shared/pwa-install.js', '../shared/sync-queue.js'

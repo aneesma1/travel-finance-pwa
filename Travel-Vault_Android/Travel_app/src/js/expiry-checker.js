@@ -10,10 +10,10 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData } from '../../shared/db.js';
-import { localSave } from '../../shared/sync-manager.js';
+import { getCachedTravelData, setCachedTravelData } from '../shared/db.js';
+import { localSave } from '../shared/sync-manager.js';
 import { syncDocumentAlerts } from './calendar.js';
-import { daysFromToday, expiryStatus, showToast, isOnline } from '../../shared/utils.js';
+import { daysFromToday, expiryStatus, showToast, isOnline } from '../shared/utils.js';
 
 const CHECKED_KEY = 'expiry_last_checked'; // localStorage -- avoid re-alerting same day
 

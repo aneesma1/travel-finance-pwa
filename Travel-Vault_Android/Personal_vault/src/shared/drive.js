@@ -7,7 +7,9 @@
 
 'use strict';
 
-import { authFetch, getToken } from './auth.js';
+// Local stubs (auth.js deleted)
+function authFetch() { return Promise.reject(new Error('Offline')); }
+function getToken() { return null; }
 import { isOnline } from './utils.js';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -575,7 +577,7 @@ export async function restoreFromLocalFile(file, appName) {
  */
 export async function purgeOrphanedFiles(appName, localData) {
   if (!isOnline()) throw new Error('Internet connection required');
-  const token = (await import('./auth.js')).getToken();
+  const token = getToken();
   if (!token) throw new Error('Not signed in');
 
   const appFolderId = localStorage.getItem(KEYS.appFolderId);

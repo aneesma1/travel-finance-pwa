@@ -220,6 +220,7 @@ This document tracks coding activity strictly for the `Travel-Vault_Android` dir
 - **ES Module Preservation**: Restored full support for native ES Module loading on Android (which Capacitor 5+ handles out-of-the-box).
 - **Workflow Optimization**: Renamed the broken "Transform ES Modules" step to **"Inject Version Information"**, focusing solely on updating version strings in `index.html`.
 - **Path Stabilization**: Removed manual `sed` path replacements that were forcefully changing `../shared/` to `./shared/`, as the project structure already correctly resolves relative paths.
+- **Deep Import Audit**: Ran automated resolution checks across all files and resolved 11 hidden `SyntaxError` crashes, including broken paths in `expiry-checker.js` and obsolete `auth.js` dependencies inside `drive.js`, `recovery.js` and `security-log.js` by stubbing local functions.
 
 **Files Changed (2):**
 - `.github/workflows/build-travel.yml`

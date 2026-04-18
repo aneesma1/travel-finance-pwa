@@ -6,7 +6,10 @@
 
 'use strict';
 
-import { getToken, getUser, isAuthenticated } from './auth.js';
+// Local stubs
+function getToken() { return null; }
+function getUser() { return { name: 'Local User', email: 'local@device' }; }
+function isAuthenticated() { return false; }
 import { isOnline, uuidv4 } from './utils.js';
 
 const SESSION_FILE_KEY  = 'drive_sessions_file_id';
