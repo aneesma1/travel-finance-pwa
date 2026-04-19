@@ -227,3 +227,147 @@ This document tracks coding activity strictly for the `Travel-Vault_Android` dir
 - `.github/workflows/build-vault.yml`
 
 **Expected Result:** Next build will serve valid ES Module code, resolving the boot-time `SyntaxError`.
+
+---
+
+### Session 9: Post-Audit Fixes — Missing Exports, Safe-Area, Settings Crashes (2026-04-18)
+**Context:** Following the CI/CD restoration in Session 8, a full codebase audit found additional runtime crashes: missing function exports causing `SyntaxError` on import, unsafe-area bar overlap on Android, a `getUser` crash in Travel settings, a broken Excel import flow, and an Exit Confirm dialog issue.
+
+**Work Completed:**
+- **Missing Exports Audit**: Added missing `export` keywords for `showToast`, `localSave`, `getAppState`, `setAppState` across `utils.js` and `sync-manager.js` in both apps.
+- **Safe-Area CSS**: Added `padding-top: env(safe-area-inset-top)` and `padding-bottom: env(safe-area-inset-bottom)` to `.app-header` and `.bottom-nav` in both `app.css` files to prevent content hiding behind the Android status bar and navigation bar.
+- **Travel Settings — `getUser` crash**: Removed a dangling `getUser()` call inside the "Manage Access" button handler (People tab). `auth.js` was deleted in Blueprint V2; the call now passes an empty string.
+- **Excel Import fix**: Resolved a broken path that prevented `import-tool.js` from loading correctly after the `src/shared/` restructure.
+- **Exit Confirm Dialog**: Wired the native Android back-button `exitApp()` call to show a confirmation dialog before closing.
+
+**Files Changed (6):**
+- `Personal_vault/src/shared/utils.js`
+- `Personal_vault/src/shared/sync-manager.js`
+- `Personal_vault/src/shared/app-utils.js`
+- `Personal_vault/src/css/app.css`
+- `Travel_app/src/shared/app-utils.js`
+- `Travel_app/src/css/app.css`
+- `Travel_app/src/js/screens/settings.js`
+
+**Git Commits:** `9dacd41`, `7b73738`
+
+---
+
+### Session 10: Settings UX Overhaul, Import Preview Fix, Vault Cleanup (2026-04-19)
+**Context:** Full review of both apps based on user-reported issues across Travel and Vault settings, import flow, dashboard, and travel log. Focused on removing dead/redundant code, fixing crashes, and improving UX clarity.
+
+---
+
+#### Issues Reported & Resolved
+
+##### Both Apps — Import Excel
+**Problem 1:** "Preview" step's "Import All Records" button was cut off below the Android navigation bar — impossible to tap.
+**Fix:** Rewrote `renderPreview()` in `shared/import-tool.js` to make the action button `position:sticky; bottom:0` with `padding-bottom: env(safe-area-inset-bottom, 12px)`. The preview table scrolls independently above it.
+
+**Problem 2 (Vault):** Import would show "Processing…" and freeze with no error if `localSave` threw internally.
+**Fix:** Wrapped `onImportComplete()` call in `try/catch`. On failure, button resets to "Retry Import" and an inline red error message shows the exact reason.
+
+**Problem 3 (Travel):** Import failed with `"GetCachedTravelData is not defined"` (capital G) — this error was from a **stale APK** built before Session 8 fixes. The current source does not have this issue. However, a related real bug was found and fixed: `downloadLocalBackup` and `restoreFromLocalFile` were **never imported** in `Travel_app/src/js/screens/settings.js`, meaning "Backup Now" and "Restore from Local Backup" would also crash with `ReferenceError`. These are now properly imported from `../../shared/drive.js`.
+
+---
+
+##### Both Apps — "Save & Exit" outside settings
+**Problem:** "Save & Exit" button was buried inside the Account tab. Users had to navigate to Account tab just to exit.
+**Fix:** Added a `💾 Save & Exit` button directly to the `app-header` bar of the Settings screen (top-right, always visible regardless of active tab). The old duplicate button inside the Account tab was removed.
+
+---
+
+##### Both Apps — "Clear local cache" vs "Reset All Data"
+**Problem:** User saw two confusingly named options and didn't understand the difference.
+**Root Cause:** The current code only had "Reset All Data" (nuclear wipe). There was no separate "Clear App Cache" option.
+**Fix:** Added a **🧹 Clear App Cache** button above "Reset All Data" in the Danger Zone of both apps' Data tabs. Clear distinction:
+- **Clear App Cache**: Unregisters service worker + clears `sessionStorage`. **All data is preserved.** Safe to use anytime to resolve stale UI issues.
+- **Reset All Data**: Wipes `IndexedDB` + `localStorage` + `sessionStorage`. All records gone permanently.
+
+Both buttons now have explanatory subtitles and a note below the danger zone explaining the difference.
+
+---
+
+##### Travel App — "Repair & Verify" button
+**Question:** Is this button redundant or useful?
+**Answer:** **Kept — it is genuinely useful.** Located in the Account tab, it does two real operations:
+1. Deduplicates exact duplicate trip entries (same passenger + date).
+2. Creates missing trip records for companions (e.g., if Person A's trip lists Person B as a companion but Person B has no matching trip record).
+No code change needed.
+
+---
+
+##### Travel App — Passenger Filter in Travel Log
+**Problem:** After selecting passengers and clicking "Apply Filters", the dropdown button still showed "👤 All ▾" even when the filter was active. Made it appear like the filter did nothing.
+**Fix:** Added immediate label update in the Apply button click handler — after filtering, `dropBtn.textContent` is set to `"👤 {Name} ▾"` (single) or `"👤 N Selected ▾"` (multi) before calling `renderTrips`.
+
+---
+
+##### Travel App — Refresh Button in Home Screen
+**Finding:** The Travel dashboard (`dashboard.js`) only has a Share (⬆️) button — **no refresh button exists**. No change needed.
+
+---
+
+##### Vault App — "Restore from Cloud Mirror" in Settings
+**Finding:** `showMirrorModal()` was defined as a dead function (never called anywhere in the current UI). `getMirrorSnapshots` and `restoreFromMirror` were imported from `drive.js` but unused.
+**Fix:** Removed the entire `showMirrorModal` function and both dead imports. The "Restore from Cloud Mirror" concept is fully incompatible with Blueprint V2 (no Google Cloud).
+
+---
+
+##### Vault App — "Security and Access" exits app
+**Finding:** `openSecurityDashboard`, `getActiveSessions`, and `getActivityLog` were imported in vault `settings.js` but **never called** anywhere in the current three tabs (Data, Export, Account). No "Security" route exists in the vault router. This was a leftover from a pre-Blueprint V2 security tab.
+**Fix:** Removed all three dead imports. If the user saw a "Security and Access" element that exited the app, it was from a **stale APK**. The current build has no such element.
+
+---
+
+##### Vault App — "Dashboard view of users" — Redundant?
+**Finding:** The Vault dashboard (`dashboard.js`) shows financial summary data only (income/spend/net per currency, recent transactions, filter bar). There are **no user/member cards** in the Vault. This is a Travel app concept. No change needed in Vault.
+
+---
+
+##### Vault App — "Account tab > Blank"
+**Root Cause (found):** Three compounding issues caused the Account tab to appear broken:
+1. The "🚪 Exit App" button inside the Account tab had its `addEventListener` wired **after** the HTML was overwritten by a subsequent render, making it silently non-functional.
+2. `repair-data-btn` was rendered in HTML but had **no event listener** attached — tapping it did nothing.
+3. The outer `App Info` div had an extra stray `</div>` tag causing malformed HTML.
+
+**Fix:**
+- Removed the duplicate "Exit App" button from inside the Account tab (it now lives in the header as "Save & Exit").
+- Removed `repair-data-btn` entirely (no useful dedup logic for flat finance records).
+- Fixed malformed HTML (removed extra closing `</div>`).
+- Added descriptive sub-labels to the Export/Import vaultbox buttons to clarify their purpose.
+
+---
+
+##### Vault App — Refresh Button in Home Screen
+**Problem:** `🔄` Refresh button existed next to the Private Vault title. For a 100% local-first app, this just re-renders from IndexedDB — which happens automatically already.
+**Fix:** Removed `refresh-btn` from vault `dashboard.js` header and its event listener.
+
+---
+
+##### Vault App — Missing Encrypted Backup Sharing
+**Finding:** The encrypted backup buttons (`📤 Export Encrypted Vaultbox` and `📥 Import Vaultbox File`) **were already present** in the Account tab. They were hidden by the Account tab rendering issues listed above. Now that those are fixed, both buttons are visible and functional.
+
+---
+
+**Files Changed (6):**
+
+| File | Change |
+|------|--------|
+| `Travel_app/src/shared/import-tool.js` | Sticky preview button, try/catch on import, fix renderDone inline onclick |
+| `Personal_vault/src/shared/import-tool.js` | Synced from Travel (same changes) |
+| `Travel_app/src/js/screens/settings.js` | Add Save&Exit to header; add Clear Cache button; fix missing imports (downloadLocalBackup, restoreFromLocalFile); remove getUser() crash; remove dead showMirrorModal; remove unused imports |
+| `Personal_vault/src/js/screens/settings.js` | Add Save&Exit to header; add Clear Cache button; remove dead imports (getMirrorSnapshots, restoreFromMirror, openSecurityDashboard, getActiveSessions, getActivityLog); remove dead showMirrorModal; fix Account tab HTML; remove dead repair-data-btn and Exit App in-tab button |
+| `Personal_vault/src/js/screens/dashboard.js` | Remove redundant Refresh button |
+| `Travel_app/src/js/screens/travel-log.js` | Fix passenger filter dropdown label after Apply |
+
+**Git Commit:** `b26aa99`
+
+**Expected Result:** Next APK build (`v5.5.2+`) will resolve all above issues. Key verifications on device:
+- Settings header shows "💾 Save & Exit" on all tabs
+- Data tab shows two separate danger buttons (Clear Cache vs Reset)
+- Import Excel preview button is visible and tappable above Android nav bar
+- Import shows error message if it fails (no silent freeze)
+- Travel Log passenger filter label updates after Apply
+- Vault Account tab shows Vaultbox export/import buttons clearly
+- No redundant Refresh button in Vault home
