@@ -6,17 +6,12 @@
 'use strict';
 
 import { getCachedFinanceData, setCachedFinanceData, clearAllCachedData } from '../../shared/db.js';
-import { getActiveSessions, getActivityLog } from '../../shared/security-log.js';
-import { openSecurityDashboard } from '../../shared/security-dashboard.js';
 import {
-  currentMonth, currentYear, formatDisplayDate, showToast, isOnline, copyToClipboard,
-  showConfirmModal, getAppState, setAppState
+  currentMonth, currentYear, showToast, copyToClipboard
 } from '../../shared/utils.js';
 import {
-  downloadLocalBackup, restoreFromLocalFile, timestampSuffix,
-  getMirrorSnapshots, restoreFromMirror
+  downloadLocalBackup, restoreFromLocalFile, timestampSuffix
 } from '../../shared/drive.js';
-import { getSecurityLogs, clearSecurityLogs } from '../../shared/db.js';
 import { localSave } from '../../shared/sync-manager.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
@@ -39,6 +34,7 @@ export async function renderSettings(container, params = {}) {
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">⚙️ Settings</span>
+      <button id="header-exit-btn" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">💾 Save &amp; Exit</button>
     </div>
 
     <!-- Tab bar -->
@@ -46,7 +42,6 @@ export async function renderSettings(container, params = {}) {
       ${[
       { id: 'data', label: '💾 Data' },
       { id: 'export', label: '📤 Export' },
-      { id: 'security', label: '🔐 Security' },
       { id: 'account', label: '👤 Account' },
     ].map(tab => `
         <button class="settings-tab ${activeTab === tab.id ? 'active' : ''}" data-tab="${tab.id}" style="
@@ -63,6 +58,13 @@ export async function renderSettings(container, params = {}) {
     <input type="file" id="restore-file" accept=".json" style="display:none;" />
   `;
 
+  // Header Save & Exit
+  document.getElementById('header-exit-btn')?.addEventListener('click', async () => {
+    showToast('Saving & exiting…', 'info', 1500);
+    await new Promise(r => setTimeout(r, 800));
+    await exitApp();
+  });
+
   // Tab switching
   document.querySelectorAll('.settings-tab').forEach(btn => {
     btn.addEventListener('click', () => renderSettings(container, { tab: btn.dataset.tab }));
@@ -71,8 +73,7 @@ export async function renderSettings(container, params = {}) {
   switch (activeTab) {
     case 'data': renderDataTab(transactions, data); break;
     case 'export': renderExportTab(transactions, data); break;
-    case 'security': renderSecurityTab(); break;
-    case 'account': renderAccountTab(user, data); break;
+    case 'account': renderAccountTab(null, data); break;
   }
 
   // ── DATA TAB ──────────────────────────────────────────────────────────────
@@ -97,16 +98,6 @@ export async function renderSettings(container, params = {}) {
           </div>
           <span style="color:var(--text-muted);">›</span>
         </div>
-        <div class="list-row" id="restore-mirror">
-          <span style="font-size:20px;">☁️</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Restore from Cloud Mirror</div>
-            <div style="font-size:12px;color:var(--text-secondary);">Pick a recovery snapshot from Drive</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
-        </div>
-
-
       </div>
       <div class="list-row" id="import-data">
           <span style="font-size:20px;">📥</span>
@@ -124,13 +115,6 @@ export async function renderSettings(container, params = {}) {
           </div>
           <span style="color:var(--text-muted);">›</span>
         </div>
-        <div class="list-row" id="clear-cache" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
-          <span style="font-size:20px;">🧹</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Clear Local Cache</div>
-            <div style="font-size:12px;color:var(--text-muted);">Force re-download from Drive on next open</div>
-          </div>
-          <span style="color:var(--text-muted);">›</span>
         </div>
       </div>
 
@@ -158,17 +142,25 @@ export async function renderSettings(container, params = {}) {
 
       <div class="section-title" style="color:var(--danger);margin-top:24px;">⛔ Danger Zone</div>
       <div class="card" style="margin:0 16px;border:1px solid var(--danger);background:rgba(220,38,38,0.05);">
-        <div class="list-row" id="reset-db-btn" style="border:none;border-radius:var(--radius-lg);">
+        <div class="list-row" id="clear-cache-btn" style="border:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:20px;">🧹</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Clear App Cache</div>
+            <div style="font-size:11px;color:var(--text-muted);">Clears service-worker &amp; temp caches. Your data is kept.</div>
+          </div>
+          <span style="color:var(--text-muted);font-weight:700;font-size:12px;">CLEAR</span>
+        </div>
+        <div class="list-row" id="reset-db-btn" style="border:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);">
           <span style="font-size:20px;">🔥</span>
           <div style="flex:1;">
             <div style="font-size:14px;font-weight:700;color:var(--danger);">Reset All Data</div>
-            <div style="font-size:11px;color:var(--text-muted);">Permanently delete all finance records.</div>
+            <div style="font-size:11px;color:var(--text-muted);">Permanently deletes ALL records &amp; cache. Irreversible.</div>
           </div>
           <span style="color:var(--danger);font-weight:700;font-size:12px;">RESET</span>
         </div>
       </div>
       <div style="padding:12px 24px;font-size:11px;color:var(--text-muted);line-height:1.4;">
-        ⚠️ Resetting will wipe your local cache <b>and</b> your Drive mirror. This is irreversible. Please <b>Backup Now</b> before resetting.
+        ⚠️ <b>Clear App Cache</b> = remove temp files only (data is safe). <b>Reset All Data</b> = wipe everything permanently. Always <b>Backup Now</b> first.
       </div>
     `;
 
@@ -188,31 +180,28 @@ export async function renderSettings(container, params = {}) {
       input.click();
     };
 
-    document.getElementById('restore-mirror').addEventListener('click', async () => {
-      if (!isOnline()) { showToast('Internet required for Drive mirror', 'warning'); return; }
-      const snapshots = await getMirrorSnapshots('finance').catch(() => []);
-      if (!snapshots.length) { showToast('No mirror snapshots found', 'warning'); return; }
-      // Assuming showMirrorModal is available in scope or imported
-      // For now, using the drive.js restoreFromMirror if possible, or keeping standard flow
-      showToast('Cloud Mirror Check...', 'info');
-      // ... (rest of mirror logic)
-    });
-
     document.getElementById('import-data').addEventListener('click', () => {
       openFinanceImportModal(transactions);
     });
 
-
-    document.getElementById('clear-cache').addEventListener('click', async () => {
-      if (!confirm('Clear local cache? Data will be re-downloaded from Drive on next open.')) return;
-      await clearAllCachedData();
-      showToast('Cache cleared', 'success');
-      setTimeout(() => window.location.reload(), 1000);
+    document.getElementById('clear-cache-btn')?.addEventListener('click', async () => {
+      if (!confirm('Clear app cache? Your finance data will NOT be deleted.')) return;
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) await reg.unregister();
+        }
+        sessionStorage.clear();
+        showToast('Cache cleared. Reloading…', 'success');
+        setTimeout(() => window.location.reload(true), 1200);
+      } catch (err) {
+        showToast('Clear failed: ' + err.message, 'error');
+      }
     });
 
     document.getElementById('reset-db-btn').addEventListener('click', async () => {
       if (!confirm('⚠️ RESET DATABASE?\n\nThis will PERMANENTLY DELETE all your transactions, categories, and account settings.\n\nHave you taken a backup first?')) return;
-      if (!confirm('SECOND CONFIRMATION:\n\nThis action cannot be undone. All your data in the cloud (Google Drive) will also be wiped out. Are you absolutely sure?')) return;
+      if (!confirm('SECOND CONFIRMATION:\n\nThis action cannot be undone. Are you absolutely sure?')) return;
 
       try {
         showToast('Resetting database…', 'info', 3000);
@@ -455,132 +444,6 @@ export async function renderSettings(container, params = {}) {
     }
   }
 
-  // ── SECURITY TAB ──────────────────────────────────────────────────────────
-  function renderSecurityTab() {
-    const tab = document.getElementById('tab-content');
-    tab.innerHTML = `
-      <div class="section-title">Security Dashboard</div>
-      <div class="list-row" id="safe-exit-btn" style="border-radius:var(--radius-lg);">
-        <span style="font-size:20px;">🛡️</span>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;">Security & Access</div>
-          <div style="font-size:12px;color:var(--text-muted);">Sessions · Activity log · Revoke access</div>
-        </div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-      <div class="list-row" id="security-dashboard-btn" style="border-radius:var(--radius-lg); border-top:1px solid var(--border-light);">
-        <span style="font-size:20px;">⚙️</span>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;">Dashboard View</div>
-          <div style="font-size:12px;color:var(--text-muted);">Detailed logs and session management</div>
-        </div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-    </div>
-
-    <div class="section-title" style="margin-top:16px;">App Session</div>
-    <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);">
-      <div class="list-row" id="safe-exit-btn-alt" style="border-radius:var(--radius-lg);">
-        <span style="font-size:20px;">🚪</span>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;">Save & Exit</div>
-          <div style="font-size:12px;color:var(--text-muted);">Sync to Drive then close app</div>
-        </div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-    </div>
-
-      <div class="section-title" style="margin-top:16px;">Auto-lock</div>
-      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:16px;">
-        <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Lock app after inactivity</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;" id="lock-timeout-pills">
-          ${[
-        { label: '1 min', ms: 60000 },
-        { label: '5 min', ms: 300000 },
-        { label: '15 min', ms: 900000 },
-        { label: '30 min', ms: 1800000 },
-        { label: 'Never', ms: 0 }
-      ].map(opt => {
-        const current = Number(localStorage.getItem('vault_lock_timeout_ms') || 300000);
-        const active = opt.ms === current || (opt.ms === 300000 && !localStorage.getItem('vault_lock_timeout_ms'));
-        const cls = active ? 'pill-btn active' : 'pill-btn';
-        const border = active ? 'var(--primary)' : 'var(--border)';
-        const bg = active ? 'var(--primary-bg)' : 'transparent';
-        const col = active ? 'var(--primary)' : 'var(--text)';
-        return '<button class="' + cls + '" data-ms="' + opt.ms + '" style="padding:8px 16px;border-radius:20px;border:1.5px solid ' + border + ';background:' + bg + ';color:' + col + ';font-size:14px;cursor:pointer;">' + opt.label + '</button>';
-      }).join('')}
-        </div>
-      </div>
-
-      <div class="section-title" style="margin-top:16px;">Change PIN</div>
-      <div class="card" style="margin:0 16px;padding:20px;">
-        <div class="form-group" style="margin:0 0 16px;">
-          <label class="form-label">Current PIN</label>
-          <input type="password" class="form-input" id="current-pin" inputmode="numeric" maxlength="4" placeholder="····" style="letter-spacing:8px;font-size:20px;" />
-        </div>
-        <div class="form-group" style="margin:0 0 16px;">
-          <label class="form-label">New PIN</label>
-          <input type="password" class="form-input" id="new-pin" inputmode="numeric" maxlength="4" placeholder="····" style="letter-spacing:8px;font-size:20px;" />
-        </div>
-        <div class="form-group" style="margin:0 0 20px;">
-          <label class="form-label">Confirm New PIN</label>
-          <input type="password" class="form-input" id="confirm-pin" inputmode="numeric" maxlength="4" placeholder="····" style="letter-spacing:8px;font-size:20px;" />
-        </div>
-        <div id="pin-error" style="color:var(--danger);font-size:13px;text-align:center;min-height:18px;margin-bottom:12px;"></div>
-        <button class="btn btn-primary btn-full" id="change-pin-btn">🔑 Change PIN</button>
-      </div>
-    `;
-
-    document.getElementById('security-dashboard-btn')?.addEventListener('click', () => {
-      openSecurityDashboard(container);
-    });
-
-    const onExit = async () => {
-      showToast('Syncing before exit…', 'info', 2000);
-      await new Promise(r => setTimeout(r, 1500));
-      await exitApp();
-    };
-
-    document.getElementById('safe-exit-btn')?.addEventListener('click', onExit);
-    document.getElementById('safe-exit-btn-alt')?.addEventListener('click', onExit);
-
-    document.querySelectorAll('#lock-timeout-pills .pill-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const ms = Number(btn.dataset.ms);
-        localStorage.setItem('vault_lock_timeout_ms', String(ms));
-        document.querySelectorAll('#lock-timeout-pills .pill-btn').forEach(b => {
-          const active = b === btn;
-          b.style.border = `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`;
-          b.style.background = active ? 'var(--primary-bg)' : 'transparent';
-          b.style.color = active ? 'var(--primary)' : 'var(--text)';
-        });
-        showToast('Auto-lock set to ' + btn.textContent, 'success');
-      });
-    });
-
-    document.getElementById('change-pin-btn').addEventListener('click', async () => {
-      const cur = document.getElementById('current-pin').value;
-      const nw = document.getElementById('new-pin').value;
-      const conf = document.getElementById('confirm-pin').value;
-      const err = document.getElementById('pin-error');
-
-      if (!cur || cur.length !== 4) { err.textContent = 'Enter your current 4-digit PIN'; return; }
-      if (!nw || nw.length !== 4) { err.textContent = 'New PIN must be 4 digits'; return; }
-      if (nw !== conf) { err.textContent = 'New PINs do not match'; return; }
-      if (nw === cur) { err.textContent = 'New PIN must be different from current'; return; }
-
-      try {
-        await changePin(cur, nw);
-        showToast('PIN changed successfully!', 'success');
-        err.textContent = '';
-        ['current-pin', 'new-pin', 'confirm-pin'].forEach(id => { document.getElementById(id).value = ''; });
-      } catch (e) {
-        err.textContent = e.message.startsWith('WRONG') ? 'Current PIN is incorrect' : e.message;
-      }
-    });
-  }
-
-
 
   // ── ACCOUNT TAB ───────────────────────────────────────────────────────────
   function renderAccountTab(user, data) {
@@ -591,36 +454,29 @@ export async function renderSettings(container, params = {}) {
         <div class="card-body" style="padding-top:12px;padding-bottom:12px;">
           <div style="font-size:14px; font-weight:700; text-align:center;">Local-First Edition</div>
           <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:8px;">
-             Your data is securely stored directly on this device.
+             Your data is securely stored directly on this device. Use the <b>Save &amp; Exit</b> button at the top to exit safely.
           </div>
-          <button class="btn btn-primary btn-full" style="margin-top:8px; margin-bottom:10px;" id="account-exit-btn">💾 Save & Exit App</button>
-          
-          <div style="border-top:1px dashed var(--border); margin:16px 0;"></div>
-          
+
+          <div style="border-top:1px dashed var(--border); margin:8px 0;"></div>
+
           <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--primary);">🔒 Secure Vaultbox Backup</div>
           <button class="btn btn-secondary btn-full" id="export-vaultbox-btn">📤 Export Encrypted Vaultbox</button>
           <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
-             Generate a secure, password-protected file to share via WhatsApp.
+             Generate a secure, password-protected file to share via WhatsApp or Google Drive.
           </div>
-          
+
           <button class="btn btn-secondary btn-full" id="import-vaultbox-btn" style="margin-top:12px; border-style: dashed;">📥 Import Vaultbox File</button>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
+             Pick a .vaultbox file from WhatsApp / Files, enter password to restore.
+          </div>
         </div>
       </div>
 
       <div class="section-title" style="margin-top:16px;">App Info</div>
       <div style="margin:0 16px;padding:12px 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
         <div style="font-size:13px;color:var(--text-muted);">Private Vault ${window.APP_VERSION || 'v5.5.0'} · Native</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v2.0 · Offline-First Array</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Blueprint v2.0 · Offline-First</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Data: ${data?.transactions?.length || 0} transactions · ${data?.categories?.length || 0} categories</div>
-
-          <div style="display:flex; gap:10px; margin-top:10px">
-            <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Repair Data</button>
-          </div>
-          <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
-            Maintenance: Removes duplicates and tests data integrity.
-          </div>
-        </div>
-
       </div>
     `;
 
@@ -636,22 +492,6 @@ export async function renderSettings(container, params = {}) {
       importEncryptedBackup('finance');
     });
 
-
-    document.getElementById('force-update-btn')?.addEventListener('click', async () => {
-      if (confirm('This will unregister the Service Worker and hard-reload the app. Continue?')) {
-        if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (const reg of regs) await reg.unregister();
-        }
-        localStorage.clear();
-        window.location.reload(true);
-      }
-    });
-    document.getElementById('account-exit-btn')?.addEventListener('click', async () => {
-      showToast('Syncing before exit…', 'info', 2000);
-      await new Promise(r => setTimeout(r, 1500));
-      await exitApp();
-    });
 
     document.getElementById('photo-zip-btn')?.addEventListener('click', async () => {
       try {
@@ -701,45 +541,6 @@ export async function renderSettings(container, params = {}) {
     // Cloud-based sign-in / shared database features removed — Local-first edition
   }
 
-  // ── Mirror modal ──────────────────────────────────────────────────────────
-  function showMirrorModal(snapshots) {
-    const modal = document.getElementById('modal');
-    modal.classList.remove('hidden');
-    modal.innerHTML = `
-      <div class="modal-sheet">
-        <div class="modal-handle"></div>
-        <div style="padding:0 20px 24px;">
-          <div style="font-size:17px;font-weight:700;margin-bottom:16px;">Restore from Mirror</div>
-          ${snapshots.map((s, i) => `
-            <button class="list-row" data-snap="${i}" style="width:100%;text-align:left;border-radius:var(--radius-md);margin-bottom:8px;border:1px solid var(--border);">
-              <div style="flex:1;">
-                <div style="font-size:14px;font-weight:600;">${new Date(s.timestamp).toLocaleString('en-GB')}</div>
-                <div style="font-size:12px;color:var(--text-muted);">${s.recordCount} transactions</div>
-              </div>
-              <span style="color:var(--primary);font-weight:600;font-size:13px;">Restore</span>
-            </button>
-          `).join('')}
-          <button class="btn btn-secondary btn-full" id="close-modal" style="margin-top:8px;">Cancel</button>
-        </div>
-      </div>`;
-    modal.querySelectorAll('[data-snap]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const idx = Number(btn.dataset.snap);
-        if (!confirm(`Restore snapshot from ${new Date(snapshots[idx].timestamp).toLocaleString('en-GB')}?`)) return;
-        try {
-          showToast('Restoring…', 'info', 2000);
-          const restored = await restoreFromMirror('finance', idx);
-          await setCachedFinanceData(restored);
-          showToast('Restored!', 'success');
-          modal.classList.add('hidden');
-          navigate('dashboard');
-        } catch { showToast('Restore failed', 'error'); }
-      });
-    });
-    document.getElementById('close-modal').addEventListener('click', () => modal.classList.add('hidden'));
-    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
-  }
-
   // ── Finance Import Modal ──────────────────────────────────────────────────
   function openFinanceImportModal(existingTransactions) {
     const modal = document.getElementById('modal');
@@ -751,7 +552,7 @@ export async function renderSettings(container, params = {}) {
           <span style="font-size:16px;font-weight:700;">Import Finance Data</span>
           <button id="close-import" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
         </div>
-        <div id="import-tool-container" style="overflow-y:auto;max-height:72vh;"></div>
+        <div id="import-tool-container" style="overflow-y:auto;max-height:72vh;padding-bottom:60px;"></div>
       </div>
     `;
     document.getElementById('close-import').addEventListener('click', () => modal.classList.add('hidden'));

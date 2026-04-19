@@ -24,7 +24,6 @@ export async function renderDashboard(container) {
       <span class="app-header-title">🔐 Private Vault</span>
       <div style="display:flex;gap:8px;">
         <button class="app-header-action" id="share-btn" title="Share">⬆️</button>
-        <button class="app-header-action" id="refresh-btn" title="Refresh">🔄</button>
       </div>
     </div>
     <div id="filter-bar-wrap"></div>
@@ -36,7 +35,6 @@ export async function renderDashboard(container) {
   `;
 
   document.getElementById('add-fab').addEventListener('click', () => navigate('add-transaction'));
-  document.getElementById('refresh-btn').addEventListener('click', () => renderDashboard(container));
   document.getElementById('share-btn').addEventListener('click', toggleSharePopup);
 
   const data = await getCachedFinanceData();

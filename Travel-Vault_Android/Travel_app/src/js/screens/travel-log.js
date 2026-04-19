@@ -331,9 +331,16 @@ export async function renderTravelLog(container, params = {}) {
       filterPassenger = checked.length > 0 ? checked.join(',') : null;
       setHashParams({ passenger: filterPassenger });
       _tripPage = 1;
+
+      // Update dropdown button label immediately
+      if (dropBtn) {
+        const label = checked.length === 0 ? 'All' : checked.length === 1 ? checked[0] : `${checked.length} Selected`;
+        dropBtn.textContent = `👤 ${label} ▾`;
+      }
+      if (dropMenu) dropMenu.style.display = 'none';
+
       const content = document.getElementById('log-content');
       if (content) renderTrips(filterPassenger, filterYear, true, content);
-      if (dropMenu) dropMenu.style.display = 'none';
     });
 
     bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(btn => {

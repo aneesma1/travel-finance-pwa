@@ -4,14 +4,13 @@
 
 'use strict';
 
-import { getCachedTravelData, setCachedTravelData, clearAllCachedData, getSecurityLogs, clearSecurityLogs } from '../../shared/db.js';
+import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../shared/db.js';
 import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
-import { getActiveSessions, getActivityLog } from '../../shared/security-log.js';
-import { uuidv4, formatDisplayDate, showToast, toISODate, showConfirmModal, showInputModal, getAppState, setAppState } from '../../shared/utils.js';
+import { uuidv4, formatDisplayDate, showToast, toISODate, showConfirmModal, showInputModal } from '../../shared/utils.js';
 import { renderImportTool } from '../../shared/import-tool.js';
-import { downloadRecoveryBundle, runRestoreWizard } from '../../shared/recovery.js';
+import { downloadLocalBackup, restoreFromLocalFile } from '../../shared/drive.js';
 import { openPersonManage } from './person-manage.js';
 import { exitApp } from '../../shared/app-utils.js';
 import { exportEncryptedBackup, importEncryptedBackup } from '../../shared/backup-engine.js';
@@ -29,6 +28,7 @@ export async function renderSettings(container, params = {}) {
   container.innerHTML = `
     <div class="app-header">
       <span class="app-header-title">⚙️ Settings</span>
+      <button id="header-exit-btn" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">💾 Save &amp; Exit</button>
     </div>
     <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 4px;">
       ${tabs.map(id => `
@@ -44,6 +44,12 @@ export async function renderSettings(container, params = {}) {
     <div id="tab-content" style="padding-bottom:32px;"></div>
     <input type="file" id="restore-file-input" accept=".json" style="display:none;" />
   `;
+
+  document.getElementById('header-exit-btn')?.addEventListener('click', async () => {
+    showToast('Saving & exiting…', 'info', 1500);
+    await new Promise(r => setTimeout(r, 800));
+    await exitApp();
+  });
 
   // Reset the global modal to hidden state when navigating to settings
   const globalModal = document.getElementById('member-modal');
@@ -120,9 +126,9 @@ function renderPeopleTab(container, data, members, user) {
       const saved = await localSave('travel', () => newData);
       await setCachedTravelData(saved);
       showToast('Access updated', 'success');
-      renderAccessControl(document.getElementById('access-control-container'), saved, getUser()?.email || '', onSave);
+      renderAccessControl(document.getElementById('access-control-container'), saved, '', onSave);
     };
-    renderAccessControl(document.getElementById('access-control-container'), data, user?.email || '', onSave);
+    renderAccessControl(document.getElementById('access-control-container'), data, '', onSave);
   });
 }
 
@@ -190,31 +196,34 @@ function renderDataTab(data, members, container) {
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Import from Excel / CSV</div><div style="font-size:12px;color:var(--text-muted);">Import travel history from spreadsheet</div></div>
         <span style="color:var(--text-muted);">›</span>
       </div>
-      <div class="list-row" id="photo-zip-btn">
+      <div class="list-row" id="photo-zip-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
         <span style="font-size:20px;">📦</span>
         <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Export All Photos as ZIP</div><div style="font-size:12px;color:var(--text-muted);">Document scans, address photos</div></div>
-        <span style="color:var(--text-muted);">›</span>
-      </div>
-      <div class="list-row" id="clear-cache-btn" style="border-radius:0 0 var(--radius-lg) var(--radius-lg);">
-        <span style="font-size:20px;">🧹</span>
-        <div style="flex:1;"><div style="font-size:14px;font-weight:600;">Clear Local Cache</div><div style="font-size:12px;color:var(--text-muted);">Force re-download from Drive on next open</div></div>
         <span style="color:var(--text-muted);">›</span>
       </div>
     </div>
 
     <div class="section-title" style="color:var(--danger);margin-top:24px;">⛔ Danger Zone</div>
     <div class="card" style="margin:0 16px;border:1px solid var(--danger);background:rgba(220,38,38,0.05);">
-      <div class="list-row" id="reset-db-btn" style="border:none;border-radius:var(--radius-lg);">
+      <div class="list-row" id="clear-cache-btn" style="border:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:20px;">🧹</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Clear App Cache</div>
+          <div style="font-size:11px;color:var(--text-muted);">Clears service-worker & temp caches. Your data is kept.</div>
+        </div>
+        <span style="color:var(--text-muted);font-weight:700;font-size:12px;">CLEAR</span>
+      </div>
+      <div class="list-row" id="reset-db-btn" style="border:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);">
         <span style="font-size:20px;">🔥</span>
         <div style="flex:1;">
           <div style="font-size:14px;font-weight:700;color:var(--danger);">Reset All Data</div>
-          <div style="font-size:11px;color:var(--text-muted);">Permanently delete all travel records.</div>
+          <div style="font-size:11px;color:var(--text-muted);">Permanently deletes ALL travel records &amp; cache. Irreversible.</div>
         </div>
         <span style="color:var(--danger);font-weight:700;font-size:12px;">RESET</span>
       </div>
     </div>
     <div style="padding:12px 24px;font-size:11px;color:var(--text-muted);line-height:1.4;">
-      ⚠️ Resetting will wipe your local cache <b>and</b> your Drive mirror. This is irreversible. Please <b>Backup Now</b> before resetting.
+      ⚠️ <b>Clear App Cache</b> = remove temp files only (data is safe). <b>Reset All Data</b> = wipe everything permanently. Always <b>Backup Now</b> before resetting.
     </div>
   `;
 
@@ -288,11 +297,19 @@ function renderDataTab(data, members, container) {
   });
 
 
-  document.getElementById('clear-cache-btn').addEventListener('click', async () => {
-    if (!confirm('Clear local cache? Drive data is safe. App will re-download on next open.')) return;
-    await clearAllCachedData();
-    showToast('Cache cleared — reloading…', 'success');
-    setTimeout(() => window.location.reload(), 1200);
+  document.getElementById('clear-cache-btn')?.addEventListener('click', async () => {
+    if (!confirm('Clear app cache? Your travel data will NOT be deleted.')) return;
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+      }
+      sessionStorage.clear();
+      showToast('Cache cleared. Reloading…', 'success');
+      setTimeout(() => window.location.reload(true), 1200);
+    } catch (err) {
+      showToast('Clear failed: ' + err.message, 'error');
+    }
   });
 
   document.getElementById('reset-db-btn').addEventListener('click', async () => {
@@ -310,8 +327,6 @@ function renderDataTab(data, members, container) {
       showToast('Reset failed: ' + err.message, 'error');
     }
   });
-
-
 }
 
 // Security tab removed in favour of complete local architecture.
@@ -328,9 +343,7 @@ function renderAccountTab(data, members, user, container) {
         <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:8px;">
            Your data is securely stored directly on this device.
         </div>
-        <button class="btn btn-primary btn-full" style="margin-top:8px; margin-bottom:10px;" id="account-exit-btn">💾 Save & Exit App</button>
-        
-        <div style="border-top:1px dashed var(--border); margin:16px 0;"></div>
+        <div style="border-top:1px dashed var(--border); margin:8px 0;"></div>
         
         <div style="font-size:13px; font-weight:700; margin-bottom:8px; color:var(--primary);">👨‍👩‍👧 Encrypted Backup Sharing</div>
         <button class="btn btn-secondary btn-full" id="export-vaultbox-btn">📤 Export Encrypted Travelbox</button>
@@ -361,12 +374,6 @@ Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data
     </div>`;
 
   // --- Account Tab Listeners ---
-  document.getElementById('account-exit-btn')?.addEventListener('click', async () => {
-    showToast('Saving & exiting…', 'info', 1500);
-    await new Promise(r => setTimeout(r, 1000));
-    await exitApp();
-  });
-
   document.getElementById('export-vaultbox-btn')?.addEventListener('click', async () => {
     const data = await getCachedTravelData();
     exportEncryptedBackup('travel', data);
@@ -468,44 +475,6 @@ Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data
   });
 }
 
-// ── Mirror restore modal ───────────────────────────────────────────────────────
-function showMirrorModal(snapshots) {
-  const modal = document.getElementById('member-modal');
-  modal.classList.remove('hidden');
-  modal.innerHTML = `
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div style="padding:0 20px 20px;">
-        <div style="font-size:17px;font-weight:700;margin-bottom:16px;">Restore from Mirror</div>
-        ${snapshots.map((s, i) => `
-          <button class="list-row" data-snapshot="${i}" style="width:100%;text-align:left;border-radius:var(--radius-md);margin-bottom:8px;border:1px solid var(--border);">
-            <div style="flex:1;">
-              <div style="font-size:14px;font-weight:600;">${new Date(s.timestamp).toLocaleString('en-GB')}</div>
-              <div style="font-size:12px;color:var(--text-muted);">${s.recordCount} records</div>
-            </div>
-            <span style="color:var(--primary);font-weight:600;font-size:13px;">Restore</span>
-          </button>`).join('')}
-        <button class="btn btn-secondary btn-full" id="close-mirror" style="margin-top:8px;">Cancel</button>
-      </div>
-    </div>`;
-  modal.querySelectorAll('[data-snapshot]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const idx = Number(btn.dataset.snapshot);
-      if (!confirm('Restore this snapshot? Current data will be overwritten.')) return;
-      try {
-        showToast('Restoring…', 'info', 2000);
-        const restored = await restoreFromMirror('travel', idx);
-        await setCachedTravelData(restored);
-        showToast('Restored!', 'success');
-        modal.classList.add('hidden');
-        navigate('dashboard');
-      } catch { showToast('Restore failed', 'error'); }
-    });
-  });
-  document.getElementById('close-mirror').addEventListener('click', () => modal.classList.add('hidden'));
-  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
-}
-
 // ── Import modal ──────────────────────────────────────────────────────────────
 // SIMPLIFIED: Import trips as-is. Store personName directly. No person-linking.
 function openImportModal(data, persons) {
@@ -519,7 +488,7 @@ function openImportModal(data, persons) {
         <button id="close-import" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
       </div>
       <div id="import-status" style="display:none;padding:10px 20px;font-size:14px;font-weight:600;"></div>
-      <div id="import-tool-container" style="overflow-y:auto;max-height:70vh;"></div>
+      <div id="import-tool-container" style="overflow-y:auto;max-height:70vh;padding-bottom:60px;"></div>
     </div>`;
 
   let importInProgress = false;

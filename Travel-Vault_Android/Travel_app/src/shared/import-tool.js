@@ -133,26 +133,42 @@ export function renderImportTool(container, { appType, existingData, onImportCom
 
   function renderPreview() {
     container.innerHTML = `
-      <div style="padding:20px;">
-        <div style="font-size:16px;font-weight:700;margin-bottom:10px;">Preview (${parsedRows.length} rows)</div>
-        <div style="max-height:300px;overflow:auto;border:1px solid var(--border);font-size:11px;">
-          <table style="width:100%;border-collapse:collapse;">
-            ${parsedRows.slice(0,10).map(r => `<tr>${COLUMNS.map(c=>`<td style="border:1px solid var(--border);padding:4px;">${r[c.key]}</td>`).join('')}</tr>`).join('')}
-          </table>
+      <div style="display:flex;flex-direction:column;height:100%;">
+        <div style="padding:16px 20px 8px;">
+          <div style="font-size:16px;font-weight:700;margin-bottom:10px;">Preview (${parsedRows.length} rows)</div>
+          <div style="overflow:auto;border:1px solid var(--border);border-radius:8px;font-size:11px;max-height:260px;">
+            <table style="width:100%;border-collapse:collapse;">
+              ${parsedRows.slice(0,10).map(r => `<tr>${COLUMNS.map(c=>`<td style="border:1px solid var(--border);padding:4px;white-space:nowrap;">${r[c.key]||''}</td>`).join('')}</tr>`).join('')}
+            </table>
+          </div>
+          <div id="import-error" style="display:none;color:var(--danger);font-size:12px;margin-top:8px;padding:8px 12px;background:#FEF2F2;border-radius:8px;"></div>
         </div>
-        <button class="btn btn-primary btn-full" id="import-all-btn" style="margin-top:20px;">Import All Records</button>
+        <div style="padding:12px 20px;padding-bottom:max(12px, env(safe-area-inset-bottom, 12px));background:var(--surface);border-top:1px solid var(--border);position:sticky;bottom:0;">
+          <button class="btn btn-primary btn-full" id="import-all-btn">✅ Import All ${parsedRows.length} Records</button>
+        </div>
       </div>
     `;
-    container.querySelector('#import-all-btn').onclick = async () => {
-      container.querySelector('#import-all-btn').disabled = true;
-      container.querySelector('#import-all-btn').textContent = 'Processing…';
-      await onImportComplete(parsedRows, () => {});
-      step = 'done'; render();
+    const btn = container.querySelector('#import-all-btn');
+    const errEl = container.querySelector('#import-error');
+    btn.onclick = async () => {
+      btn.disabled = true;
+      btn.textContent = '⏳ Processing…';
+      errEl.style.display = 'none';
+      try {
+        await onImportComplete(parsedRows, () => {});
+        step = 'done'; render();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '✅ Retry Import';
+        errEl.style.display = 'block';
+        errEl.textContent = '❌ Import failed: ' + (err.message || 'Unknown error');
+      }
     };
   }
 
   function renderDone() {
-    container.innerHTML = `<div style="padding:40px;text-align:center;"><h2>✅ Done!</h2><button class="btn btn-primary" onclick="location.reload()">Reload App</button></div>`;
+    container.innerHTML = `<div style="padding:40px;text-align:center;"><h2>✅ Done!</h2><p style="color:var(--text-muted);font-size:13px;">Imported successfully. Reload the app to see your records.</p><button class="btn btn-primary" id="done-reload-btn" style="margin-top:12px;">Reload App</button></div>`;
+    container.querySelector('#done-reload-btn').addEventListener('click', () => location.reload());
   }
 
   render();
