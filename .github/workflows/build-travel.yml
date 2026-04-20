@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # Allows manual trigger from the GitHub UI to save minutes!
   push:
     branches:
-      - main
+      - master
     paths:
       - 'Travel-Vault_Android/Travel_app/**'
       - 'Travel-Vault_PWA/shared/**'

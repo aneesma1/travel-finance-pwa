@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # Manual trigger rules apply
   push:
     branches:
-      - main
+      - master
     paths:
       - 'Travel-Vault_Android/Personal_vault/**'
       - 'Travel-Vault_PWA/shared/**'
