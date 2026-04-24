@@ -10,7 +10,7 @@ import {
   currentMonth, currentYear, showToast, copyToClipboard
 } from '../../shared/utils.js';
 import {
-  downloadLocalBackup, restoreFromLocalFile, timestampSuffix
+  downloadLocalBackup, restoreFromLocalFile, timestampSuffix, saveXLSXToExports
 } from '../../shared/drive.js';
 import { localSave } from '../../shared/sync-manager.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
@@ -85,16 +85,16 @@ export async function renderSettings(container, params = {}) {
         <div class="list-row" id="backup-now">
           <span style="font-size:20px;">💾</span>
           <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Backup Now</div>
-            <div style="font-size:12px;color:var(--text-muted);">Download JSON to device (${transactions.length} records)</div>
+            <div style="font-size:14px;font-weight:600;">Backup Now (JSON)</div>
+            <div style="font-size:12px;color:var(--text-muted);">Saves plain-text JSON to Documents/PersonalVault/exports/ · ${transactions.length} records · No password needed</div>
           </div>
           <span style="color:var(--text-muted);">›</span>
         </div>
         <div class="list-row" id="restore-local">
           <span style="font-size:20px;">📂</span>
           <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;">Restore from Local Backup</div>
-            <div style="font-size:12px;color:var(--text-muted);">Pick a backup .json file from device</div>
+            <div style="font-size:14px;font-weight:600;">Restore JSON Backup</div>
+            <div style="font-size:12px;color:var(--text-muted);">Pick a Vault_Backup_*.json file — plain text, no password required</div>
           </div>
           <span style="color:var(--text-muted);">›</span>
         </div>
@@ -171,7 +171,16 @@ export async function renderSettings(container, params = {}) {
 
 
 
-    document.getElementById('backup-now').onclick = () => downloadLocalBackup('vault');
+    document.getElementById('backup-now').onclick = async () => {
+      try {
+        showToast('Saving backup…', 'info', 1500);
+        const currentData = await getCachedFinanceData();
+        const savedPath = await downloadLocalBackup('finance', currentData);
+        showToast(`Saved to ${savedPath}`, 'success', 4000);
+      } catch (err) {
+        showToast('Backup failed: ' + err.message, 'error');
+      }
+    };
     document.getElementById('restore-local').onclick = () => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -200,7 +209,7 @@ export async function renderSettings(container, params = {}) {
     });
 
     document.getElementById('reset-db-btn').addEventListener('click', async () => {
-      if (!confirm('⚠️ RESET DATABASE?\n\nThis will PERMANENTLY DELETE all your transactions, categories, and account settings.\n\nHave you taken a backup first?')) return;
+      if (!confirm('⚠️ RESET DATABASE?\n\nThis will PERMANENTLY DELETE all your transactions, categories, and account settings from this device.\n\n✅ Your backup files in Documents/PersonalVault/ are NOT affected.\n\nHave you taken a backup first?')) return;
       if (!confirm('SECOND CONFIRMATION:\n\nThis action cannot be undone. Are you absolutely sure?')) return;
 
       try {
@@ -345,12 +354,20 @@ export async function renderSettings(container, params = {}) {
 
     statusEl.textContent = 'Generating spreadsheet…';
 
-    // Load SheetJS from CDN
+    // Load SheetJS — local bundle first, CDN fallback
     if (!window.XLSX) {
       await new Promise((res, rej) => {
         const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload = res; s.onerror = rej;
+        s.setAttribute('data-internal', 'xlsx-loader');
+        s.src = '/js/lib/xlsx.full.min.js';
+        s.onload = res;
+        s.onerror = () => {
+          // CDN fallback
+          const cdn = document.createElement('script');
+          cdn.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          cdn.onload = res; cdn.onerror = rej;
+          document.head.appendChild(cdn);
+        };
         document.head.appendChild(s);
       });
     }
@@ -386,7 +403,7 @@ export async function renderSettings(container, params = {}) {
       { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 10 }, { wch: 8 }
     ];
 
-    // Style header row bold (basic)
+    // Style header row bold
     headers.forEach((_, i) => {
       const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
       if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: '065F46' } } };
@@ -394,28 +411,30 @@ export async function renderSettings(container, params = {}) {
 
     XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
 
-    // Filename
+    // Filename base (no extension — saveXLSXToExports appends timestamp + .xlsx)
     const yr = document.getElementById('exp-year')?.value || 'All';
     const mo = document.getElementById('exp-month')?.value;
     const cur = document.getElementById('exp-currency')?.value || 'All';
     const moLabel = mo ? MONTHS[Number(mo) - 1] : 'All';
-    const ts = timestampSuffix();
-    const filename = `Finance_Export_${cur}_${yr}${moLabel ? '_' + moLabel : ''}_${ts}.xlsx`;
+    const filenameBase = `Finance_Export_${cur}_${yr}${moLabel ? '_' + moLabel : ''}`;
 
     if (!sendEmail) {
-      // Direct download
-      XLSX.writeFile(wb, filename);
-      statusEl.textContent = `✅ Downloaded: ${filename}`;
-      showToast('Excel file downloaded!', 'success');
+      // Save to Documents/PersonalVault/exports/
+      try {
+        const savedPath = await saveXLSXToExports('finance', wb, filenameBase);
+        statusEl.textContent = `✅ Saved to ${savedPath}`;
+        showToast(`Saved to ${savedPath}`, 'success');
+      } catch (err) {
+        statusEl.textContent = `⚠️ Save failed: ${err.message}`;
+        showToast('Export failed', 'error');
+      }
     } else {
-      // Email via mailto
+      // Share via system share sheet (email / WhatsApp etc.)
       try {
         const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-        const subject = encodeURIComponent(`Finance Export -- ${moLabel} ${yr}`);
-        const body = encodeURIComponent(
-          `Finance export attached.\n\nPeriod: ${moLabel} ${yr}\nCurrency: ${cur}\nRecords: ${transactions.length}\n\nGenerated by Private Vault App`
-        );
-        // Try Web Share API with file first (works on Android)
+        const ts = timestampSuffix();
+        const filename = `${filenameBase}_${ts}.xlsx`;
+        const subject = encodeURIComponent(`Finance Export — ${moLabel} ${yr}`);
         const blob = new Blob(
           [Uint8Array.from(atob(wbout), c => c.charCodeAt(0))],
           { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
@@ -426,20 +445,12 @@ export async function renderSettings(container, params = {}) {
           await navigator.share({ files: [file], title: 'Finance Export' });
           statusEl.textContent = '✅ Shared via system share sheet';
         } else {
-          // Fallback: mailto with data URI (works in Gmail/Outlook on Android)
-          const dataUri = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
-          const mailto = `mailto:?subject=${subject}&body=${body}`;
+          const mailto = `mailto:?subject=${subject}&body=${encodeURIComponent(`Finance export\n\nPeriod: ${moLabel} ${yr}\nCurrency: ${cur}\nRecords: ${transactions.length}\n\nGenerated by Personal Vault`)}`;
           window.location.href = mailto;
-          // Also download as fallback since mailto attachment isn't always supported
-          setTimeout(() => {
-            XLSX.writeFile(wb, filename);
-            statusEl.innerHTML = `✅ Email app opened. File also downloaded as backup.<br><span style="font-size:11px;color:var(--text-muted);">If attachment didn't work, attach the downloaded file manually.</span>`;
-          }, 500);
+          statusEl.textContent = '✅ Email app opened.';
         }
       } catch (err) {
-        // Last resort: just download
-        XLSX.writeFile(wb, filename);
-        statusEl.textContent = '⚠️ Email failed -- file downloaded instead.';
+        statusEl.textContent = `⚠️ Share failed: ${err.message}`;
       }
     }
   }
@@ -467,7 +478,7 @@ export async function renderSettings(container, params = {}) {
 
           <button class="btn btn-secondary btn-full" id="import-vaultbox-btn" style="margin-top:12px; border-style: dashed;">📥 Import Vaultbox File</button>
           <div style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
-             Pick a .vaultbox file from WhatsApp / Files, enter password to restore.
+             AES-GCM encrypted .vaultbox file — requires the password set during export. Use for backups received via WhatsApp or Drive.
           </div>
         </div>
       </div>

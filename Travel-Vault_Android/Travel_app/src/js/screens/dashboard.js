@@ -86,8 +86,8 @@ export async function renderDashboard(container) {
     <div class="app-header">
       <span class="app-header-title">✈️ Family Hub</span>
       <div style="display:flex;gap:8px;">
+        <button class="app-header-action" id="export-locations-btn" title="Export current locations">📊</button>
         <button class="app-header-action" id="share-btn" title="Share dashboard">⬆️</button>
-
       </div>
     </div>
     <div id="offline-content"></div>
@@ -102,18 +102,25 @@ export async function renderDashboard(container) {
 
 
   document.getElementById('share-btn').addEventListener('click', () => toggleSharePopup());
+  document.getElementById('export-locations-btn').addEventListener('click', () => exportCurrentLocationsXLSX());
 
   await loadAndRender();
 
   async function loadAndRender() {
     const data = await getCachedTravelData();
+    const content = document.getElementById('dashboard-content');
+    // Clear the loading spinner before rendering anything
+    content.innerHTML = '';
+
     if (!data) {
-      document.getElementById('dashboard-content').innerHTML = `
+      content.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">📭</div>
           <div class="empty-state-title">No data yet</div>
-          <div class="empty-state-text">Sign in to load your family data</div>
+          <div class="empty-state-text">Go to Settings → Import from Excel to add your travel records.</div>
+          <button class="btn btn-primary" style="margin-top:20px;" id="go-settings-btn">⚙️ Open Settings</button>
         </div>`;
+      content.querySelector('#go-settings-btn')?.addEventListener('click', () => navigate('settings'));
       return;
     }
 
@@ -302,9 +309,10 @@ export async function renderDashboard(container) {
       return;
     }
 
-    // If there are no members (People), show just the passenger-based cards
+    // If there are no members (People tab), location widget is the whole dashboard
     if (!members.length && allPassengerNames.length > 0) {
-      // Location widget already rendered above — nothing more to add here
+      // Location widget already rendered above — nothing more needed
+      // (spinner was already cleared in loadAndRender before we got here)
       return;
     }
 
@@ -633,5 +641,72 @@ export async function renderDashboard(container) {
     const ok = await copyToClipboard(text);
     if (ok) showToast('Copied to clipboard!', 'success');
     else    showToast('Copy failed -- try again', 'error');
+  }
+
+  // ── Export current locations as XLSX ─────────────────────────────────────────
+  async function exportCurrentLocationsXLSX() {
+    try {
+      const data = await getCachedTravelData();
+      if (!data) { showToast('No data to export', 'warning'); return; }
+
+      const { trips = [], passengers = [] } = data;
+      const todayStr = today();
+      const allNames = [...new Set(
+        trips.filter(Boolean).map(t => String(t.passengerName || '').trim()).filter(Boolean)
+      )].sort();
+
+      if (!allNames.length) { showToast('No passenger data found', 'warning'); return; }
+
+      showToast('Preparing export…', 'info', 2000);
+
+      // Load XLSX
+      if (!window.XLSX) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.setAttribute('data-internal', 'xlsx-loader');
+          s.src = './js/lib/xlsx.full.min.js';
+          s.onload = res;
+          s.onerror = () => {
+            const s2 = document.createElement('script');
+            s2.setAttribute('data-internal', 'xlsx-loader');
+            s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+            s2.onload = res; s2.onerror = rej;
+            document.head.appendChild(s2);
+          };
+          document.head.appendChild(s);
+        });
+      }
+
+      // Build rows
+      const rows = allNames.map(name => {
+        const { location, days } = getCurrentLocationFromTrips(name, trips);
+        const nameLower = name.toLowerCase();
+        const personTrips = trips.filter(t =>
+          String(t.passengerName || '').toLowerCase() === nameLower ||
+          (t._resolvedCompanionNames || []).map(n => n.toLowerCase()).includes(nameLower)
+        ).sort((a, b) => new Date(b.dateArrivedDest || 0) - new Date(a.dateArrivedDest || 0));
+        const entryDate = personTrips[0]?.dateArrivedDest || personTrips[0]?.dateLeftOrigin || '';
+        return {
+          'Passenger Name': name,
+          'Current Country': location || 'Unknown',
+          'Entry Date': entryDate,
+          'Days in Country': days !== null ? days : ''
+        };
+      });
+
+      const ws = window.XLSX.utils.json_to_sheet(rows);
+      // Column widths
+      ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 16 }];
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, 'Current Locations');
+
+      // Save via Capacitor Filesystem
+      const { saveXLSXToExports } = await import('../../shared/drive.js');
+      const savedPath = await saveXLSXToExports('travel', wb, `CurrentLocations_${todayStr}`);
+      showToast(`✅ Saved: ${savedPath}`, 'success', 4000);
+    } catch (err) {
+      console.error('Export error:', err);
+      showToast('Export failed: ' + err.message, 'error');
+    }
   }
 }

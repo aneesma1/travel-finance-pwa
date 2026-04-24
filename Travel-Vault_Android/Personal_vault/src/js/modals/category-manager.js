@@ -1,4 +1,4 @@
-// v3.5.10 — 2026-03-28
+// v3.6.0 — 2026-04-24 — Title Case normalization, case-insensitive comparisons
 // ─── app-b-private-vault/js/modals/category-manager.js ───────────────────────
 // Category Manager Modal: Multi-select, Rename, Merge, Delete
 
@@ -7,15 +7,21 @@ import { localSave } from '../../shared/sync-manager.js';
 import { showToast, uuidv4 } from '../../shared/utils.js';
 import { SmartInput } from '../../shared/smart-input.js';
 
+// Normalize any category string to Title Case
+function toTitleCase(str) {
+  if (!str) return '';
+  return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export async function openCategoryManager(containerEl) {
   const data = await getCachedFinanceData();
   let { transactions = [], categories = [] } = data || {};
-  
-  // Extract categories from transactions to ensure imported ones show up
-  const dynamicCats = transactions.flatMap(t => [t.category1, t.category2]).filter(Boolean);
-  
-  // Ensure categories is a sorted unique array including dynamic ones
-  let cats = [...new Set([...categories, ...dynamicCats])].sort();
+
+  // Extract categories from transactions to ensure imported ones show up — normalize to Title Case
+  const dynamicCats = transactions.flatMap(t => [t.category1, t.category2]).filter(Boolean).map(toTitleCase);
+
+  // Ensure categories is a sorted unique array including dynamic ones — all Title Case
+  let cats = [...new Set([...categories.map(toTitleCase), ...dynamicCats])].sort();
 
   let selected = new Set();
   let modalEl = document.getElementById('modal');
@@ -26,9 +32,9 @@ export async function openCategoryManager(containerEl) {
 
   function renderModal() {
     modalEl.innerHTML = `
-      <div class="modal-sheet" style="max-height:92vh; display:flex; flex-direction:column;">
+      <div class="modal-sheet" style="max-height:92vh; display:flex; flex-direction:column; position:relative;">
         <div class="modal-handle"></div>
-        
+
         <div style="padding:0 20px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border-light);">
           <span style="font-size:18px; font-weight:700;">🏷️ Manage Categories</span>
           <button id="close-cat-mgr" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-muted);">&times;</button>
@@ -42,18 +48,19 @@ export async function openCategoryManager(containerEl) {
           </div>
         </div>
 
-        <div id="cat-list-container" style="flex:1; overflow-y:auto; padding:12px 0;">
+        <div id="cat-list-container" style="flex:1; overflow-y:auto; padding:12px 0; padding-bottom:${selected.size > 0 ? '100px' : '12px'};">
           ${renderList()}
         </div>
+      </div>
 
-        <div id="multi-action-bar" style="display:${selected.size > 0 ? 'flex' : 'none'}; padding:16px 20px 32px; gap:10px; background:var(--surface); border-top:1px solid var(--border); box-shadow:0 -4px 12px rgba(0,0,0,0.05);">
-          <button id="bulk-delete-btn" class="btn btn-secondary" style="flex:1; color:var(--danger); border-color:var(--danger-light);">
-            🗑️ Delete (${selected.size})
-          </button>
-          <button id="bulk-merge-btn" class="btn btn-primary" style="flex:1;">
-            🔄 Merge (${selected.size})
-          </button>
-        </div>
+      <!-- Action bar OUTSIDE modal-sheet so it sits above Android nav bar -->
+      <div id="multi-action-bar" style="display:${selected.size > 0 ? 'flex' : 'none'}; position:fixed; bottom:0; left:0; right:0; padding:12px 20px; padding-bottom:calc(12px + env(safe-area-inset-bottom)); gap:10px; background:var(--surface); border-top:1px solid var(--border); box-shadow:0 -4px 12px rgba(0,0,0,0.12); z-index:1000;">
+        <button id="bulk-delete-btn" class="btn btn-secondary" style="flex:1; color:var(--danger); border-color:var(--danger-light);">
+          🗑️ Delete (${selected.size})
+        </button>
+        <button id="bulk-merge-btn" class="btn btn-primary" style="flex:1;">
+          🔄 Merge (${selected.size})
+        </button>
       </div>
     `;
 
@@ -93,14 +100,15 @@ export async function openCategoryManager(containerEl) {
     });
 
     document.getElementById('add-cat-btn').addEventListener('click', async () => {
-      const val = smartInput.value.trim();
-      if (!val) return;
-      if (val.length > 25) { showToast('Name too long (max 25)', 'warning'); return; }
-      if (cats.includes(val)) { showToast('Already exists', 'warning'); return; }
+      const raw = smartInput.value.trim();
+      if (!raw) return;
+      if (raw.length > 25) { showToast('Name too long (max 25)', 'warning'); return; }
+      const val = toTitleCase(raw);
+      if (cats.some(c => c.toLowerCase() === val.toLowerCase())) { showToast('Already exists', 'warning'); return; }
 
       try {
         const newData = await localSave('finance', r => ({
-          ...r, categories: [...new Set([...(r.categories || []), val])].sort()
+          ...r, categories: [...new Set([...(r.categories || []).map(toTitleCase), val])].sort()
         }));
         await setCachedFinanceData(newData);
         cats = newData.categories;
@@ -138,8 +146,11 @@ export async function openCategoryManager(containerEl) {
 
   function updateActionBar() {
     const bar = document.getElementById('multi-action-bar');
+    const listContainer = document.getElementById('cat-list-container');
     if (!bar) return;
-    bar.style.display = selected.size > 0 ? 'flex' : 'none';
+    const show = selected.size > 0;
+    bar.style.display = show ? 'flex' : 'none';
+    if (listContainer) listContainer.style.paddingBottom = show ? '100px' : '12px';
     const delBtn = document.getElementById('bulk-delete-btn');
     const mrgBtn = document.getElementById('bulk-merge-btn');
     if (delBtn) delBtn.innerHTML = `🗑️ Delete (${selected.size})`;
@@ -159,12 +170,13 @@ export async function openCategoryManager(containerEl) {
     const ok = await showConfirmModal('Delete Categories', msg, { confirmText: 'Delete', danger: true });
     if (!ok) return;
 
+    const itemsLowerDel = items.map(i => i.toLowerCase());
     try {
       const newData = await localSave('finance', r => {
-        const remainingCats = (r.categories || []).filter(c => !items.includes(c));
+        const remainingCats = (r.categories || []).filter(c => !itemsLowerDel.includes(c.toLowerCase()));
         const updatedTxns = (r.transactions || []).map(t => {
-          if (items.includes(t.category1)) t.category1 = '';
-          if (items.includes(t.category2)) t.category2 = '';
+          if (itemsLowerDel.includes((t.category1 || '').toLowerCase())) t.category1 = '';
+          if (itemsLowerDel.includes((t.category2 || '').toLowerCase())) t.category2 = '';
           return t;
         });
         return { ...r, categories: remainingCats, transactions: updatedTxns };
@@ -188,22 +200,24 @@ export async function openCategoryManager(containerEl) {
     }
 
     const { showInputModal, showConfirmModal } = await import('../../shared/utils.js');
-    const target = await showInputModal('Merge Categories', `Merge ${items.length} items into:`, others[0], { suggestions: others });
-    if (!target) return;
-    
-    if (!others.includes(target)) {
+    const rawTarget = await showInputModal('Merge Categories', `Merge ${items.length} items into:`, others[0], { suggestions: others });
+    if (!rawTarget) return;
+    const target = toTitleCase(rawTarget);
+
+    const itemsLower = items.map(i => i.toLowerCase());
+    if (!others.some(o => o.toLowerCase() === target.toLowerCase())) {
       const ok = await showConfirmModal('Create & Merge?', `"${target}" doesn't exist. Create it and merge selected items into it?`);
       if (!ok) return;
     }
 
     try {
       const newData = await localSave('finance', r => {
-        let finalCats = (r.categories || []).filter(c => !items.includes(c));
-        if (!finalCats.includes(target)) finalCats.push(target);
-        
+        let finalCats = (r.categories || []).map(toTitleCase).filter(c => !itemsLower.includes(c.toLowerCase()));
+        if (!finalCats.some(c => c.toLowerCase() === target.toLowerCase())) finalCats.push(target);
+
         const updatedTxns = (r.transactions || []).map(t => {
-          if (items.includes(t.category1)) t.category1 = target;
-          if (items.includes(t.category2)) t.category2 = target;
+          if (itemsLower.includes((t.category1 || '').toLowerCase())) t.category1 = target;
+          if (itemsLower.includes((t.category2 || '').toLowerCase())) t.category2 = target;
           return t;
         });
         return { ...r, categories: finalCats.sort(), transactions: updatedTxns };
@@ -219,24 +233,26 @@ export async function openCategoryManager(containerEl) {
 
   async function promptRename(oldName) {
     const { showInputModal } = await import('../../shared/utils.js');
-    const val = await showInputModal('Rename Category', 'New name for "' + oldName + '":', oldName);
-    if (!val || val === oldName) return;
-    
+    const raw = await showInputModal('Rename Category', 'New name for "' + oldName + '":', oldName);
+    if (!raw) return;
+    const val = toTitleCase(raw);
+    if (val === oldName) return;
+
     if (val.length > 25) { showToast('Name too long', 'warning'); return; }
-    if (cats.includes(val)) { showToast('Name already exists', 'warning'); return; }
+    if (cats.some(c => c.toLowerCase() === val.toLowerCase() && c !== oldName)) { showToast('Name already exists', 'warning'); return; }
 
     try {
       const newData = await localSave('finance', r => {
-        const idx = (r.categories || []).indexOf(oldName);
-        const newCats = [...(r.categories || [])];
-        if (idx > -1) newCats[idx] = val;
-        
+        const normCats = (r.categories || []).map(toTitleCase);
+        const idx = normCats.findIndex(c => c.toLowerCase() === oldName.toLowerCase());
+        if (idx > -1) normCats[idx] = val;
+
         const updatedTxns = (r.transactions || []).map(t => {
-          if (t.category1 === oldName) t.category1 = val;
-          if (t.category2 === oldName) t.category2 = val;
+          if ((t.category1 || '').toLowerCase() === oldName.toLowerCase()) t.category1 = val;
+          if ((t.category2 || '').toLowerCase() === oldName.toLowerCase()) t.category2 = val;
           return t;
         });
-        return { ...r, categories: newCats.sort(), transactions: updatedTxns };
+        return { ...r, categories: normCats.sort(), transactions: updatedTxns };
       });
       await setCachedFinanceData(newData);
       cats = newData.categories;

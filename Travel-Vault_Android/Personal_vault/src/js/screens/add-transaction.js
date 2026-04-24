@@ -13,6 +13,12 @@ import { renderPhotoSlots } from '../../shared/photo-picker.js';
 import { SmartInput }  from '../../shared/smart-input.js';
 import { uuidv4, today, showToast, formatAmount, showConfirmModal, showInputModal } from '../../shared/utils.js';
 
+// Normalize to Title Case so categories are case-consistent
+function toTitleCase(str) {
+  if (!str) return '';
+  return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export async function renderAddTransaction(container, params = {}) {
   const { txnId, mode } = params;
   const isEdit = mode === 'edit' && txnId;
@@ -316,8 +322,8 @@ export async function renderAddTransaction(container, params = {}) {
       amountSpend: state.amountSpend ? Number(state.amountSpend) : null,
       income:      state.income      ? Number(state.income)      : null,
       currency:    state.currency,
-      category1:   state.category1,
-      category2:   state.category2 || null,
+      category1:   toTitleCase(state.category1),
+      category2:   state.category2 ? toTitleCase(state.category2) : null,
       notes1:      state.notes1    || null,
       account:     state.account,
       photos:      state.photos    || [],

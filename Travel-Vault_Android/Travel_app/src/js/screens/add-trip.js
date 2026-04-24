@@ -126,31 +126,221 @@ export async function renderAddTrip(container, params = {}) {
     }
   }
 
-  async function shareTripText() {
+  // ── Build WhatsApp-ready trip text ───────────────────────────────────────────
+  function buildTripShareText() {
     const member = persons.find(m => m.id === state.passengerId);
-    const text = [
+    const companions = Array.isArray(state.travelWith)
+      ? state.travelWith.map(id => persons.find(m => m.id === id)?.name).filter(Boolean).join(', ')
+      : (state.travelWith || '');
+    const duration = state.dateArrivedDest && state.dateLeftDest
+      ? daysBetween(state.dateArrivedDest, state.dateLeftDest) + ' days'
+      : daysBetween(state.dateArrivedDest, today()) + ' days so far';
+
+    return [
       `✈️ *Travel Details: ${member?.name || 'Unknown'}*`,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `🛫 Departed Origin: ${formatDisplayDate(state.dateLeftOrigin)}`,
-      `🛬 Arrived Destination: ${formatDisplayDate(state.dateArrivedDest)}`,
-      state.dateLeftDest ? `🛫 Left Destination: ${formatDisplayDate(state.dateLeftDest)}` : `📍 Status: Still in Destination`,
-      state.dateReturnedOrigin  ? `🇮🇳 Back in Origin: ${formatDisplayDate(state.dateReturnedOrigin)}` : '',
-      `⏱️ Duration: ${state.dateArrivedDest && state.dateLeftDest ? daysBetween(state.dateArrivedDest, state.dateLeftDest) + ' days' : daysBetween(state.dateArrivedDest, today()) + ' days so far'}`,
-      state.flightInward ? `✈️ Inward: ${state.flightInward}` : '',
-      state.flightOutward? `✈️ Outward: ${state.flightOutward}` : '',
-      state.reason       ? `📝 Reason: ${state.reason}` : '',
-      (state.travelWith && state.travelWith.length) ? `👥 With: ${Array.isArray(state.travelWith) ? state.travelWith.map(id => persons.find(m => m.id === id)?.name).filter(Boolean).join(', ') : state.travelWith}` : '',
+      `🛫 Departed Origin:      ${formatDisplayDate(state.dateLeftOrigin)}`,
+      `🛬 Arrived Destination:  ${formatDisplayDate(state.dateArrivedDest)}`,
+      state.dateLeftDest
+        ? `🛫 Left Destination:     ${formatDisplayDate(state.dateLeftDest)}`
+        : `📍 Status: Still in Destination`,
+      state.dateReturnedOrigin
+        ? `🏠 Back in Origin:       ${formatDisplayDate(state.dateReturnedOrigin)}`
+        : '',
+      `⏱️ Duration: ${duration}`,
+      state.flightInward  ? `✈️ Inward Flight:  ${state.flightInward}`  : '',
+      state.flightOutward ? `✈️ Outward Flight: ${state.flightOutward}` : '',
+      state.reason        ? `📝 Reason: ${state.reason}`                : '',
+      companions          ? `👥 Travelling With: ${companions}`         : '',
       `━━━━━━━━━━━━━━━━━━━━`,
-      `_Shared from Family Hub PWA_`
+      `_Shared from Family Hub_`
     ].filter(Boolean).join('\n');
+  }
 
-    if (navigator.share) {
-      await navigator.share({ title: `Travel Details - ${member?.name}`, text }).catch(() => {});
-    } else {
-      const { copyToClipboard } = await import('../../shared/utils.js');
-      const ok = await copyToClipboard(text);
-      showToast(ok ? 'Details copied to clipboard!' : 'Failed to copy', ok ? 'success' : 'error');
+  // ── Render canvas trip card → return dataURL ──────────────────────────────────
+  function buildTripCardDataURL() {
+    const member = persons.find(m => m.id === state.passengerId);
+    const name = member?.name || 'Unknown';
+    const origin = state.originCountry || 'India';
+    const dest   = state.destinationCountry || 'Qatar';
+    const arrived = formatDisplayDate(state.dateArrivedDest);
+    const duration = state.dateArrivedDest && state.dateLeftDest
+      ? daysBetween(state.dateArrivedDest, state.dateLeftDest) + ' days'
+      : daysBetween(state.dateArrivedDest, today()) + ' days';
+    const flagMap = { Qatar: '🇶🇦', India: '🇮🇳' };
+
+    const W = 640, H = 360;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#3730A3');
+    grad.addColorStop(1, '#1E1B4B');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Decorative arc
+    ctx.beginPath();
+    ctx.arc(W - 60, -40, 200, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fill();
+
+    // App tag
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.font = '500 13px sans-serif';
+    ctx.fillText('✈️ Family Hub', 28, 32);
+
+    // Name
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText(name, 28, 80);
+
+    // Route pill
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    _roundRect(ctx, 24, 96, 340, 44, 22);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '600 18px sans-serif';
+    ctx.fillText(`${flagMap[origin] || '📍'} ${origin}   →   ${flagMap[dest] || '📍'} ${dest}`, 40, 123);
+
+    // Stats row
+    const stats = [
+      ['Arrived', arrived],
+      ['Duration', duration],
+    ];
+    if (state.flightInward) stats.push(['Flight', state.flightInward]);
+
+    stats.forEach(([label, val], i) => {
+      const x = 28 + i * 200;
+      const y = 172;
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      _roundRect(ctx, x, y, 180, 70, 12);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = '500 11px sans-serif';
+      ctx.fillText(label.toUpperCase(), x + 14, y + 22);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 17px sans-serif';
+      ctx.fillText(val, x + 14, y + 48);
+    });
+
+    // Reason
+    if (state.reason) {
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.font = '500 13px sans-serif';
+      ctx.fillText(`📝 ${state.reason}`, 28, 270);
     }
+
+    // Date generated
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(`Generated ${formatDisplayDate(today())}`, 28, H - 18);
+
+    return c.toDataURL('image/jpeg', 0.92);
+  }
+
+  function _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  // ── 3-Option share bottom sheet ───────────────────────────────────────────────
+  async function shareTripText() {
+    const member = persons.find(m => m.id === state.passengerId);
+    const pName  = member?.name || 'Unknown';
+
+    // Remove any existing sheet
+    document.getElementById('trip-share-sheet')?.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'trip-share-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:900;display:flex;align-items:flex-end;';
+    sheet.innerHTML = `
+      <div style="width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:0 0 max(20px,env(safe-area-inset-bottom,20px));">
+        <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto;"></div>
+        <div style="padding:0 20px 16px;font-size:16px;font-weight:700;border-bottom:1px solid var(--border);">📤 Share Trip · ${pName}</div>
+        <div style="padding:12px 20px;display:flex;flex-direction:column;gap:10px;">
+          <button id="share-opt-wa" class="btn btn-secondary" style="justify-content:flex-start;gap:12px;padding:14px 16px;">
+            <span style="font-size:22px;">💬</span>
+            <div style="text-align:left;"><div style="font-size:14px;font-weight:600;">Copy for WhatsApp</div><div style="font-size:11px;color:var(--text-muted);">Formatted text copied to clipboard</div></div>
+          </button>
+          <button id="share-opt-card" class="btn btn-secondary" style="justify-content:flex-start;gap:12px;padding:14px 16px;">
+            <span style="font-size:22px;">🖼️</span>
+            <div style="text-align:left;"><div style="font-size:14px;font-weight:600;">Share as Image Card</div><div style="font-size:11px;color:var(--text-muted);">Send JPG card via any app</div></div>
+          </button>
+          <button id="share-opt-save" class="btn btn-secondary" style="justify-content:flex-start;gap:12px;padding:14px 16px;">
+            <span style="font-size:22px;">💾</span>
+            <div style="text-align:left;"><div style="font-size:14px;font-weight:600;">Save Card to Device</div><div style="font-size:11px;color:var(--text-muted);">Save JPG to Documents/TravelHub/exports/</div></div>
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(sheet);
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+
+    // Option 1: Copy for WhatsApp
+    sheet.querySelector('#share-opt-wa').addEventListener('click', async () => {
+      sheet.remove();
+      const ok = await copyToClipboard(buildTripShareText());
+      showToast(ok ? '💬 Copied! Paste into WhatsApp.' : 'Copy failed', ok ? 'success' : 'error');
+    });
+
+    // Option 2: Share as JPG card
+    sheet.querySelector('#share-opt-card').addEventListener('click', async () => {
+      sheet.remove();
+      try {
+        showToast('Building card…', 'info', 1500);
+        const dataUrl = buildTripCardDataURL();
+        const base64  = dataUrl.split(',')[1];
+        const filename = `TripCard_${pName.replace(/\s+/g,'_')}_${today()}.jpg`;
+
+        if (window.Capacitor?.Plugins?.Filesystem && window.Capacitor?.Plugins?.Share) {
+          const { Filesystem, Directory, Share } = window.Capacitor.Plugins;
+          await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
+          const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
+          await Share.share({ title: `Trip Card – ${pName}`, files: [uri], dialogTitle: 'Share Trip Card' });
+        } else {
+          // Web fallback — download
+          const a = document.createElement('a');
+          a.href = dataUrl; a.download = filename; a.click();
+          showToast('Card downloaded!', 'success');
+        }
+      } catch (err) { showToast('Share failed: ' + err.message, 'error'); }
+    });
+
+    // Option 3: Save JPG locally to Documents/TravelHub/exports/
+    sheet.querySelector('#share-opt-save').addEventListener('click', async () => {
+      sheet.remove();
+      try {
+        showToast('Saving card…', 'info', 1500);
+        const dataUrl = buildTripCardDataURL();
+        const base64  = dataUrl.split(',')[1];
+        const filename = `TripCard_${pName.replace(/\s+/g,'_')}_${today()}.jpg`;
+        const saveDir  = 'TravelHub/exports';
+
+        if (window.Capacitor?.Plugins?.Filesystem) {
+          const { Filesystem, Directory } = window.Capacitor.Plugins;
+          await Filesystem.mkdir({ path: saveDir, directory: Directory.Documents, recursive: true }).catch(() => {});
+          await Filesystem.writeFile({ path: `${saveDir}/${filename}`, data: base64, directory: Directory.Documents });
+          showToast(`✅ Saved to Documents/${saveDir}/`, 'success', 3500);
+        } else {
+          const a = document.createElement('a');
+          a.href = dataUrl; a.download = filename; a.click();
+          showToast('Card downloaded!', 'success');
+        }
+      } catch (err) { showToast('Save failed: ' + err.message, 'error'); }
+    });
   }
 
   function renderStep() {

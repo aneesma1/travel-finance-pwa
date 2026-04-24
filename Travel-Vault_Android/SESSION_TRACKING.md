@@ -371,3 +371,141 @@ No code change needed.
 - Travel Log passenger filter label updates after Apply
 - Vault Account tab shows Vaultbox export/import buttons clearly
 - No redundant Refresh button in Vault home
+
+---
+
+### Session 11: UX Improvements — Share Card, Passenger Filter, Folder Structure, Backup, Export (2026-04-24)
+**Context:** Post-v5.5.2 user-testing feedback batch. 16 improvements across both apps in one commit.
+
+---
+
+#### Issues Resolved — Travel App
+
+**1. Per-trip share → 3-option bottom sheet**
+- Old behaviour: single "Copy to clipboard" only.
+- New: bottom sheet with 3 options:
+  - 💬 Copy WhatsApp Text — clipboard copy of formatted trip summary
+  - 🖼️ Share as Card — canvas-rendered 640×360 JPG shared via Capacitor Share
+  - 💾 Save JPG to Device — saved to `Documents/TravelHub/exports/TripCard_*.jpg`
+- Canvas card: dark indigo gradient, passenger name, route pill with flags, stats grid, reason text.
+- **Files:** `Travel_app/src/js/screens/add-trip.js`
+
+**2. Passenger filter → chip-style multi-select**
+- Old: radio-button single-select, no memory.
+- New: scrollable chip rows (People / Year), multi-select, instant apply (no Apply button), persists to `localStorage` key `travellog_filter_passengers`.
+- Filter initialised from localStorage on render.
+- Removed `setHashParams` from filter logic (eliminated re-render loop).
+- **Files:** `Travel_app/src/js/screens/travel-log.js`
+
+**3. Export button (📤) wired in Travel Log header**
+- `#header-export-btn` now calls `openTravelExportSheet(passengers, safeTrips, documents)`.
+- **Files:** `Travel_app/src/js/screens/travel-log.js`
+
+**4. Passenger Summary: current location line**
+- Under passenger name in Passenger Summary tab: pill showing current country flag + entry date + days count.
+- Example: `🇶🇦 Qatar · Since 10 Feb 2026 · 73 Days`
+- **Files:** `Travel_app/src/js/screens/travel-log.js`
+
+**5. Dashboard spinner fixed permanently**
+- Root cause: spinner left in DOM when `members.length === 0` early-return path was hit.
+- Fix: `content.innerHTML = ''` in `loadAndRender()` before any render call.
+- **Files:** `Travel_app/src/js/screens/dashboard.js`
+
+**6. Dashboard empty-state copy updated**
+- "Sign in" → "Import from Excel via Settings" with navigation button.
+- **Files:** `Travel_app/src/js/screens/dashboard.js`
+
+**7. Dashboard: Export current locations as XLSX**
+- New `📊` button in dashboard header → `exportCurrentLocationsXLSX()`.
+- Builds XLSX with columns: Passenger Name, Current Country, Entry Date, Days in Country.
+- Saved to `Documents/TravelHub/exports/CurrentLocations_YYYY-MM-DD_*.xlsx`.
+- Toast shows exact saved path.
+- **Files:** `Travel_app/src/js/screens/dashboard.js`
+
+**8. Travel Settings: Verify & Repair description updated**
+- New text: "Merges duplicate trip entries and creates any missing companion records. Local only — does not affect Google Drive."
+- **Files:** `Travel_app/src/js/screens/settings.js`
+
+---
+
+#### Issues Resolved — Vault App
+
+**9. Categories: Title Case normalization**
+- `toTitleCase()` helper added to `category-manager.js` and `add-transaction.js`.
+- All category names normalized on add, rename, merge (Anees → Anees, ANEES → Anees, etc.).
+- All comparisons updated to case-insensitive (`toLowerCase()`).
+- **Files:** `Personal_vault/src/js/modals/category-manager.js`, `Personal_vault/src/js/screens/add-transaction.js`
+
+**10. Category manager: action bar above Android nav bar**
+- `#multi-action-bar` moved outside `.modal-sheet` scroll area, `position:fixed; bottom:0`.
+- `padding-bottom: calc(12px + env(safe-area-inset-bottom))`.
+- List container gets `padding-bottom:100px` when bar is shown; `12px` when hidden.
+- **Files:** `Personal_vault/src/js/modals/category-manager.js`
+
+**11. XLSX export: save to Documents/PersonalVault/exports/**
+- `exportToXlsx()` refactored to use `saveXLSXToExports('finance', wb, filenameBase)`.
+- XLSX library: local `/js/lib/xlsx.full.min.js` first, CDN fallback.
+- Toast shows exact saved path.
+- **Files:** `Personal_vault/src/js/screens/settings.js`
+
+**12. Backup JSON: save to Documents/PersonalVault/exports/**
+- `backup-now` button now calls `downloadLocalBackup('finance', currentData)`.
+- Returns path string → shown in success toast.
+- **Files:** `Personal_vault/src/js/screens/settings.js`
+
+**13. drive.js: updated downloadLocalBackup + added saveXLSXToExports**
+- `downloadLocalBackup()` — rewrote to save JSON directly to `Documents/<AppFolder>/exports/` (no more Cache + Share flow).
+- `saveXLSXToExports(appName, wb, filenameBase)` — new export: saves any XLSX workbook to exports folder.
+- `_arrayBufferToBase64()` helper added.
+- Applied to **both apps** (`Travel_app/src/shared/drive.js` and `Personal_vault/src/shared/drive.js`).
+
+**14. Settings: labels for Restore JSON vs Import Vaultbox**
+- Backup Now: "Saves plain-text JSON to Documents/PersonalVault/exports/ · No password needed"
+- Restore JSON Backup: "Pick a Vault_Backup_*.json file — plain text, no password required"
+- Import Vaultbox: "AES-GCM encrypted .vaultbox file — requires the password set during export."
+- **Files:** `Personal_vault/src/js/screens/settings.js`
+
+---
+
+#### Issues Resolved — Both Apps
+
+**15. Reset All Data dialog: backup files NOT deleted**
+- Confirm dialog text updated to include: "✅ Your backup files in Documents/<AppFolder>/ are NOT affected."
+- **Files:** `Travel_app/src/js/screens/settings.js`, `Personal_vault/src/js/screens/settings.js`
+
+**16. Exit confirmation dialog on back button at root screen**
+- When `canGoBack = false` (at root screen), native back button now shows styled bottom-sheet overlay.
+- Overlay shows app icon, "Exit [App Name]?", "Your data is saved locally on this device.", Cancel + Exit buttons.
+- Guards against double-tap with `_exitDialogOpen` flag.
+- **Files:** `Travel_app/src/index.html`, `Personal_vault/src/index.html`
+
+---
+
+#### Folder Structure Fixes (Both Apps)
+
+- Auto-backup files reorganized into organized subfolders:
+  - `Documents/TravelHub/TravelboxFiles/` — daily `.travelbox` backups
+  - `Documents/PersonalVault/VaultboxFiles/` — daily `.vaultbox` backups
+  - `Documents/TravelHub/exports/` — XLSX exports, JSON backups, trip card JPGs
+  - `Documents/PersonalVault/exports/` — XLSX exports, JSON backups
+- **Files:** `Travel_app/src/shared/sync-manager.js`, `Personal_vault/src/shared/sync-manager.js`
+
+---
+
+**Files Changed (12):**
+
+| File | Change |
+|------|--------|
+| `Travel_app/src/js/screens/add-trip.js` | Per-trip 3-option share: WhatsApp text + JPG card share + JPG save |
+| `Travel_app/src/js/screens/travel-log.js` | Chip-style filter, export button wired, current location in Passenger Summary |
+| `Travel_app/src/js/screens/dashboard.js` | Spinner fix, empty-state text, locations XLSX export |
+| `Travel_app/src/js/screens/settings.js` | Verify & Repair description, Reset dialog text |
+| `Travel_app/src/shared/drive.js` | `downloadLocalBackup` fixed, `saveXLSXToExports` added |
+| `Travel_app/src/shared/sync-manager.js` | Auto-backup to `TravelboxFiles` subfolder |
+| `Travel_app/src/index.html` | Exit confirmation dialog |
+| `Personal_vault/src/js/modals/category-manager.js` | Title Case normalization, nav bar fix |
+| `Personal_vault/src/js/screens/add-transaction.js` | `toTitleCase` on save |
+| `Personal_vault/src/js/screens/settings.js` | XLSX/JSON to exports folder + path toast, labels, Reset dialog text |
+| `Personal_vault/src/shared/drive.js` | `downloadLocalBackup` fixed, `saveXLSXToExports` added |
+| `Personal_vault/src/shared/sync-manager.js` | Auto-backup to `VaultboxFiles` subfolder |
+| `Personal_vault/src/index.html` | Exit confirmation dialog |

@@ -313,7 +313,7 @@ function renderDataTab(data, members, container) {
   });
 
   document.getElementById('reset-db-btn').addEventListener('click', async () => {
-    const doubleConfirm = confirm('☢️ NUCLEAR RESET: This will PERMANENTLY DELETE all local travel data.\n\nProceed to wipe everything?');
+    const doubleConfirm = confirm('☢️ NUCLEAR RESET: This will PERMANENTLY DELETE all local travel data from this device.\n\n✅ Your backup files in Documents/TravelHub/ are NOT affected.\n\nProceed to wipe everything?');
     if (!doubleConfirm) return;
     const tripleConfirm = confirm('Are you 100% sure? All history will be lost forever.');
     if (!tripleConfirm) return;
@@ -368,7 +368,7 @@ Members: ${members.length} · Trips: ${data?.trips?.length || 0} · Docs: ${data
           <button id="repair-data-btn" class="btn btn-secondary" style="flex:1; padding:10px; font-size:11px;">🔍 Verify & Repair Data</button>
         </div>
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">
-          Maintenance: Removes duplicates and ensures data integrity.
+          Merges duplicate trip entries and creates any missing companion records. Local only — does not affect Google Drive.
         </div>
       </div>
     </div>`;

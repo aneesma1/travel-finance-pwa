@@ -479,55 +479,39 @@ export async function restoreFromMirror(appName, snapshotIndex) {
 }
 
 // ── Local device backup ───────────────────────────────────────────────────────
+// Saves JSON backup directly to Documents/<AppFolder>/exports/ on Android.
+// Returns the save path string for display in success toasts.
 export async function downloadLocalBackup(appName, data) {
   const ts = timestampSuffix();
-  const label = appName === 'travel' ? 'TravelApp' : 'VaultApp';
-  const filename = `${label}_Backup_${ts}.json`;
+  const appFolder  = appName === 'travel' ? 'TravelHub' : 'PersonalVault';
+  const label      = appName === 'travel' ? 'TravelHub' : 'Vault';
+  const exportDir  = `${appFolder}/exports`;
+  const filename   = `${label}_Backup_${ts}.json`;
   const jsonContent = JSON.stringify(data, null, 2);
 
-  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share) {
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
     try {
-      const { Filesystem, Directory, Encoding, Share } = window.Capacitor.Plugins;
-      
+      const { Filesystem, Directory, Encoding } = window.Capacitor.Plugins;
+
+      // Ensure exports subfolder exists
+      await Filesystem.mkdir({ path: exportDir, directory: Directory.Documents, recursive: true }).catch(() => {});
+
+      // Write JSON backup to Documents/<AppFolder>/exports/
       await Filesystem.writeFile({
-        path: filename,
+        path: `${exportDir}/${filename}`,
         data: jsonContent,
-        directory: Directory.Cache,
+        directory: Directory.Documents,
         encoding: Encoding.UTF8
       });
-      
-      const fileUri = await Filesystem.getUri({
-        directory: Directory.Cache,
-        path: filename
-      });
-      
-      const urlList = [fileUri.uri];
-      const xlsxBlob = await generateXLSXBlob(appName, data);
-      
-      if (xlsxBlob) {
-        const reader = new FileReader();
-        reader.readAsDataURL(xlsxBlob);
-        await new Promise(r => {
-           reader.onloadend = async () => {
-             const base64 = reader.result.split(',')[1];
-             const xName = `${label}_Backup_${ts}.xlsx`;
-             await Filesystem.writeFile({ path: xName, data: base64, directory: Directory.Cache });
-             const xUri = await Filesystem.getUri({ directory: Directory.Cache, path: xName });
-             urlList.push(xUri.uri);
-             r();
-           };
-        });
-      }
-      
-      await Share.share({
-        title: 'Export Backup',
-        files: urlList,
-        dialogTitle: 'Save Backup Files'
-      });
-      return;
-    } catch(err) { console.error('Share failed, fallback to web download', err); }
+
+      return `Documents/${exportDir}/${filename}`;
+    } catch (err) {
+      console.error('Filesystem backup failed:', err);
+      throw new Error('Could not save backup: ' + err.message);
+    }
   }
 
+  // Web fallback — browser download
   const blob = new Blob([jsonContent], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -535,6 +519,40 @@ export async function downloadLocalBackup(appName, data) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+  return filename;
+}
+
+// ── Save any data as XLSX to Documents/<AppFolder>/exports/ ──────────────────
+export async function saveXLSXToExports(appName, wb, filenameBase) {
+  const appFolder = appName === 'travel' ? 'TravelHub' : 'PersonalVault';
+  const exportDir = `${appFolder}/exports`;
+  const ts = timestampSuffix();
+  const filename = `${filenameBase}_${ts}.xlsx`;
+
+  if (!window.XLSX) throw new Error('XLSX library not loaded');
+  const buf = window.XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  const base64 = _arrayBufferToBase64(buf);
+
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+    const { Filesystem, Directory } = window.Capacitor.Plugins;
+    await Filesystem.mkdir({ path: exportDir, directory: Directory.Documents, recursive: true }).catch(() => {});
+    await Filesystem.writeFile({ path: `${exportDir}/${filename}`, data: base64, directory: Directory.Documents });
+    return `Documents/${exportDir}/${filename}`;
+  }
+
+  // Web fallback
+  const blob = new Blob([new Uint8Array(buf)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  return filename;
+}
+
+function _arrayBufferToBase64(buffer) {
+  let bin = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
 }
 
 // ── Timestamp suffix helper -- DD-MMM-YYYY_HH-MM_AM ───────────────────────────────

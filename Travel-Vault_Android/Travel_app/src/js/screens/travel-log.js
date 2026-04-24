@@ -103,10 +103,10 @@ export async function renderTravelLog(container, params = {}) {
   const urlYear = params.year || getHashParams().year;
   let filterYear = urlYear || 'all';
   
-  if (params.passengerId) setHashParams({ passenger: params.passengerId });
-  const hashParams = getHashParams();
-  let filterPassenger = hashParams.passenger || '';
-  let searchQuery = hashParams.q || '';
+  // Load persisted passenger filter from localStorage (falls back to URL param)
+  const _savedFilter = (() => { try { return JSON.parse(localStorage.getItem('travellog_filter_passengers') || '[]'); } catch { return []; } })();
+  let filterPassenger = _savedFilter.length > 0 ? _savedFilter.join(',') : (getHashParams().passenger || '');
+  let searchQuery = getHashParams().q || '';
 
   // Tab State
   let activeTab = 'trips'; // 'trips' or 'summary'
@@ -149,9 +149,14 @@ export async function renderTravelLog(container, params = {}) {
     `;
 
     container.querySelector('#tab-btn-trips').addEventListener('click', () => { activeTab = 'trips'; renderLayout(); });
-    container.querySelector('#tab-btn-summary').addEventListener('click', () => { 
+    container.querySelector('#tab-btn-summary').addEventListener('click', () => {
        if (!summaryState.selectedPassenger && uniquePassengers.length > 0) summaryState.selectedPassenger = uniquePassengers[0].name;
-       activeTab = 'summary'; renderLayout(); 
+       activeTab = 'summary'; renderLayout();
+    });
+
+    // ── Wire export button (was disconnected) ──
+    container.querySelector('#header-export-btn').addEventListener('click', () => {
+      openTravelExportSheet(passengers, safeTrips, data.documents || []);
     });
 
     const tabContent = container.querySelector('#tab-content');
@@ -247,113 +252,101 @@ export async function renderTravelLog(container, params = {}) {
     container.style.display = 'block';
   }
 
+  // ── Passenger filter persistence helpers ─────────────────────────────────────
+  const FILTER_KEY = 'travellog_filter_passengers';
+  function loadSavedPassengerFilter() {
+    try { return JSON.parse(localStorage.getItem(FILTER_KEY) || '[]'); } catch { return []; }
+  }
+  function savePassengerFilter(arr) {
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify(arr)); } catch {}
+  }
+
   function renderFilters(fPass, fYear, bar) {
-    if(!bar) return;
+    if (!bar) return;
     const yearsDisplay = [...availableYears];
     if (!yearsDisplay.includes(String(currentYear()))) yearsDisplay.unshift(String(currentYear()));
 
+    // Chip-style passenger filter: multi-select, instant, persistent
     const selectedPasses = fPass ? fPass.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     bar.innerHTML = `
-      <div class="filter-bar" style="border-bottom:1px solid var(--border); padding:8px 16px;">
-        <div class="filter-chips" style="padding:0;">
-          <span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-right:8px;flex-shrink:0;">Filter</span>
-          
-          <div style="position:relative; display:inline-block;" id="passenger-dropdown-container">
-             <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px; border-radius:99px;" id="passenger-dropdown-btn">
-               👤 ${selectedPasses.length === 0 ? 'All' : selectedPasses.length === 1 ? selectedPasses[0] : `${selectedPasses.length} Selected`} ▾
-             </button>
-             
-             <div id="passenger-dropdown-menu" style="display:none; position:absolute; top:100%; left:0; width:220px; background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-top:8px; box-shadow:0 8px 32px rgba(0,0,0,0.15); z-index:100; max-height:50vh; overflow-y:auto; padding:8px;">
-               <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; cursor:pointer; border-radius:8px;">
-                 <input type="checkbox" value="" ${selectedPasses.length === 0 ? 'checked' : ''} class="pass-checkbox pass-all-cb">
-                 <span style="font-size:13px; font-weight:700;">All Passengers</span>
-               </label>
-               <div style="height:1px; background:var(--border); margin:6px 0;"></div>
-               ${uniquePassengers.map(p => `
-                 <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; cursor:pointer;" class="pass-label">
-                    <input type="checkbox" value="${p.name}" ${selectedPasses.includes(p.name) ? 'checked' : ''} class="pass-checkbox pass-item-cb">
-                    <span style="font-size:13px;">${p.emoji || '👤'} ${p.name}</span>
-                 </label>
-               `).join('')}
-               <div style="margin-top:12px; display:flex;">
-                 <button class="btn btn-primary" style="flex:1; padding:8px; font-size:12px;" id="pass-apply-btn">Apply Filters</button>
-               </div>
-             </div>
+      <div style="border-bottom:1px solid var(--border); padding:8px 12px;">
+        <!-- Passenger chips row -->
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px;">
+          <div style="display:flex; gap:6px; white-space:nowrap; min-width:max-content; align-items:center; padding:2px 0;">
+            <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;margin-right:2px;">People</span>
+            <button class="pass-chip ${selectedPasses.length === 0 ? 'pass-chip-active' : 'pass-chip-inactive'}" data-name="">
+              All
+            </button>
+            ${uniquePassengers.map(p => `
+              <button class="pass-chip ${selectedPasses.includes(p.name) ? 'pass-chip-active' : 'pass-chip-inactive'}" data-name="${p.name}">
+                ${p.emoji || '👤'} ${p.name}
+              </button>
+            `).join('')}
           </div>
-
-          <div style="width:1px;height:16px;background:var(--border);flex-shrink:0;margin:0 8px;"></div>
-          <button class="filter-chip ${fYear === 'all' ? 'active' : ''}" data-filter="year" data-value="all">All</button>
-          ${yearsDisplay.map(y => `
-            <button class="filter-chip ${fYear === y ? 'active' : ''}" data-filter="year" data-value="${y}">${y}</button>
-          `).join('')}
+        </div>
+        <!-- Year chips row -->
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch; padding-top:6px;">
+          <div style="display:flex; gap:6px; white-space:nowrap; min-width:max-content; align-items:center; padding:2px 0;">
+            <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;margin-right:2px;">Year</span>
+            <button class="filter-chip ${!fYear || fYear === 'all' ? 'active' : ''}" data-filter="year" data-value="all">All</button>
+            ${yearsDisplay.map(y => `
+              <button class="filter-chip ${fYear === y ? 'active' : ''}" data-filter="year" data-value="${y}">${y}</button>
+            `).join('')}
+          </div>
         </div>
       </div>
+      <style>
+        .pass-chip { border:none; border-radius:99px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; font-family:inherit; }
+        .pass-chip-active { background:var(--primary); color:#fff; }
+        .pass-chip-inactive { background:var(--surface-3,#F3F4F6); color:var(--text-muted); }
+      </style>
     `;
 
-    // DROP-DOWN TOGGLE: Bulletproof implementation
-    const dropBtn = bar.querySelector('#passenger-dropdown-btn');
-    const dropMenu = bar.querySelector('#passenger-dropdown-menu');
-    if (dropBtn && dropMenu) {
-      dropBtn.onclick = (e) => {
-        e.stopPropagation();
-        const isHidden = dropMenu.style.display === 'none' || dropMenu.style.display === '';
-        dropMenu.style.display = isHidden ? 'block' : 'none';
-      };
-      
-      document.addEventListener('click', (e) => {
-        const container = bar.querySelector('#passenger-dropdown-container');
-        if (container && !container.contains(e.target)) {
-          dropMenu.style.display = 'none';
+    // Passenger chip click — instant multi-select with persistence
+    bar.querySelectorAll('.pass-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.name;
+        let current = filterPassenger ? filterPassenger.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+        if (name === '') {
+          // "All" chip — clear all individual selections
+          current = [];
+        } else {
+          if (current.includes(name)) {
+            current = current.filter(n => n !== name); // deselect
+          } else {
+            current.push(name); // select
+          }
         }
+
+        filterPassenger = current.length > 0 ? current.join(',') : null;
+        savePassengerFilter(current); // persist
+        _tripPage = 1;
+
+        // Instant re-render of chips (toggle classes without full re-render)
+        bar.querySelectorAll('.pass-chip').forEach(c => {
+          const cName = c.dataset.name;
+          if (cName === '') {
+            c.className = `pass-chip ${current.length === 0 ? 'pass-chip-active' : 'pass-chip-inactive'}`;
+          } else {
+            c.className = `pass-chip ${current.includes(cName) ? 'pass-chip-active' : 'pass-chip-inactive'}`;
+          }
+        });
+
+        const content = document.getElementById('log-content');
+        if (content) renderTrips(filterPassenger, filterYear, true, content);
       });
-      
-      const allCb = bar.querySelector('.pass-all-cb');
-      const itemCbs = bar.querySelectorAll('.pass-item-cb');
-      
-      if (allCb && itemCbs) {
-        allCb.addEventListener('change', (e) => {
-          if (e.target.checked) itemCbs.forEach(cb => cb.checked = false);
-          else if (Array.from(itemCbs).every(cb => !cb.checked)) e.target.checked = true;
-        });
-        
-        itemCbs.forEach(cb => {
-          cb.addEventListener('change', () => {
-            if (cb.checked) allCb.checked = false;
-            else if (Array.from(itemCbs).every(c => !c.checked)) allCb.checked = true;
-          });
-        });
-      }
-    }
-    
-    bar.querySelector('#pass-apply-btn').addEventListener('click', () => {
-      const checked = Array.from(bar.querySelectorAll('.pass-item-cb')).filter(c => c.checked).map(c => c.value);
-      filterPassenger = checked.length > 0 ? checked.join(',') : null;
-      setHashParams({ passenger: filterPassenger });
-      _tripPage = 1;
-
-      // Update dropdown button label immediately
-      if (dropBtn) {
-        const label = checked.length === 0 ? 'All' : checked.length === 1 ? checked[0] : `${checked.length} Selected`;
-        dropBtn.textContent = `👤 ${label} ▾`;
-      }
-      if (dropMenu) dropMenu.style.display = 'none';
-
-      const content = document.getElementById('log-content');
-      if (content) renderTrips(filterPassenger, filterYear, true, content);
     });
 
+    // Year chip click
     bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(btn => {
       btn.addEventListener('click', () => {
         filterYear = btn.dataset.value === 'all' ? null : btn.dataset.value;
-        setHashParams({ year: filterYear });
         _tripPage = 1;
-        
-        // Update active UI state for pills immediately
         bar.querySelectorAll('.filter-chip[data-filter="year"]').forEach(b => {
           b.classList.toggle('active', b.dataset.value === (filterYear || 'all'));
         });
-
         const content = document.getElementById('log-content');
         if (content) renderTrips(filterPassenger, filterYear, true, content);
       });
@@ -719,8 +712,29 @@ export async function renderTravelLog(container, params = {}) {
             <div style="text-align:center;margin-bottom:16px;">
               <div style="font-size:36px;margin-bottom:8px;">${getEmoji(summaryState.selectedPassenger)}</div>
               <h2 style="margin:0;font-size:20px;">${summaryState.selectedPassenger || 'Select a Passenger'}</h2>
-              <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted);">
-                Travel Summary <br/> <span style="opacity:0.7">(Days grouped by entry date)</span>
+              ${(() => {
+                if (!summaryState.selectedPassenger) return '';
+                // Compute current location inline using trip data
+                const pName = summaryState.selectedPassenger;
+                const nameLower = pName.toLowerCase();
+                const personTrips = safeTrips.filter(t =>
+                  String(t.passengerName || '').toLowerCase() === nameLower ||
+                  (t._resolvedCompanionNames || []).map(n => n.toLowerCase()).includes(nameLower)
+                ).sort((a, b) => new Date(b.dateArrivedDest || 0) - new Date(a.dateArrivedDest || 0));
+                if (!personTrips.length) return '';
+                const latest = personTrips[0];
+                const country = latest.destinationCountry || 'Unknown';
+                const entryDate = latest.dateArrivedDest || latest.dateLeftOrigin || '';
+                const daysIn = entryDate ? daysBetween(entryDate, today()) : null;
+                const flagMap = { Qatar: '🇶🇦', India: '🇮🇳' };
+                const flag = flagMap[country] || '📍';
+                const entryFormatted = entryDate ? formatDisplayDate(entryDate) : '—';
+                return `<div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:var(--primary-bg);border-radius:99px;padding:4px 14px;font-size:12px;font-weight:600;color:var(--primary);">
+                  ${flag} ${country} &nbsp;·&nbsp; Since ${entryFormatted}${daysIn !== null ? ` &nbsp;·&nbsp; ${daysIn} Days` : ''}
+                </div>`;
+              })()}
+              <p style="margin:8px 0 0;font-size:12px;color:var(--text-muted);">
+                Travel Summary <span style="opacity:0.7;">· Days grouped by entry date</span>
               </p>
             </div>
             

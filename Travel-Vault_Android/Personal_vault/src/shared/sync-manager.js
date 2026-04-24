@@ -104,27 +104,32 @@ async function writeAndPruneLocalBackup(appName, data) {
 
   var Filesystem = window.Capacitor.Plugins.Filesystem;
   var dir = 'DOCUMENTS'; // Android: /storage/emulated/0/Documents/
+  // Organised subfolder per app
+  var subDir = appName === 'travel' ? 'TravelHub/TravelboxFiles' : 'PersonalVault/VaultboxFiles';
   var prefix = appName === 'travel' ? 'TravelHub_Backup_' : 'Vault_Backup_';
   var ext = appName === 'travel' ? '.travelbox' : '.vaultbox';
 
-  // Write today's backup (unencrypted JSON, one file per day)
+  // Ensure subfolder exists
+  try { await Filesystem.mkdir({ path: subDir, directory: dir, recursive: true }); } catch (e) { /* already exists */ }
+
+  // Write today's backup (one file per day, overwrites same-day)
   var today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   var fileName = prefix + today + ext;
 
   await Filesystem.writeFile({
-    path: fileName,
+    path: subDir + '/' + fileName,
     data: JSON.stringify(data),
     directory: dir,
     encoding: 'utf8',
     recursive: true
   });
 
-  // Prune any backup files older than 15 days
+  // Prune backup files older than 15 days
   var cutoffMs = 15 * 24 * 60 * 60 * 1000;
   var now = Date.now();
 
   try {
-    var listResult = await Filesystem.readdir({ path: '', directory: dir });
+    var listResult = await Filesystem.readdir({ path: subDir, directory: dir });
     var files = (listResult.files || []);
 
     for (var i = 0; i < files.length; i++) {
@@ -139,7 +144,7 @@ async function writeAndPruneLocalBackup(appName, data) {
 
       if (now - fileDate > cutoffMs) {
         try {
-          await Filesystem.deleteFile({ path: name, directory: dir });
+          await Filesystem.deleteFile({ path: subDir + '/' + name, directory: dir });
         } catch (delErr) { /* non-blocking */ }
       }
     }
