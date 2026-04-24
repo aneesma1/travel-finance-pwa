@@ -152,13 +152,16 @@ async function writeAndPruneLocalBackup(appName, data) {
 }
 
 
-// ── Sequential Drive queue processor ─────────────────────────────────────────
+// ── Local queue flush (Drive removed in Blueprint V2) ─────────────────────────
+// Data is already written to IndexedDB inside localSave() before this queue
+// is even populated. This function simply confirms each pending op and clears
+// the queue so it does not grow unbounded.
 async function processDriveQueue() {
-  if (_running || !isOnline()) return;
+  if (_running) return;
   if (!_queue.some(function (q) { return q.status === 'pending'; })) return;
 
   _running = true;
-  broadcastStatus('syncing', 'Syncing…');
+  broadcastStatus('syncing', 'Confirming…');
 
   var pendingOps = _queue.filter(function (q) { return q.status === 'pending'; });
   for (var i = 0; i < pendingOps.length; i++) {
@@ -167,56 +170,13 @@ async function processDriveQueue() {
     await saveQueue();
 
     try {
-      // Write-ahead: mark safe file before touching main file
-      await writeSafeSnapshot(op.appName, op.dataSnapshot);
-
-      // Drive write -- use snapshot directly (already merged locally)
-      var newData = await writeData(op.appName, async function (driveData) {
-        var localData = op.dataSnapshot;
-        var localCount = (localData.trips ? localData.trips.length : 0) + (localData.transactions ? localData.transactions.length : 0);
-        var driveCount = (driveData && driveData.trips ? driveData.trips.length : 0) + (driveData && driveData.transactions ? driveData.transactions.length : 0);
-
-        // SAFETY INTERLOCK: If local is empty but cloud has data, BLOCK the push.
-        if (localCount === 0 && driveCount > 0) {
-          console.error('SYNC BLOCK: Attempted to overwrite cloud data with empty local state.');
-          throw new Error('Zero-Data Interlock: Cloud data preserved. Please "Restore from Cloud" first.');
-        }
-
-        // Bi-Directional Merge (Conflict Resolution)
-        var mergedData = Object.assign({}, localData);
-        if (op.appName === 'travel') {
-          ['trips', 'passengers', 'documents'].forEach(function (key) {
-            var localIds = new Set((localData[key] || []).map(function (x) { return x.id; }));
-            var missing = (driveData[key] || []).filter(function (x) { return x.id && !localIds.has(x.id); });
-            if (missing.length > 0) {
-              mergedData[key] = (localData[key] || []).concat(missing);
-            }
-          });
-        } else if (op.appName === 'finance') {
-          ['transactions', 'categories', 'accounts'].forEach(function (key) {
-            var localIds = new Set((localData[key] || []).map(function (x) { return x.id; }));
-            var missing = (driveData[key] || []).filter(function (x) { return x.id && !localIds.has(x.id); });
-            if (missing.length > 0) {
-              mergedData[key] = (localData[key] || []).concat(missing);
-            }
-          });
-        }
-        return mergedData;
-      });
-
-      // Update local cache with server-confirmed version
-      if (op.appName === 'travel') await setCachedTravelData(newData);
-      else await setCachedFinanceData(newData);
-
-      // Clean up safe file
+      // Data snapshot is already confirmed in IndexedDB — clear safe file and mark done.
       await clearSafeSnapshot(op.appName);
-
       op.status = 'done';
       await saveQueue();
-
     } catch (err) {
       op.status = 'failed';
-      op.error = err.message;
+      op.error  = err.message;
       await saveQueue();
       broadcastStatus('failed', err.message);
       _running = false;
@@ -229,12 +189,7 @@ async function processDriveQueue() {
   await saveQueue();
 
   _running = false;
-  var stillPending = _queue.filter(function (q) { return q.status === 'pending'; }).length;
-  if (stillPending > 0) {
-    broadcastStatus('pending', stillPending + ' pending');
-  } else {
-    broadcastStatus('synced', 'All saved');
-  }
+  broadcastStatus('synced', 'All saved');
 }
 
 // ── Write-ahead safe snapshot ─────────────────────────────────────────────────
@@ -311,33 +266,6 @@ async function runBootIntegrityCheck(appName) {
         message: 'Record count dropped significantly (' + lastCount + ' → ' + currentCount + ').',
         detail: 'This may indicate data loss. Check your records before continuing.',
       });
-    }
-
-    // Check 4: Smart ETag Check (only if authenticated & online)
-    if (isOnline() && typeof authFetch === 'function' && typeof getToken === 'function' && getToken()) {
-      try {
-        var fileKey = appName === 'travel' ? 'drive_travel_file_id' : 'drive_finance_file_id';
-        var fileId = localStorage.getItem(fileKey);
-        if (fileId) {
-          var metaRes = await authFetch(
-            'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=modifiedTime',
-            { method: 'GET' }
-          );
-          if (metaRes.ok) {
-            var meta = await metaRes.json();
-            var cloudTime = new Date(meta.modifiedTime).getTime();
-            var localSync = new Date(cached.lastSync || 0).getTime();
-            if (cloudTime > localSync + 60000) {
-              issues.push({
-                type: 'cloud_newer',
-                message: 'Newer data is available on Google Drive',
-                detail: 'Tap Settings → Data → Restore from Cloud to download the newest changes.',
-                autoFix: false,
-              });
-            }
-          }
-        }
-      } catch (err) { console.error('ETag Check Failed', err); }
     }
 
     // Update last known count

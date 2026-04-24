@@ -6,7 +6,6 @@
 'use strict';
 
 import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
-import { writeData } from '../../shared/drive.js';
 import { localSave } from '../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { formatDisplayDate, formatAmount, showToast, showConfirmModal, showInputModal } from '../../shared/utils.js';
