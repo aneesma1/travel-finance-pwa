@@ -109,9 +109,14 @@
   // ── 404 Script error catcher ────────────────────────────────────────
   window.addEventListener('error', function(e) {
     if (e.target && e.target.tagName === 'SCRIPT') {
-      const fileName = e.target.src ? e.target.src.split('/').pop() : 'unknown';
+      // Ignore dynamically-loaded external scripts (e.g. XLSX from CDN or local lib).
+      // Those scripts handle their own fallback/error via onerror callbacks.
+      if (e.target.getAttribute('data-internal') === 'xlsx-loader') return;
+      const src = e.target.src || '';
+      if (src.includes('cdnjs.cloudflare.com') || src.includes('/js/lib/')) return;
+      const fileName = src ? src.split('/').pop() : 'unknown';
       const msg = 'Critical Asset Missing: ' + fileName + '. Please check build bundle.';
-      if (window.onerror) window.onerror(msg, e.target.src, 0);
+      if (window.onerror) window.onerror(msg, src, 0);
     }
   }, true);
 

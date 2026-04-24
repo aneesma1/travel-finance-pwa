@@ -481,14 +481,15 @@ function openImportModal(data, persons) {
   const modal = document.getElementById('member-modal');
   modal.classList.remove('hidden');
   modal.innerHTML = `
-    <div class="modal-sheet" style="max-height:92vh;">
-      <div class="modal-handle"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 8px;">
+    <div class="modal-sheet" style="max-height:92vh;display:flex;flex-direction:column;">
+      <div class="modal-handle" style="flex-shrink:0;"></div>
+      <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px 8px;">
         <span style="font-size:16px;font-weight:700;">Import Travel Data</span>
         <button id="close-import" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
       </div>
-      <div id="import-status" style="display:none;padding:10px 20px;font-size:14px;font-weight:600;"></div>
-      <div id="import-tool-container" style="overflow-y:auto;max-height:70vh;padding-bottom:60px;"></div>
+      <div id="import-status" style="flex-shrink:0;display:none;padding:10px 20px;font-size:14px;font-weight:600;"></div>
+      <div id="import-tool-container" style="overflow-y:auto;flex:1;min-height:0;"></div>
+      <div id="import-action-bar" style="display:none;flex-shrink:0;padding:12px 20px;padding-bottom:max(16px,env(safe-area-inset-bottom,16px));background:var(--surface);border-top:1px solid var(--border);"></div>
     </div>`;
 
   let importInProgress = false;

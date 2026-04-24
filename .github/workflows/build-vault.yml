@@ -39,12 +39,18 @@ jobs:
         run: |
           npm install
           # Capacitor only bundles webDir (src/).
-          
+
           # Verify shared folder is not empty
           if [ ! -f src/shared/sync-manager.js ]; then
             echo "Critical Error: src/shared/sync-manager.js not found after copy!"
             exit 1
           fi
+
+          # ── Bundle XLSX locally so the import tool works offline / without CDN ──
+          mkdir -p src/js/lib
+          cp node_modules/xlsx/dist/xlsx.full.min.js src/js/lib/xlsx.full.min.js
+          echo "XLSX bundled: $(wc -c < src/js/lib/xlsx.full.min.js) bytes"
+
           # ── NATIVE STABILITY PIVOT (v5.4.0) ──
           # No longer stripping imports/exports or modifying shared paths.
           # Capacitor natively supports ES modules.

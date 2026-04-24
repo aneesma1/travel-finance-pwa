@@ -87,7 +87,7 @@ export async function renderDashboard(container) {
       <span class="app-header-title">✈️ Family Hub</span>
       <div style="display:flex;gap:8px;">
         <button class="app-header-action" id="share-btn" title="Share dashboard">⬆️</button>
-        <button class="app-header-action" id="refresh-btn" title="Refresh">🔄</button>
+
       </div>
     </div>
     <div id="offline-content"></div>
@@ -100,7 +100,7 @@ export async function renderDashboard(container) {
     <div id="share-popup-anchor" style="position:fixed;bottom:80px;right:20px;z-index:150;"></div>
   `;
 
-  document.getElementById('refresh-btn').addEventListener('click', () => renderDashboard(container));
+
   document.getElementById('share-btn').addEventListener('click', () => toggleSharePopup());
 
   await loadAndRender();

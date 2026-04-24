@@ -5,10 +5,13 @@
 // Handles: sequential Drive writes, pending queue, write-ahead safety,
 //          boot integrity checks, sync status broadcasting
 //
-// ⚠️ NATIVE BUILD NOTE: This file uses NO import/export statements.
+// ⚠️ NATIVE BUILD NOTE: This file uses NO import/export statements until v5.4.3.
 // All dependencies (authFetch, isOnline, etc.) must be global (loaded via <script> tags).
 
 'use strict';
+
+import { getCachedTravelData, setCachedTravelData, getCachedFinanceData, setCachedFinanceData, openDB } from './db.js';
+import { getAppState, setAppState, uuidv4 } from './utils.js';
 
 // ── Sync status broadcast ─────────────────────────────────────────────────────
 function broadcastStatus(status, detail) {
@@ -17,7 +20,7 @@ function broadcastStatus(status, detail) {
 }
 
 // ── Operation queue (in-memory, persisted to appState) ────────────────────────
-var _queue   = [];   // { id, appName, mergeFn, queuedAt, status }
+var _queue = [];   // { id, appName, mergeFn, queuedAt, status }
 var _running = false;
 
 async function loadQueue() {
@@ -33,7 +36,7 @@ async function loadQueue() {
 
 async function saveQueue() {
   try {
-    var serialisable = _queue.map(function(item) {
+    var serialisable = _queue.map(function (item) {
       return { id: item.id, appName: item.appName, queuedAt: item.queuedAt, status: item.status, dataSnapshot: item.dataSnapshot };
     });
     await setAppStatePrim('syncQueue', serialisable);
@@ -44,11 +47,11 @@ async function saveQueue() {
 async function setAppStatePrim(key, value) {
   try {
     var db = await openDB();
-    return new Promise(function(resolve, reject) {
+    return new Promise(function (resolve, reject) {
       var tx = db.transaction('app_state', 'readwrite');
       var req = tx.objectStore('app_state').put({ key: key, value: value });
-      req.onsuccess = function() { resolve(); };
-      req.onerror   = function() { reject(req.error); };
+      req.onsuccess = function () { resolve(); };
+      req.onerror = function () { reject(req.error); };
     });
   } catch (e) { /* silent */ }
 }
@@ -77,16 +80,16 @@ export async function localSave(appName, mergeFn) {
 
   // ③ Add to drive sync queue
   var op = {
-    id:           uuidv4(),
-    appName:      appName,
-    queuedAt:     new Date().toISOString(),
-    status:       'pending',
+    id: uuidv4(),
+    appName: appName,
+    queuedAt: new Date().toISOString(),
+    status: 'pending',
     dataSnapshot: merged,
   };
   _queue.push(op);
   await saveQueue();
 
-  broadcastStatus('pending', _queue.filter(function(q){ return q.status === 'pending'; }).length + ' pending');
+  broadcastStatus('pending', _queue.filter(function (q) { return q.status === 'pending'; }).length + ' pending');
 
   // ④ Background sync is DISABLED in Android Native. User MUST sync manually.
 
@@ -147,12 +150,12 @@ async function writeAndPruneLocalBackup(appName, data) {
 // ── Sequential Drive queue processor ─────────────────────────────────────────
 async function processDriveQueue() {
   if (_running || !isOnline()) return;
-  if (!_queue.some(function(q){ return q.status === 'pending'; })) return;
+  if (!_queue.some(function (q) { return q.status === 'pending'; })) return;
 
   _running = true;
   broadcastStatus('syncing', 'Syncing…');
 
-  var pendingOps = _queue.filter(function(q){ return q.status === 'pending'; });
+  var pendingOps = _queue.filter(function (q) { return q.status === 'pending'; });
   for (var i = 0; i < pendingOps.length; i++) {
     var op = pendingOps[i];
     op.status = 'syncing';
@@ -163,8 +166,8 @@ async function processDriveQueue() {
       await writeSafeSnapshot(op.appName, op.dataSnapshot);
 
       // Drive write -- use snapshot directly (already merged locally)
-      var newData = await writeData(op.appName, async function(driveData) {
-        var localData  = op.dataSnapshot;
+      var newData = await writeData(op.appName, async function (driveData) {
+        var localData = op.dataSnapshot;
         var localCount = (localData.trips ? localData.trips.length : 0) + (localData.transactions ? localData.transactions.length : 0);
         var driveCount = (driveData && driveData.trips ? driveData.trips.length : 0) + (driveData && driveData.transactions ? driveData.transactions.length : 0);
 
@@ -177,17 +180,17 @@ async function processDriveQueue() {
         // Bi-Directional Merge (Conflict Resolution)
         var mergedData = Object.assign({}, localData);
         if (op.appName === 'travel') {
-          ['trips', 'passengers', 'documents'].forEach(function(key) {
-            var localIds = new Set((localData[key] || []).map(function(x){ return x.id; }));
-            var missing  = (driveData[key] || []).filter(function(x){ return x.id && !localIds.has(x.id); });
+          ['trips', 'passengers', 'documents'].forEach(function (key) {
+            var localIds = new Set((localData[key] || []).map(function (x) { return x.id; }));
+            var missing = (driveData[key] || []).filter(function (x) { return x.id && !localIds.has(x.id); });
             if (missing.length > 0) {
               mergedData[key] = (localData[key] || []).concat(missing);
             }
           });
         } else if (op.appName === 'finance') {
-          ['transactions', 'categories', 'accounts'].forEach(function(key) {
-            var localIds = new Set((localData[key] || []).map(function(x){ return x.id; }));
-            var missing  = (driveData[key] || []).filter(function(x){ return x.id && !localIds.has(x.id); });
+          ['transactions', 'categories', 'accounts'].forEach(function (key) {
+            var localIds = new Set((localData[key] || []).map(function (x) { return x.id; }));
+            var missing = (driveData[key] || []).filter(function (x) { return x.id && !localIds.has(x.id); });
             if (missing.length > 0) {
               mergedData[key] = (localData[key] || []).concat(missing);
             }
@@ -208,7 +211,7 @@ async function processDriveQueue() {
 
     } catch (err) {
       op.status = 'failed';
-      op.error  = err.message;
+      op.error = err.message;
       await saveQueue();
       broadcastStatus('failed', err.message);
       _running = false;
@@ -217,11 +220,11 @@ async function processDriveQueue() {
   }
 
   // Prune done items
-  _queue = _queue.filter(function(q){ return q.status !== 'done'; });
+  _queue = _queue.filter(function (q) { return q.status !== 'done'; });
   await saveQueue();
 
   _running = false;
-  var stillPending = _queue.filter(function(q){ return q.status === 'pending'; }).length;
+  var stillPending = _queue.filter(function (q) { return q.status === 'pending'; }).length;
   if (stillPending > 0) {
     broadcastStatus('pending', stillPending + ' pending');
   } else {
@@ -231,7 +234,7 @@ async function processDriveQueue() {
 
 // ── Write-ahead safe snapshot ─────────────────────────────────────────────────
 var SAFE_KEY = {
-  travel:  'safe_snapshot_travel',
+  travel: 'safe_snapshot_travel',
   finance: 'safe_snapshot_finance',
 };
 
@@ -263,25 +266,25 @@ async function runBootIntegrityCheck(appName) {
   var safe = await getSafeSnapshot(appName);
   if (safe && safe.writtenAt) {
     issues.push({
-      type:    'interrupted_write',
+      type: 'interrupted_write',
       message: 'Last session ended unexpectedly during a save.',
-      detail:  'Safe snapshot from ' + new Date(safe.writtenAt).toLocaleString(),
-      data:    safe.data,
+      detail: 'Safe snapshot from ' + new Date(safe.writtenAt).toLocaleString(),
+      data: safe.data,
     });
   }
 
   // Check 2: Pending queue from previous session?
   await loadQueue();
-  var stuck = _queue.filter(function(q){ return q.status === 'syncing'; });
-  stuck.forEach(function(op){ op.status = 'pending'; });
+  var stuck = _queue.filter(function (q) { return q.status === 'syncing'; });
+  stuck.forEach(function (op) { op.status = 'pending'; });
   if (stuck.length) await saveQueue();
 
-  var pending = _queue.filter(function(q){ return q.status === 'pending' || q.status === 'failed'; });
+  var pending = _queue.filter(function (q) { return q.status === 'pending' || q.status === 'failed'; });
   if (pending.length) {
     issues.push({
-      type:    'pending_queue',
+      type: 'pending_queue',
       message: pending.length + ' change' + (pending.length > 1 ? 's' : '') + ' not yet synced to Drive.',
-      detail:  'Will sync automatically when online.',
+      detail: 'Will sync automatically when online.',
       autoFix: true,
     });
   }
@@ -292,16 +295,16 @@ async function runBootIntegrityCheck(appName) {
     : await getCachedFinanceData();
 
   if (cached) {
-    var lastCount    = await getAppState('lastKnownCount_' + appName);
+    var lastCount = await getAppState('lastKnownCount_' + appName);
     var currentCount = appName === 'travel'
       ? (cached.trips ? cached.trips.length : 0)
       : (cached.transactions ? cached.transactions.length : 0);
 
     if (lastCount && currentCount < lastCount * 0.8 && lastCount > 5) {
       issues.push({
-        type:    'suspicious_drop',
+        type: 'suspicious_drop',
         message: 'Record count dropped significantly (' + lastCount + ' → ' + currentCount + ').',
-        detail:  'This may indicate data loss. Check your records before continuing.',
+        detail: 'This may indicate data loss. Check your records before continuing.',
       });
     }
 
@@ -309,21 +312,21 @@ async function runBootIntegrityCheck(appName) {
     if (isOnline() && typeof authFetch === 'function' && typeof getToken === 'function' && getToken()) {
       try {
         var fileKey = appName === 'travel' ? 'drive_travel_file_id' : 'drive_finance_file_id';
-        var fileId  = localStorage.getItem(fileKey);
+        var fileId = localStorage.getItem(fileKey);
         if (fileId) {
           var metaRes = await authFetch(
             'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=modifiedTime',
             { method: 'GET' }
           );
           if (metaRes.ok) {
-            var meta      = await metaRes.json();
+            var meta = await metaRes.json();
             var cloudTime = new Date(meta.modifiedTime).getTime();
             var localSync = new Date(cached.lastSync || 0).getTime();
             if (cloudTime > localSync + 60000) {
               issues.push({
-                type:    'cloud_newer',
+                type: 'cloud_newer',
                 message: 'Newer data is available on Google Drive',
-                detail:  'Tap Settings → Data → Restore from Cloud to download the newest changes.',
+                detail: 'Tap Settings → Data → Restore from Cloud to download the newest changes.',
                 autoFix: false,
               });
             }
@@ -341,7 +344,7 @@ async function runBootIntegrityCheck(appName) {
 
 // ── Retry failed/pending queue items ─────────────────────────────────────────
 async function retryQueue() {
-  _queue.filter(function(q){ return q.status === 'failed'; }).forEach(function(q){ q.status = 'pending'; });
+  _queue.filter(function (q) { return q.status === 'failed'; }).forEach(function (q) { q.status = 'pending'; });
   await saveQueue();
   return processDriveQueue();
 }
@@ -349,11 +352,11 @@ async function retryQueue() {
 // ── Sync status helpers ───────────────────────────────────────────────────────
 async function getPendingCount() {
   await loadQueue();
-  return _queue.filter(function(q){ return q.status === 'pending' || q.status === 'failed'; }).length;
+  return _queue.filter(function (q) { return q.status === 'pending' || q.status === 'failed'; }).length;
 }
 
 function watchSync() {
-  window.addEventListener('online', function() {
+  window.addEventListener('online', function () {
     // Auto-sync is DISABLED. User MUST trigger manually.
   });
 }
@@ -361,8 +364,10 @@ function watchSync() {
 // ── Empty data templates ──────────────────────────────────────────────────────
 function getEmptyData(appName) {
   if (appName === 'travel') {
-    return { schemaVersion: 1, members: [], trips: [], documents: [],
-             familyDefaults: {}, familyRelations: [], customDocTypes: [] };
+    return {
+      schemaVersion: 1, members: [], trips: [], documents: [],
+      familyDefaults: {}, familyRelations: [], customDocTypes: []
+    };
   }
   return { schemaVersion: 1, transactions: [], categories: [], accounts: [] };
 }
@@ -370,6 +375,6 @@ function getEmptyData(appName) {
 // ── Initialise ────────────────────────────────────────────────────────────────
 async function initSyncManager() {
   await loadQueue();
-  _queue.filter(function(q){ return q.status === 'syncing'; }).forEach(function(q){ q.status = 'pending'; });
+  _queue.filter(function (q) { return q.status === 'syncing'; }).forEach(function (q) { q.status = 'pending'; });
   await saveQueue();
 }

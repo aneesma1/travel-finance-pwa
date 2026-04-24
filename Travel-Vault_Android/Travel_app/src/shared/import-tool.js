@@ -1,4 +1,4 @@
-// v3.5.44 — 2026-03-31
+// v3.5.45 — 2026-04-24
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -45,6 +45,11 @@ export function renderImportTool(container, { appType, existingData, onImportCom
   let columnMap  = {};
 
   function render() {
+    // Clear external action bar unless we're in preview step
+    if (step !== 'preview') {
+      const actionBar = document.getElementById('import-action-bar');
+      if (actionBar) { actionBar.innerHTML = ''; actionBar.style.display = 'none'; }
+    }
     switch (step) {
       case 'pick':    renderPick();    break;
       case 'map':     renderMap();     break;
@@ -73,10 +78,23 @@ export function renderImportTool(container, { appType, existingData, onImportCom
   async function handleFile(file) {
     try {
       if (!window.XLSX) {
+        // Try local bundled copy first (available in native APK build), fall back to CDN
         await new Promise((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-          s.onload = res; s.onerror = rej; document.head.appendChild(s);
+          const tryLoad = (src, fallbackSrc) => {
+            const s = document.createElement('script');
+            s.setAttribute('data-internal', 'xlsx-loader'); // mark so global handler ignores it
+            s.src = src;
+            s.onload = res;
+            s.onerror = () => {
+              if (fallbackSrc) {
+                tryLoad(fallbackSrc, null);
+              } else {
+                rej(new Error('Could not load Excel parser. Check internet connection.'));
+              }
+            };
+            document.head.appendChild(s);
+          };
+          tryLoad('./js/lib/xlsx.full.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
         });
       }
       const buffer = await file.arrayBuffer();
@@ -132,30 +150,46 @@ export function renderImportTool(container, { appType, existingData, onImportCom
   }
 
   function renderPreview() {
+    // Render scrollable preview content (NO button inside scroll area)
     container.innerHTML = `
-      <div style="display:flex;flex-direction:column;height:100%;">
-        <div style="padding:16px 20px 8px;">
-          <div style="font-size:16px;font-weight:700;margin-bottom:10px;">Preview (${parsedRows.length} rows)</div>
-          <div style="overflow:auto;border:1px solid var(--border);border-radius:8px;font-size:11px;max-height:260px;">
-            <table style="width:100%;border-collapse:collapse;">
-              ${parsedRows.slice(0,10).map(r => `<tr>${COLUMNS.map(c=>`<td style="border:1px solid var(--border);padding:4px;white-space:nowrap;">${r[c.key]||''}</td>`).join('')}</tr>`).join('')}
-            </table>
-          </div>
-          <div id="import-error" style="display:none;color:var(--danger);font-size:12px;margin-top:8px;padding:8px 12px;background:#FEF2F2;border-radius:8px;"></div>
+      <div style="padding:16px 20px 8px;">
+        <div style="font-size:16px;font-weight:700;margin-bottom:10px;">Preview (${parsedRows.length} rows)</div>
+        <div style="overflow:auto;border:1px solid var(--border);border-radius:8px;font-size:11px;max-height:260px;">
+          <table style="width:100%;border-collapse:collapse;">
+            ${parsedRows.slice(0,10).map(r => `<tr>${COLUMNS.map(c=>`<td style="border:1px solid var(--border);padding:4px;white-space:nowrap;">${r[c.key]||''}</td>`).join('')}</tr>`).join('')}
+          </table>
         </div>
-        <div style="padding:12px 20px;padding-bottom:max(12px, env(safe-area-inset-bottom, 12px));background:var(--surface);border-top:1px solid var(--border);position:sticky;bottom:0;">
-          <button class="btn btn-primary btn-full" id="import-all-btn">✅ Import All ${parsedRows.length} Records</button>
-        </div>
+        <div id="import-error" style="display:none;color:var(--danger);font-size:12px;margin-top:8px;padding:8px 12px;background:#FEF2F2;border-radius:8px;"></div>
       </div>
     `;
-    const btn = container.querySelector('#import-all-btn');
+
     const errEl = container.querySelector('#import-error');
+    const btnHTML = `<button class="btn btn-primary btn-full" id="import-all-btn">✅ Import All ${parsedRows.length} Records</button>`;
+
+    // ── Place button in external action bar if available (prevents nav bar overlap) ──
+    // The modal in settings.js should provide <div id="import-action-bar"> outside the
+    // scroll container so the button is always visible above Android navigation bar.
+    const actionBar = document.getElementById('import-action-bar');
+    if (actionBar) {
+      actionBar.innerHTML = btnHTML;
+      actionBar.style.display = 'block';
+    } else {
+      // Fallback: append sticky button at the bottom of container
+      container.insertAdjacentHTML('beforeend', `
+        <div style="padding:12px 20px;padding-bottom:max(16px,env(safe-area-inset-bottom,16px));background:var(--surface);border-top:1px solid var(--border);position:sticky;bottom:0;z-index:10;">
+          ${btnHTML}
+        </div>
+      `);
+    }
+
+    const btn = document.getElementById('import-all-btn');
     btn.onclick = async () => {
       btn.disabled = true;
       btn.textContent = '⏳ Processing…';
       errEl.style.display = 'none';
       try {
         await onImportComplete(parsedRows, () => {});
+        if (actionBar) actionBar.innerHTML = ''; // clear external bar
         step = 'done'; render();
       } catch (err) {
         btn.disabled = false;

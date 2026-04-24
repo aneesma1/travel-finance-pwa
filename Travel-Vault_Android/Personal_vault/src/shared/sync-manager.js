@@ -5,10 +5,13 @@
 // Handles: sequential Drive writes, pending queue, write-ahead safety,
 //          boot integrity checks, sync status broadcasting
 //
-// ⚠️ NATIVE BUILD NOTE: This file uses NO import/export statements.
+// ⚠️ NATIVE BUILD NOTE: This file uses NO import/export statements until v5.4.3.
 // All dependencies (authFetch, isOnline, etc.) must be global (loaded via <script> tags).
 
 'use strict';
+
+import { getCachedTravelData, setCachedTravelData, getCachedFinanceData, setCachedFinanceData, openDB } from './db.js';
+import { getAppState, setAppState, uuidv4 } from './utils.js';
 
 // ── Sync status broadcast ─────────────────────────────────────────────────────
 function broadcastStatus(status, detail) {

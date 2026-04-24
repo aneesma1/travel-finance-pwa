@@ -17,7 +17,7 @@ export async function renderPeople(container) {
       <span class="app-header-title">👥 People</span>
       <div style="display:flex;gap:8px;">
         <button class="app-header-action" id="export-pdf-btn" title="Export contact cards">📄</button>
-        <button class="app-header-action" id="refresh-btn">🔄</button>
+
       </div>
     </div>
     <div id="people-content" style="padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:80px;">
@@ -27,7 +27,7 @@ export async function renderPeople(container) {
   `;
 
   document.getElementById('add-person-fab').addEventListener('click', () => navigate('person-profile', { mode: 'new' }));
-  document.getElementById('refresh-btn').addEventListener('click', () => renderPeople(container));
+
 
   document.getElementById('export-pdf-btn').addEventListener('click', () => openPdfExportModal(container));
 
