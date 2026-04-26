@@ -1,4 +1,4 @@
-<!-- Travel Hub — v5.4.2 — 2026-04-11 -->
+<!-- Travel Hub — v5.5.5 — 2026-04-26 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -93,6 +93,7 @@
   // Imports
   import { openDB, getCachedTravelData, setCachedTravelData } from './shared/db.js';
   import { initNav, navigate } from './js/router.js';
+  import { bootBackup } from './shared/sync-manager.js';
 
   // ── Sync indicator wiring ─────────────────────────────────────────
   window.addEventListener('sync:status', function(e) {
@@ -165,6 +166,7 @@
       }
       
       window._travelData = cached;
+      bootBackup('travel').catch(function() {}); // daily backup on open
       showApp();
 
     } catch (err) {

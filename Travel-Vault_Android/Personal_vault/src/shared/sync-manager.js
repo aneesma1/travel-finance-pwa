@@ -1,4 +1,4 @@
-// v5.4.2 — 2026-04-11 — Fixed critical syntax errors for native build
+// v5.4.3 — 2026-04-26 — Export bootBackup() for on-open daily backup
 
 // ─── shared/sync-manager.js ──────────────────────────────────────────────────
 // Core of Phase 3 -- Local-first architecture
@@ -301,6 +301,19 @@ function getEmptyData(appName) {
              familyDefaults: {}, familyRelations: [], customDocTypes: [] };
   }
   return { schemaVersion: 1, transactions: [], categories: [], accounts: [] };
+}
+
+// ── Boot backup — call once on app open ──────────────────────────────────────
+// Writes today's backup file if Capacitor Filesystem is available.
+// Non-blocking — silently skips on Web/PWA or if data is empty.
+// Ensures a daily backup exists even on view-only sessions (no data changes).
+export async function bootBackup(appName) {
+  try {
+    var data = appName === 'travel'
+      ? await getCachedTravelData()
+      : await getCachedFinanceData();
+    if (data) await writeAndPruneLocalBackup(appName, data);
+  } catch (e) { /* non-blocking */ }
 }
 
 // ── Initialise ────────────────────────────────────────────────────────────────

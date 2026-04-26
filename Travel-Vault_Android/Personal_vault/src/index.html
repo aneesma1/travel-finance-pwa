@@ -1,4 +1,4 @@
-<!-- Private Vault — v5.4.2 — 2026-04-11 -->
+<!-- Private Vault — v5.5.5 — 2026-04-26 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -85,6 +85,7 @@
   import { isPinSet, changePin, setPin } from './js/pin.js';
   import { renderPinLock, renderPinSetup } from './js/screens/pin-lock.js';
   import { initNav, navigate } from './js/router.js';
+  import { bootBackup } from './shared/sync-manager.js';
 
   // ── App state ─────────────────────────────────────────────────────
   let appUnlocked = false;
@@ -172,6 +173,7 @@
   async function loadAndShowApp() {
     const cached = await getCachedFinanceData();
     if (cached) {
+      bootBackup('finance').catch(function() {}); // daily backup on open
       showApp();
     } else {
       // Create empty db
