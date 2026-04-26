@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.6 — 2026-04-26 — copyDashboardText falls back to trip passengers when members is empty
 
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
@@ -616,31 +616,47 @@ export async function renderDashboard(container) {
     const { members = [], trips = [], documents = [] } = data;
     const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-    let text = `✈️ Family Travel Status -- ${dateStr}\n`;
+    // Fallback passenger list when People tab hasn't been set up
+    const fallbackNames = members.length === 0
+      ? [...new Set(trips.filter(Boolean).map(t => String(t.passengerName || '').trim()).filter(Boolean))].sort()
+      : [];
+
+    let text = `✈️ Family Travel Status — ${dateStr}\n`;
     text += `─────────────────────────────\n`;
 
-    members.forEach(m => {
-      const { location, days } = getCurrentLocation(m, trips);
-      const locEmoji = location === 'Qatar' ? '🇶🇦' : location === 'India' ? '🇮🇳' : '✈️';
-      text += `\n👤 ${m.name}   ${locEmoji} ${location}${days !== null ? ' · Day ' + days : ''}\n`;
-
-      const docs = getPersonDocs(m, documents);
-      docs.forEach(d => {
-        const daysLeft = daysFromToday(d.expiryDate);
-        const icon = d.docName === 'Passport' ? '🛂' : d.docName === 'QID' ? '🪪' : '📄';
-        const status = daysLeft < 0 ? '❌ EXPIRED' :
-                       daysLeft <= 30 ? `⚠️ ${daysLeft}d left` :
-                       `✅ ${daysLeft}d left`;
-        text += `   ${icon} ${d.docName}: ${status}\n`;
+    if (members.length > 0) {
+      // Full mode — members with docs
+      members.forEach(m => {
+        const { location, days } = getCurrentLocation(m, trips);
+        const locEmoji = location === 'Qatar' ? '🇶🇦' : location === 'India' ? '🇮🇳' : '✈️';
+        text += `\n👤 ${m.name}   ${locEmoji} ${location}${days !== null ? ' · Day ' + days : ''}\n`;
+        const docs = getPersonDocs(m, documents);
+        docs.forEach(d => {
+          const daysLeft = daysFromToday(d.expiryDate);
+          const icon = d.docName === 'Passport' ? '🛂' : d.docName === 'QID' ? '🪪' : '📄';
+          const status = daysLeft < 0 ? '❌ EXPIRED' :
+                         daysLeft <= 30 ? `⚠️ ${daysLeft}d left` :
+                         `✅ ${daysLeft}d left`;
+          text += `   ${icon} ${d.docName}: ${status}\n`;
+        });
       });
-    });
+    } else if (fallbackNames.length > 0) {
+      // No People tab — build from trip passenger names
+      fallbackNames.forEach(name => {
+        const { location, days } = getCurrentLocationFromTrips(name, trips);
+        const locEmoji = location === 'Qatar' ? '🇶🇦' : location === 'India' ? '🇮🇳' : '✈️';
+        text += `\n👤 ${name}   ${locEmoji} ${location}${days !== null ? ' · Day ' + days : ''}\n`;
+      });
+    } else {
+      text += '\nNo passenger data found.\n';
+    }
 
     text += `─────────────────────────────\n`;
     text += `Shared via Family Hub App`;
 
     const ok = await copyToClipboard(text);
     if (ok) showToast('Copied to clipboard!', 'success');
-    else    showToast('Copy failed -- try again', 'error');
+    else    showToast('Copy failed — try again', 'error');
   }
 
   // ── Export current locations as XLSX ─────────────────────────────────────────

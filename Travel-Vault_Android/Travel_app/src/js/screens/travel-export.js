@@ -1,4 +1,4 @@
-// v3.5.41 — 2026-03-31
+// v3.5.42 — 2026-04-26 — Fixed: getStayDays + lines[] crash; Passengers label; correct export folders; safe-area padding
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -6,8 +6,21 @@
 
 'use strict';
 
-import { timestampSuffix } from '../../shared/drive.js';
+import { timestampSuffix, saveXLSXToExports, saveFileToExports } from '../../shared/drive.js';
 import { copyToClipboard, showToast, formatDisplayDate, daysBetween, today } from '../../shared/utils.js';
+
+// ── Module-level helper — compute days a passenger stayed ─────────────────────
+function getStayDays(t) {
+  let d = t.daysInQatar != null ? Number(t.daysInQatar) : null;
+  if (d === null || isNaN(d)) {
+    // Fall back to computed: use dateArrivedDest or dateInQatar and departure or today
+    const arrDate = t.dateArrivedDest || t.dateInQatar;
+    const depDate = t.dateOutQatar;
+    if (arrDate && depDate) d = daysBetween(arrDate, depDate);
+    else if (arrDate && !depDate) d = daysBetween(arrDate, today());
+  }
+  return (d != null && !isNaN(d) && d >= 0) ? d : 0;
+}
 
 // ── Entry point -- opens the export bottom sheet ───────────────────────────────
 export function openTravelExportSheet(persons, trips, documents) {
@@ -42,10 +55,10 @@ export function openTravelExportSheet(persons, trips, documents) {
 
     '<div style="overflow-y:auto;flex:1;padding:16px 20px 8px;">',
 
-      // ── People ──
+      // ── Passengers ──
       '<div style="font-size:12px;font-weight:700;color:var(--text-muted);',
         'text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">',
-        'People',
+        'Passengers',
       '</div>',
       '<div id="tex-people" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">',
         '<button class="tex-pill active" data-person="all" style="',
@@ -113,9 +126,9 @@ export function openTravelExportSheet(persons, trips, documents) {
         'text-align:center;margin-bottom:8px;"></div>',
     '</div>',
 
-    // ── Actions ──
-    '<div style="padding:12px 20px 32px;border-top:1px solid var(--border-light);',
-      'flex-shrink:0;display:flex;gap:10px;">',
+    // ── Actions — padding accounts for Android nav bar ──
+    '<div style="padding:12px 20px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));',
+      'border-top:1px solid var(--border-light);flex-shrink:0;display:flex;gap:10px;">',
       '<button id="tex-export" class="btn btn-primary" style="flex:1;font-size:15px;',
         'padding:14px;">Export</button>',
       '<button id="tex-share" class="btn btn-secondary" style="padding:14px 18px;" title="Share (mobile) or Download (PC)">📤</button>',
@@ -395,7 +408,7 @@ async function exportPDF(trips, members, documents, deliver) {
           trip.destination || 'Qatar',
           fmtDate(trip.dateInQatar),
           trip.dateOutQatar ? fmtDate(trip.dateOutQatar) : 'Still here',
-          trip.daysInQatar != null ? String(trip.daysInQatar) : '--',
+          String(getStayDays(trip)),
           (trip.flightInward || '--').slice(0, 10),
           (trip.reason || '--').slice(0, 38),
         ];
@@ -412,7 +425,7 @@ async function exportPDF(trips, members, documents, deliver) {
         y += 7;
       });
 
-    // ── Document expiry summary (Skip if shared docs) ──────────────────────────
+    // ── Document expiry summary ───────────────────────────────────────────────
     const memberDocs = documents.filter(d => d.personId === (person?.id || person?.name));
     if (memberDocs.length) {
       y += 6;
@@ -457,14 +470,30 @@ async function exportPDF(trips, members, documents, deliver) {
   const peopleNames = [...new Set(trips.map(t => t._person?.name))].join('-');
   const filename = 'Travel_History_' + peopleNames.replace(/\s+/g,'-').slice(0,30) + '_' + ts + '.pdf';
 
-  if (deliver === 'share' && navigator.canShare && navigator.canShare({ files: [new File([''], filename)] })) {
+  // Share mode: share the blob via share sheet
+  if (deliver === 'share' && navigator.canShare) {
     const pdfBlob = doc.output('blob');
-    await navigator.share({ files: [new File([pdfBlob], filename, { type: 'application/pdf' })] })
-      .catch(() => doc.save(filename)); // fallback to download if share fails/cancelled
-  } else {
-    doc.save(filename); // Always download on PC or unsupported
+    const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+    if (navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] }).catch(() => {});
+      showToast('PDF shared!', 'success', 3000);
+      return;
+    }
   }
-  showToast('PDF saved: ' + filename, 'success', 4000);
+
+  // Save to Documents/TravelHub/exports/ via Capacitor Filesystem, fallback to browser download
+  try {
+    const pdfBuf = doc.output('arraybuffer');
+    const bytes  = new Uint8Array(pdfBuf);
+    let bin = '';
+    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+    const b64 = btoa(bin);
+    const savedPath = await saveFileToExports('travel', filename, b64);
+    showToast('✅ PDF saved: ' + savedPath, 'success', 4000);
+  } catch {
+    doc.save(filename); // Web fallback
+    showToast('PDF saved: ' + filename, 'success', 3000);
+  }
 }
 
 // ── Excel Export ──────────────────────────────────────────────────────────────
@@ -491,7 +520,7 @@ async function exportExcel(trips, deliver) {
     t.dateInQatar   || '',
     t.dateOutQatar  || '',
     t.dateInIndia   || '',
-    t.daysInQatar   != null ? t.daysInQatar : '',
+    getStayDays(t),
     t.flightInward  || '',
     t.flightOutward || '',
     t.reason        || '',
@@ -500,28 +529,32 @@ async function exportExcel(trips, deliver) {
 
   const wb = window.XLSX.utils.book_new();
   const ws = window.XLSX.utils.aoa_to_sheet([headers, ...rows]);
-
-  // Column widths
   ws['!cols'] = [14,16,16,14,14,12,14,14,24,20].map(w => ({ wch: w }));
-
   window.XLSX.utils.book_append_sheet(wb, ws, 'Travel History');
 
   const ts = timestampSuffix();
   const filename = 'Travel_History_' + ts + '.xlsx';
 
+  // Share mode
   if (deliver === 'share' && navigator.canShare) {
     const wbout = window.XLSX.write(wb, { bookType:'xlsx', type:'array' });
     const blob = new Blob([wbout], { type:'application/octet-stream' });
     const file = new File([blob], filename, { type: blob.type });
     if (navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file] }).catch(() => window.XLSX.writeFile(wb, filename));
-    } else {
-      window.XLSX.writeFile(wb, filename);
+      await navigator.share({ files: [file] }).catch(() => {});
+      showToast('Excel shared!', 'success', 3000);
+      return;
     }
-  } else {
-    window.XLSX.writeFile(wb, filename);
   }
-  showToast('Excel saved: ' + filename, 'success', 3000);
+
+  // Save to Documents/TravelHub/exports/
+  try {
+    const savedPath = await saveXLSXToExports('travel', wb, 'Travel_History');
+    showToast('✅ Saved: ' + savedPath, 'success', 4000);
+  } catch {
+    window.XLSX.writeFile(wb, filename); // Web fallback
+    showToast('Excel saved: ' + filename, 'success', 3000);
+  }
 }
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
@@ -539,7 +572,7 @@ async function exportCSV(trips, deliver) {
     t.dateInQatar   || '',
     t.dateOutQatar  || '',
     t.dateInIndia   || '',
-    t.daysInQatar   != null ? t.daysInQatar : '',
+    getStayDays(t),
     t.flightInward  || '',
     t.flightOutward || '',
     t.reason        || '',
@@ -552,34 +585,45 @@ async function exportCSV(trips, deliver) {
 
   const ts = timestampSuffix();
   const filename = 'Travel_History_' + ts + '.csv';
-  const blob = new Blob([csv], { type: 'text/csv' });
 
-  const shareFile = new File([blob], filename, { type: 'text/csv' });
-  if (deliver === 'share' && navigator.canShare && navigator.canShare({ files: [shareFile] })) {
-    await navigator.share({ files: [shareFile] }).catch(() => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename; a.click(); URL.revokeObjectURL(a.href);
-    });
-  } else {
+  // Share mode
+  if (deliver === 'share' && navigator.canShare) {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const file = new File([blob], filename, { type: 'text/csv' });
+    if (navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] }).catch(() => {});
+      showToast('CSV shared!', 'success', 3000);
+      return;
+    }
+  }
+
+  // Save to Documents/TravelHub/exports/
+  try {
+    const savedPath = await saveFileToExports('travel', filename, csv, 'utf8');
+    showToast('✅ Saved: ' + savedPath, 'success', 4000);
+  } catch {
+    // Web fallback — blob download
+    const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+    showToast('CSV saved: ' + filename, 'success', 3000);
   }
-  showToast('CSV saved: ' + filename, 'success', 3000);
 }
 
 // ── WhatsApp Text Copy ────────────────────────────────────────────────────────
 async function exportWhatsApp(trips, persons) {
+  const lines = [];  // ← was missing in previous version, causing crash
+
   // Flatten and group by individual name
   const byPersonName = {};
   trips.forEach(t => {
     const rawName = t.personName || 'Unknown';
     const splitNames = rawName.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
-    
+
     splitNames.forEach(name => {
       if (!byPersonName[name]) byPersonName[name] = { name, trips: [] };
-      // Avoid duplicate trips for the same person in the report (deduplicate by date)
+      // Avoid duplicate trips for the same person (deduplicate by date)
       const dKey = `${t.dateOutIndia}|${t.dateInIndia}`;
       if (!byPersonName[name].trips.some(existing => `${existing.dateOutIndia}|${existing.dateInIndia}` === dKey)) {
         byPersonName[name].trips.push(t);
@@ -588,17 +632,8 @@ async function exportWhatsApp(trips, persons) {
   });
 
   Object.values(byPersonName).sort((a,b) => a.name.localeCompare(b.name)).forEach(({ name, trips: pTrips }) => {
-    const getStayDays = (t) => {
-      let d = t.daysInQatar ? Number(t.daysInQatar) : null;
-      if (d === null || isNaN(d)) {
-        if (t.dateInQatar && t.dateOutQatar) d = daysBetween(t.dateInQatar, t.dateOutQatar);
-        else if (t.dateInQatar && !t.dateOutQatar) d = daysBetween(t.dateInQatar, today());
-      }
-      return d || 0;
-    };
-
     const totalDays = pTrips.reduce((s, t) => s + getStayDays(t), 0);
-    
+
     // Yearly totals breakdown
     const yearly = {};
     pTrips.forEach(t => {
@@ -614,7 +649,7 @@ async function exportWhatsApp(trips, persons) {
     pTrips.sort((a,b) => {
       const d1 = a.dateOutIndia || '';
       const d2 = b.dateOutIndia || '';
-      return d2.localeCompare(d1); // simple string sort for descending dates
+      return d2.localeCompare(d1);
     }).forEach((t, i) => {
       const d = t.destination || 'Qatar';
       const stay = getStayDays(t);

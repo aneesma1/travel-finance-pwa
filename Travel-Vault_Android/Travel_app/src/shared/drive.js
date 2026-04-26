@@ -1,4 +1,4 @@
-// v5.5.4 — 2026-04-24 — Purged all dead Google Drive API code (Blueprint V2)
+// v5.5.5 — 2026-04-26 — Fixed Directory/Encoding enum crash (use string literals)
 
 // ─── shared/drive.js ─────────────────────────────────────────────────────────
 // Device Storage Utilities (formerly Google Drive wrapper — Drive removed in Blueprint V2)
@@ -25,15 +25,15 @@ export async function downloadLocalBackup(appName, data) {
 
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
     try {
-      const { Filesystem, Directory, Encoding } = window.Capacitor.Plugins;
+      const { Filesystem } = window.Capacitor.Plugins;
 
-      await Filesystem.mkdir({ path: exportDir, directory: Directory.Documents, recursive: true }).catch(() => {});
+      await Filesystem.mkdir({ path: exportDir, directory: 'DOCUMENTS', recursive: true }).catch(() => {});
 
       await Filesystem.writeFile({
         path:      `${exportDir}/${filename}`,
         data:      jsonContent,
-        directory: Directory.Documents,
-        encoding:  Encoding.UTF8,
+        directory: 'DOCUMENTS',
+        encoding:  'utf8',
       });
 
       return `Documents/${exportDir}/${filename}`;
@@ -70,9 +70,9 @@ export async function saveXLSXToExports(appName, wb, filenameBase) {
   const base64 = _arrayBufferToBase64(buf);
 
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-    const { Filesystem, Directory } = window.Capacitor.Plugins;
-    await Filesystem.mkdir({ path: exportDir, directory: Directory.Documents, recursive: true }).catch(() => {});
-    await Filesystem.writeFile({ path: `${exportDir}/${filename}`, data: base64, directory: Directory.Documents });
+    const { Filesystem } = window.Capacitor.Plugins;
+    await Filesystem.mkdir({ path: exportDir, directory: 'DOCUMENTS', recursive: true }).catch(() => {});
+    await Filesystem.writeFile({ path: `${exportDir}/${filename}`, data: base64, directory: 'DOCUMENTS' });
     return `Documents/${exportDir}/${filename}`;
   }
 
@@ -111,6 +111,39 @@ export async function restoreFromLocalFile(file, appName) {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsText(file);
   });
+}
+
+// ── Save any file (text or base64) to Documents/<AppFolder>/exports/ ─────────
+// content: string (text) or base64 string
+// encoding: 'utf8' for text, omit for base64 binary
+// Returns path string for toast display.
+export async function saveFileToExports(appName, filename, content, encoding) {
+  const appFolder = appName === 'travel' ? 'TravelHub' : 'PersonalVault';
+  const exportDir = `${appFolder}/exports`;
+
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+    const { Filesystem } = window.Capacitor.Plugins;
+    await Filesystem.mkdir({ path: exportDir, directory: 'DOCUMENTS', recursive: true }).catch(() => {});
+    const writeOpts = { path: `${exportDir}/${filename}`, data: content, directory: 'DOCUMENTS' };
+    if (encoding) writeOpts.encoding = encoding;
+    await Filesystem.writeFile(writeOpts);
+    return `Documents/${exportDir}/${filename}`;
+  }
+
+  // Web / PWA fallback — trigger browser download
+  const mime = encoding === 'utf8'
+    ? (filename.endsWith('.csv') ? 'text/csv' : 'application/octet-stream')
+    : 'application/octet-stream';
+  const blob = encoding === 'utf8'
+    ? new Blob([content], { type: mime })
+    : new Blob([Uint8Array.from(atob(content), c => c.charCodeAt(0))], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  return filename;
 }
 
 // ── Timestamp suffix — DD-MMM-YYYY_HH-MM_AM ──────────────────────────────────

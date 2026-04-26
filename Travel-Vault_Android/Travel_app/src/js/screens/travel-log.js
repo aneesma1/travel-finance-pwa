@@ -1,4 +1,4 @@
-// v3.7.0 — 2026-04-03
+// v3.7.1 — 2026-04-26 — Passengers popup picker + Share Text/Image + current location in text report
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: Dual-tab architecture (Trip Log & Passenger Summary)
@@ -266,27 +266,26 @@ export async function renderTravelLog(container, params = {}) {
     const yearsDisplay = [...availableYears];
     if (!yearsDisplay.includes(String(currentYear()))) yearsDisplay.unshift(String(currentYear()));
 
-    // Chip-style passenger filter: multi-select, instant, persistent
+    // Passenger multi-select — show summary chip, open bottom-sheet picker
     const selectedPasses = fPass ? fPass.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const summaryLabel = selectedPasses.length === 0
+      ? '👥 All'
+      : selectedPasses.length === 1
+        ? `${uniquePassengers.find(p => p.name === selectedPasses[0])?.emoji || '👤'} ${selectedPasses[0]}`
+        : `👥 ${selectedPasses.length} passengers`;
 
     bar.innerHTML = `
       <div style="border-bottom:1px solid var(--border); padding:8px 12px;">
-        <!-- Passenger chips row -->
-        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px;">
-          <div style="display:flex; gap:6px; white-space:nowrap; min-width:max-content; align-items:center; padding:2px 0;">
-            <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;margin-right:2px;">People</span>
-            <button class="pass-chip ${selectedPasses.length === 0 ? 'pass-chip-active' : 'pass-chip-inactive'}" data-name="">
-              All
-            </button>
-            ${uniquePassengers.map(p => `
-              <button class="pass-chip ${selectedPasses.includes(p.name) ? 'pass-chip-active' : 'pass-chip-inactive'}" data-name="${p.name}">
-                ${p.emoji || '👤'} ${p.name}
-              </button>
-            `).join('')}
-          </div>
+        <!-- Passenger row: summary button opens bottom-sheet picker -->
+        <div style="display:flex; align-items:center; gap:8px; padding-bottom:6px;">
+          <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">Passengers</span>
+          <button id="open-pass-picker" class="pass-chip ${selectedPasses.length > 0 ? 'pass-chip-active' : 'pass-chip-inactive'}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;">
+            ${summaryLabel}
+          </button>
+          ${selectedPasses.length > 0 ? `<button id="clear-pass-filter" style="background:none;border:none;font-size:15px;cursor:pointer;padding:2px 6px;color:var(--text-muted);flex-shrink:0;" title="Clear">✕</button>` : ''}
         </div>
         <!-- Year chips row -->
-        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch; padding-top:6px;">
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch; padding-top:2px;">
           <div style="display:flex; gap:6px; white-space:nowrap; min-width:max-content; align-items:center; padding:2px 0;">
             <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;margin-right:2px;">Year</span>
             <button class="filter-chip ${!fYear || fYear === 'all' ? 'active' : ''}" data-filter="year" data-value="all">All</button>
@@ -296,6 +295,26 @@ export async function renderTravelLog(container, params = {}) {
           </div>
         </div>
       </div>
+      <!-- Passenger Picker Bottom Sheet (fixed overlay — keyboard-safe) -->
+      <div id="pass-picker-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;touch-action:none;">
+        <div id="pass-picker-sheet" style="position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));max-height:70vh;display:flex;flex-direction:column;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-shrink:0;">
+            <span style="font-size:16px;font-weight:700;color:var(--text);">Filter by Passenger</span>
+            <button id="pass-picker-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);padding:0 8px;line-height:1;">✕</button>
+          </div>
+          <div style="overflow-y:auto;flex:1;">
+            <div style="display:flex;flex-wrap:wrap;gap:10px;padding-bottom:8px;">
+              <button class="pass-chip pick-chip ${selectedPasses.length === 0 ? 'pass-chip-active' : 'pass-chip-inactive'}" data-name="">👥 All</button>
+              ${uniquePassengers.map(p => `
+                <button class="pass-chip pick-chip ${selectedPasses.includes(p.name) ? 'pass-chip-active' : 'pass-chip-inactive'}" data-name="${p.name}">
+                  ${p.emoji || '👤'} ${p.name}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+          <button id="pass-picker-done" class="btn btn-primary" style="width:100%;padding:14px;margin-top:16px;font-size:15px;flex-shrink:0;">Done</button>
+        </div>
+      </div>
       <style>
         .pass-chip { border:none; border-radius:99px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; font-family:inherit; }
         .pass-chip-active { background:var(--primary); color:#fff; }
@@ -303,37 +322,66 @@ export async function renderTravelLog(container, params = {}) {
       </style>
     `;
 
-    // Passenger chip click — instant multi-select with persistence
-    bar.querySelectorAll('.pass-chip').forEach(btn => {
+    const overlay  = bar.querySelector('#pass-picker-overlay');
+    const sheet    = bar.querySelector('#pass-picker-sheet');
+    const openBtn  = bar.querySelector('#open-pass-picker');
+    const closeBtn = bar.querySelector('#pass-picker-close');
+    const doneBtn  = bar.querySelector('#pass-picker-done');
+    const clearBtn = bar.querySelector('#clear-pass-filter');
+
+    const openPicker  = () => { overlay.style.display = 'block'; };
+    const closePicker = () => { overlay.style.display = 'none';  };
+
+    openBtn.addEventListener('click', openPicker);
+    closeBtn.addEventListener('click', closePicker);
+    doneBtn.addEventListener('click', closePicker);
+    // Backdrop tap closes picker (tap outside sheet)
+    overlay.addEventListener('click', (e) => { if (!sheet.contains(e.target)) closePicker(); });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        filterPassenger = null;
+        savePassengerFilter([]);
+        _tripPage = 1;
+        renderFilters(filterPassenger, filterYear, bar);
+        const content = document.getElementById('log-content');
+        if (content) renderTrips(filterPassenger, filterYear, true, content);
+      });
+    }
+
+    // Chip multi-select inside picker — instant apply, visual-only update
+    bar.querySelectorAll('.pick-chip').forEach(btn => {
       btn.addEventListener('click', () => {
         const name = btn.dataset.name;
         let current = filterPassenger ? filterPassenger.split(',').map(s => s.trim()).filter(Boolean) : [];
 
         if (name === '') {
-          // "All" chip — clear all individual selections
           current = [];
         } else {
-          if (current.includes(name)) {
-            current = current.filter(n => n !== name); // deselect
-          } else {
-            current.push(name); // select
-          }
+          if (current.includes(name)) current = current.filter(n => n !== name);
+          else current.push(name);
         }
 
         filterPassenger = current.length > 0 ? current.join(',') : null;
-        savePassengerFilter(current); // persist
+        savePassengerFilter(current);
         _tripPage = 1;
 
-        // Instant re-render of chips (toggle classes without full re-render)
-        bar.querySelectorAll('.pass-chip').forEach(c => {
+        // Update chip states inside picker
+        bar.querySelectorAll('.pick-chip').forEach(c => {
           const cName = c.dataset.name;
-          if (cName === '') {
-            c.className = `pass-chip ${current.length === 0 ? 'pass-chip-active' : 'pass-chip-inactive'}`;
-          } else {
-            c.className = `pass-chip ${current.includes(cName) ? 'pass-chip-active' : 'pass-chip-inactive'}`;
-          }
+          c.className = `pass-chip pick-chip ${cName === '' ? (current.length === 0 ? 'pass-chip-active' : 'pass-chip-inactive') : (current.includes(cName) ? 'pass-chip-active' : 'pass-chip-inactive')}`;
         });
 
+        // Update summary button
+        const newLabel = current.length === 0
+          ? '👥 All'
+          : current.length === 1
+            ? `${uniquePassengers.find(p => p.name === current[0])?.emoji || '👤'} ${current[0]}`
+            : `👥 ${current.length} passengers`;
+        openBtn.textContent = newLabel;
+        openBtn.className   = `pass-chip ${current.length > 0 ? 'pass-chip-active' : 'pass-chip-inactive'}`;
+
+        // Apply immediately
         const content = document.getElementById('log-content');
         if (content) renderTrips(filterPassenger, filterYear, true, content);
       });
@@ -771,17 +819,20 @@ export async function renderTravelLog(container, params = {}) {
           </div>
         </div>
         
-        <!-- Actions (Constrained to export area width) -->
-        <div style="display:flex; gap:12px; margin-top:20px; max-width:450px; margin-left:auto; margin-right:auto;">
-           <button class="btn btn-secondary" style="flex:1; display:flex; flex-direction:column; align-items:center; padding:12px 0;" id="sum-export-txt">
-             <span style="font-size:18px;margin-bottom:2px;">📋</span><span style="font-size:11px;">Copy Text</span>
-           </button>
-           <button class="btn btn-secondary" style="flex:1; display:flex; flex-direction:column; align-items:center; padding:12px 0;" id="sum-export-image">
-             <span style="font-size:18px;margin-bottom:2px;">📸</span><span style="font-size:11px;">Save Image</span>
-           </button>
-           <button class="btn btn-primary" style="flex:1.5; display:flex; flex-direction:column; align-items:center; padding:12px 0;" id="sum-share-wa">
-             <span style="font-size:18px;margin-bottom:2px;">💬</span><span style="font-size:11px;">WhatsApp</span>
-           </button>
+        <!-- Actions (Constrained to export area width) — 2×2 grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;max-width:450px;margin-left:auto;margin-right:auto;">
+          <button class="btn btn-secondary" style="display:flex;flex-direction:column;align-items:center;padding:12px 8px;" id="sum-export-txt">
+            <span style="font-size:18px;margin-bottom:2px;">📋</span><span style="font-size:11px;">Copy Text</span>
+          </button>
+          <button class="btn btn-secondary" style="display:flex;flex-direction:column;align-items:center;padding:12px 8px;" id="sum-share-wa">
+            <span style="font-size:18px;margin-bottom:2px;">📤</span><span style="font-size:11px;">Share Text</span>
+          </button>
+          <button class="btn btn-secondary" style="display:flex;flex-direction:column;align-items:center;padding:12px 8px;" id="sum-export-image">
+            <span style="font-size:18px;margin-bottom:2px;">📸</span><span style="font-size:11px;">Save Image</span>
+          </button>
+          <button class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;padding:12px 8px;" id="sum-share-img">
+            <span style="font-size:18px;margin-bottom:2px;">🖼️</span><span style="font-size:11px;">Share Image</span>
+          </button>
         </div>
 
       </div>
@@ -795,38 +846,89 @@ export async function renderTravelLog(container, params = {}) {
     tabContent.querySelector('#mode-year-btn').addEventListener('click', () => { summaryState.pivotMode = 'year'; renderLayout(); });
     tabContent.querySelector('#mode-country-btn').addEventListener('click', () => { summaryState.pivotMode = 'country'; renderLayout(); });
 
+    // ── Copy Text ──
     tabContent.querySelector('#sum-export-txt').addEventListener('click', () => {
       copyToClipboard(generateTextReport(data));
       showToast('Report copied to clipboard', 'success');
     });
-    
-    tabContent.querySelector('#sum-share-wa').addEventListener('click', () => {
-      copyToClipboard(generateTextReport(data));
-      showToast('Copied text for WhatsApp!', 'success');
-    });
-    
-    tabContent.querySelector('#sum-export-image').addEventListener('click', async () => {
-      const target = tabContent.querySelector('#summary-render-target');
-      if (!target) return;
-      
-      showToast('Generating image…', 'info');
-      
-      if (!window.html2canvas) {
-        await new Promise(resolve => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-          script.onload = resolve;
-          document.head.appendChild(script);
-        });
+
+    // ── Share Text (navigator.share → clipboard fallback) ──
+    tabContent.querySelector('#sum-share-wa').addEventListener('click', async () => {
+      const text = generateTextReport(data);
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: `Travel Summary: ${summaryState.selectedPassenger}`, text });
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return; // user cancelled
+          console.warn('navigator.share failed, falling back to clipboard', e);
+        }
       }
+      copyToClipboard(text);
+      showToast('Copied! Paste into WhatsApp', 'success');
+    });
+
+    // ── Shared html2canvas loader ──
+    async function loadHtml2Canvas() {
+      if (window.html2canvas) return;
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function captureImageBlob() {
+      const target = tabContent.querySelector('#summary-render-target');
+      if (!target) throw new Error('Render target not found');
+      await loadHtml2Canvas();
+      const canvas = await window.html2canvas(target, { scale: 2, backgroundColor: '#f8fafc' });
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Blob failed')), 'image/jpeg', 0.9);
+      });
+    }
+
+    // ── Save Image (download to device) ──
+    tabContent.querySelector('#sum-export-image').addEventListener('click', async () => {
+      showToast('Generating image…', 'info');
       try {
-        const canvas = await window.html2canvas(target, { scale: 2, backgroundColor: '#f8fafc' });
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `Travel_Summary_${summaryState.selectedPassenger.replace(/ /g, '_')}_${Date.now()}.jpg`;
-        a.click();
-        showToast('Image downloaded!', 'success');
+        const blob  = await captureImageBlob();
+        const fname = `Travel_Summary_${summaryState.selectedPassenger.replace(/ /g, '_')}_${Date.now()}.jpg`;
+        const url   = URL.createObjectURL(blob);
+        const a     = document.createElement('a');
+        a.href = url; a.download = fname; a.click();
+        URL.revokeObjectURL(url);
+        showToast('Image saved!', 'success');
+      } catch(err) {
+        console.error(err);
+        showToast('Failed to create image', 'error');
+      }
+    });
+
+    // ── Share Image (navigator.share files → download fallback) ──
+    tabContent.querySelector('#sum-share-img').addEventListener('click', async () => {
+      showToast('Generating image…', 'info');
+      try {
+        const blob  = await captureImageBlob();
+        const fname = `Travel_Summary_${summaryState.selectedPassenger.replace(/ /g, '_')}.jpg`;
+        const file  = new File([blob], fname, { type: 'image/jpeg' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: `Travel Summary: ${summaryState.selectedPassenger}` });
+            return;
+          } catch (e) {
+            if (e.name === 'AbortError') return;
+            console.warn('Image share failed, downloading instead', e);
+          }
+        }
+        // Fallback: download
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href = url; a.download = fname; a.click();
+        URL.revokeObjectURL(url);
+        showToast('Image downloaded', 'success');
       } catch(err) {
         console.error(err);
         showToast('Failed to create image', 'error');
@@ -836,8 +938,29 @@ export async function renderTravelLog(container, params = {}) {
 
   function generateTextReport(data) {
      if (!data || Object.keys(data.pivotYear).length === 0) return 'No data to share.';
-     
+
+     // Compute current location
+     let locationLine = '';
+     if (summaryState.selectedPassenger) {
+       const nameLower = summaryState.selectedPassenger.toLowerCase();
+       const personTrips = safeTrips
+         .filter(t => String(t.passengerName || '').toLowerCase() === nameLower ||
+                      (t._resolvedCompanionNames || []).map(n => n.toLowerCase()).includes(nameLower))
+         .sort((a, b) => new Date(b.dateArrivedDest || 0) - new Date(a.dateArrivedDest || 0));
+       if (personTrips.length) {
+         const latest    = personTrips[0];
+         const country   = latest.destinationCountry || 'Unknown';
+         const entryDate = latest.dateArrivedDest || latest.dateLeftOrigin || '';
+         const daysIn    = entryDate ? daysBetween(entryDate, today()) : null;
+         const flagMap   = { Qatar: '🇶🇦', India: '🇮🇳' };
+         const flag      = flagMap[country] || '📍';
+         const entryFmt  = entryDate ? formatDisplayDate(entryDate) : '—';
+         locationLine = `${flag} Currently in ${country} · Since ${entryFmt}${daysIn !== null ? ` · ${daysIn} Days` : ''}\n`;
+       }
+     }
+
      let text = `✈️ *Travel Summary: ${summaryState.selectedPassenger}*\n━━━━━━━━━━━━━━\n`;
+     if (locationLine) text += locationLine + `\n`;
      text += `📋 Total Trips: ${data.totalTrips}\n`;
      text += `🗓️ Total Days: ${data.lifetimeDays}\n`;
      text += `🏆 Top Dest: ${data.topDest}\n`;

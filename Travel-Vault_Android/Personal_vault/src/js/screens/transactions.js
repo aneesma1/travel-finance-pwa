@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.6 — 2026-04-26 — FAB above nav bar + filter sheet Cancel button + safe-area padding
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -28,7 +28,7 @@ export async function renderTransactions(container) {
     <div id="filter-bar-wrap"></div>
     <div id="balance-bar" class="running-balance hidden"></div>
     <div id="txn-list-wrap"></div>
-    <button class="fab" id="add-fab">＋</button>
+    <button class="fab" id="add-fab" style="bottom:calc(72px + env(safe-area-inset-bottom,0px));">＋</button>
   `;
 
   document.getElementById('add-fab').addEventListener('click', () => navigate('add-transaction'));
@@ -502,7 +502,8 @@ export async function renderTransactions(container) {
         </div>
       </div>
 
-      <div style="padding:16px 20px;border-top:1px solid var(--border-light);flex-shrink:0;display:flex;gap:10px;background:var(--surface);">
+      <div style="padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border-light);flex-shrink:0;display:flex;gap:10px;background:var(--surface);">
+        <button id="sheet-cancel" class="btn btn-secondary" style="flex:0.6;">Cancel</button>
         <button id="sheet-apply" class="btn btn-primary" style="flex:1;">Apply Filters</button>
       </div>
     `;
@@ -520,6 +521,7 @@ export async function renderTransactions(container) {
 
     const close = () => { sheet.remove(); backdrop.remove(); };
     backdrop.addEventListener('click', close);
+    document.getElementById('sheet-cancel').addEventListener('click', close);
 
     // Year pills
     sheet.querySelectorAll('[data-year]').forEach(btn => {
