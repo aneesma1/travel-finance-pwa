@@ -1,4 +1,4 @@
-// v3.5.6 — 2026-04-26 — FAB above nav bar + filter sheet Cancel button + safe-area padding
+// v3.5.7 — 2026-04-27 — FAB z-index above nav bar (CSS already positions correctly)
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -28,7 +28,7 @@ export async function renderTransactions(container) {
     <div id="filter-bar-wrap"></div>
     <div id="balance-bar" class="running-balance hidden"></div>
     <div id="txn-list-wrap"></div>
-    <button class="fab" id="add-fab" style="bottom:calc(72px + env(safe-area-inset-bottom,0px));">＋</button>
+    <button class="fab" id="add-fab" style="z-index:105;">＋</button>
   `;
 
   document.getElementById('add-fab').addEventListener('click', () => navigate('add-transaction'));

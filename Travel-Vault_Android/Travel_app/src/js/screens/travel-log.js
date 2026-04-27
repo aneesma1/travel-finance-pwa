@@ -1,4 +1,4 @@
-// v3.7.1 — 2026-04-26 — Passengers popup picker + Share Text/Image + current location in text report
+// v3.7.2 — 2026-04-27 — Passenger filter primary-only + share image canShare bypass
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: Dual-tab architecture (Trip Log & Passenger Summary)
@@ -430,13 +430,12 @@ export async function renderTravelLog(container, params = {}) {
         });
       }
 
-      // ── 2. Passenger Filter ──
+      // ── 2. Passenger Filter — primary passenger only (not companions) ──
       if (fPass) {
         const selectedArr = fPass.split(',').map(s => s.toLowerCase().trim()).filter(Boolean);
         filtered = filtered.filter(t => {
           const primaryMatch = String(t.passengerName || '').toLowerCase().trim();
-          const travelWithNames = (t._resolvedCompanionNames || []).map(n => n.toLowerCase());
-          return selectedArr.some(sel => primaryMatch === sel || travelWithNames.includes(sel));
+          return selectedArr.some(sel => primaryMatch === sel);
         });
       }
       
@@ -914,13 +913,13 @@ export async function renderTravelLog(container, params = {}) {
         const blob  = await captureImageBlob();
         const fname = `Travel_Summary_${summaryState.selectedPassenger.replace(/ /g, '_')}.jpg`;
         const file  = new File([blob], fname, { type: 'image/jpeg' });
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        if (navigator.share) {
           try {
             await navigator.share({ files: [file], title: `Travel Summary: ${summaryState.selectedPassenger}` });
             return;
           } catch (e) {
             if (e.name === 'AbortError') return;
-            console.warn('Image share failed, downloading instead', e);
+            // File share not supported on this device — fall through to download
           }
         }
         // Fallback: download

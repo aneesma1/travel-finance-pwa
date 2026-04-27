@@ -1,4 +1,4 @@
-// v3.5.6 — 2026-04-26 — copyDashboardText falls back to trip passengers when members is empty
+// v3.5.7 — 2026-04-27 — Share image: remove canShare gatekeeper, try navigator.share directly
 
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
@@ -583,12 +583,21 @@ export async function renderDashboard(container) {
     backdrop.addEventListener('click', close);
 
     document.getElementById('img-share-btn').addEventListener('click', async () => {
-      if (navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'Family Travel Status' }); close(); }
-        catch { /* cancelled */ }
-      } else {
-        showToast('Sharing not supported — use Save instead', 'warning');
+      if (navigator.share) {
+        try {
+          await navigator.share({ files: [file], title: 'Family Travel Status' });
+          close();
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') { close(); return; }
+          // File share not supported — fall through to download
+        }
       }
+      // Fallback: trigger download
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      showToast('Image saved to device', 'success');
+      close();
     });
 
     document.getElementById('img-save-btn').addEventListener('click', () => {
