@@ -1,4 +1,4 @@
-// v5.4.3 — 2026-04-26 — Export bootBackup() for on-open daily backup
+// v5.5.0 — 2026-04-28 — bootBackup + localSave now also write to public sync_folder
 
 // ─── shared/sync-manager.js ──────────────────────────────────────────────────
 // Core of Phase 3 -- Local-first architecture
@@ -12,6 +12,7 @@
 
 import { getCachedTravelData, setCachedTravelData, getCachedFinanceData, setCachedFinanceData, openDB } from './db.js';
 import { getAppState, setAppState, uuidv4 } from './utils.js';
+import { syncFolderWrite } from './drive.js';
 
 // ── Sync status broadcast ─────────────────────────────────────────────────────
 function broadcastStatus(status, detail) {
@@ -77,6 +78,8 @@ export async function localSave(appName, mergeFn) {
 
   // ② Write a daily local device backup + prune old backups (instant, no background)
   try { await writeAndPruneLocalBackup(appName, merged); } catch (e) { /* non-blocking */ }
+  // ② Also write to public sync_folder (silently skips if permission not granted)
+  syncFolderWrite(appName, merged).catch(function() {});
 
   // ③ Add to drive sync queue
   var op = {
@@ -312,7 +315,10 @@ export async function bootBackup(appName) {
     var data = appName === 'travel'
       ? await getCachedTravelData()
       : await getCachedFinanceData();
-    if (data) await writeAndPruneLocalBackup(appName, data);
+    if (data) {
+      await writeAndPruneLocalBackup(appName, data);
+      syncFolderWrite(appName, data).catch(function() {});
+    }
   } catch (e) { /* non-blocking */ }
 }
 

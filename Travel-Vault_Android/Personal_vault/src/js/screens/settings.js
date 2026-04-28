@@ -10,7 +10,8 @@ import {
   currentMonth, currentYear, showToast, copyToClipboard
 } from '../../shared/utils.js';
 import {
-  downloadLocalBackup, restoreFromLocalFile, timestampSuffix, saveXLSXToExports
+  downloadLocalBackup, restoreFromLocalFile, timestampSuffix, saveXLSXToExports,
+  hasPublicStorageAccess, requestPublicStorage, syncFolderWrite, syncFolderRestore
 } from '../../shared/drive.js';
 import { localSave } from '../../shared/sync-manager.js';
 import { changePin, setPin, isPinSet } from '../pin.js';
@@ -140,6 +141,26 @@ export async function renderSettings(container, params = {}) {
         </div>
       </div>
 
+      <div class="section-title" style="margin-top:24px;">📁 Sync Folder</div>
+      <div class="card" style="margin:0 16px;overflow:visible;">
+        <div style="padding:14px 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:600;">All Files Access</span>
+            <span id="sync-perm-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#E5E7EB;color:#374151;">Checking…</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">📂 /storage/emulated/0/Documents/PersonalVault/sync_folder/</div>
+          <div id="sync-grant-row" style="display:none;margin-bottom:10px;">
+            <button id="sync-grant-btn" class="btn btn-secondary btn-full" style="font-size:13px;">🔓 Grant All Files Access</button>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px;text-align:center;">Android Settings → Special App Access → All Files Access</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <button id="sync-now-btn" class="btn btn-primary" style="font-size:13px;">🔄 Sync Now</button>
+            <button id="sync-restore-btn" class="btn btn-secondary" style="font-size:13px;">📥 Restore</button>
+          </div>
+          <div id="sync-last-time" style="font-size:11px;color:var(--text-muted);text-align:center;min-height:16px;"></div>
+        </div>
+      </div>
+
       <div class="section-title" style="color:var(--danger);margin-top:24px;">⛔ Danger Zone</div>
       <div class="card" style="margin:0 16px;border:1px solid var(--danger);background:rgba(220,38,38,0.05);">
         <div class="list-row" id="clear-cache-btn" style="border:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:1px solid var(--border);">
@@ -222,6 +243,64 @@ export async function renderSettings(container, params = {}) {
         showToast('Reset failed: ' + err.message, 'error');
       }
     });
+
+    // ── Sync Folder section ─────────────────────────────────────────────────
+    (async () => {
+      const badge    = document.getElementById('sync-perm-badge');
+      const grantRow = document.getElementById('sync-grant-row');
+      const lastEl   = document.getElementById('sync-last-time');
+
+      const updatePermBadge = async () => {
+        const granted = await hasPublicStorageAccess();
+        if (badge) {
+          badge.textContent  = granted ? '✅ Granted' : '⚠️ Not granted';
+          badge.style.background = granted ? '#D1FAE5' : '#FEF3C7';
+          badge.style.color      = granted ? '#065F46' : '#92400E';
+        }
+        if (grantRow) grantRow.style.display = granted ? 'none' : 'block';
+        return granted;
+      };
+      await updatePermBadge();
+
+      const raw = localStorage.getItem('syncFolder_lastSync_finance');
+      if (raw && lastEl) {
+        lastEl.textContent = 'Last sync: ' + new Date(raw).toLocaleString();
+      }
+
+      document.getElementById('sync-grant-btn')?.addEventListener('click', async () => {
+        showToast('Opening Android settings…', 'info', 1500);
+        const granted = await requestPublicStorage();
+        await updatePermBadge();
+        if (granted) showToast('✅ All Files Access granted!', 'success');
+        else showToast('Permission not granted — tap Allow in Settings', 'warning');
+      });
+
+      document.getElementById('sync-now-btn')?.addEventListener('click', async () => {
+        const cached = await getCachedFinanceData();
+        if (!cached) { showToast('No data to sync', 'warning'); return; }
+        showToast('Syncing…', 'info', 1500);
+        const path = await syncFolderWrite('finance', cached);
+        if (path) {
+          const ts = new Date().toLocaleString();
+          if (lastEl) lastEl.textContent = 'Last sync: ' + ts;
+          showToast('✅ Synced to ' + path, 'success', 4000);
+        } else {
+          showToast('⚠️ Sync failed — check Files Access permission', 'warning');
+        }
+      });
+
+      document.getElementById('sync-restore-btn')?.addEventListener('click', async () => {
+        if (!confirm('Restore from sync_folder? This will overwrite current data with the latest synced version.')) return;
+        try {
+          showToast('Restoring from sync folder…', 'info', 2000);
+          await syncFolderRestore('finance');
+          showToast('✅ Restored! Reloading…', 'success');
+          setTimeout(() => window.location.reload(), 1200);
+        } catch (err) {
+          showToast('Restore failed: ' + err.message, 'error');
+        }
+      });
+    })();
   }
 
   // ── EXPORT TAB ────────────────────────────────────────────────────────────
