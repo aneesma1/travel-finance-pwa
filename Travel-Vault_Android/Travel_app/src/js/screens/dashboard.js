@@ -1,4 +1,4 @@
-// v3.5.7 — 2026-04-27 — Share image: remove canShare gatekeeper, try navigator.share directly
+// v3.5.8 — 2026-04-29 — Share image via Capacitor Share plugin (reliable on Android WebView)
 
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
@@ -583,17 +583,23 @@ export async function renderDashboard(container) {
     backdrop.addEventListener('click', close);
 
     document.getElementById('img-share-btn').addEventListener('click', async () => {
-      if (navigator.share) {
+      const FS          = window.Capacitor?.Plugins?.Filesystem;
+      const SharePlugin = window.Capacitor?.Plugins?.Share;
+      if (FS && SharePlugin) {
         try {
-          await navigator.share({ files: [file], title: 'Family Travel Status' });
-          close();
-          return;
+          showToast('Preparing share…', 'info', 1500);
+          const base64 = await _blobToBase64(blob);
+          await FS.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+          const { uri } = await FS.getUri({ path: filename, directory: 'CACHE' });
+          await SharePlugin.share({ title: 'Family Travel Status', files: [uri], dialogTitle: 'Share Dashboard' });
+          await FS.deleteFile({ path: filename, directory: 'CACHE' }).catch(() => {});
+          close(); return;
         } catch (e) {
-          if (e.name === 'AbortError') { close(); return; }
-          // File share not supported — fall through to download
+          await FS.deleteFile({ path: filename, directory: 'CACHE' }).catch(() => {});
+          if (e.name === 'AbortError' || String(e.message).toLowerCase().includes('cancel')) { close(); return; }
         }
       }
-      // Fallback: trigger download
+      // Fallback: save to device
       const a = document.createElement('a');
       a.href = url; a.download = filename; a.click();
       showToast('Image saved to device', 'success');
@@ -666,6 +672,15 @@ export async function renderDashboard(container) {
     const ok = await copyToClipboard(text);
     if (ok) showToast('Copied to clipboard!', 'success');
     else    showToast('Copy failed — try again', 'error');
+  }
+
+  // ── Internal helper ───────────────────────────────────────────────────────────
+  function _blobToBase64(blob) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
   }
 
   // ── Export current locations as XLSX ─────────────────────────────────────────

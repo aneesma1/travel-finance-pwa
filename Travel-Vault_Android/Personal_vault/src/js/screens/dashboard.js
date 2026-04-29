@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.8 — 2026-04-29 — FAB z-index fix; Share image via Capacitor Share plugin
 
 // ─── app-b-private-vault/js/screens/dashboard.js ────────────────────────────
 // Finance Vault Dashboard
@@ -30,7 +30,7 @@ export async function renderDashboard(container) {
     <div id="dash-content" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
       <div style="display:flex;justify-content:center;padding:40px 0;"><div class="spinner"></div></div>
     </div>
-    <button class="fab" id="add-fab">＋</button>
+    <button class="fab" id="add-fab" style="z-index:105;">＋</button>
     <div id="share-anchor" style="position:fixed;bottom:80px;right:20px;z-index:150;"></div>
   `;
 
@@ -331,10 +331,27 @@ export async function renderDashboard(container) {
     backdrop.addEventListener('click', close);
 
     document.getElementById('img-share-btn').addEventListener('click', async () => {
-      if (navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'Finance Summary' }); close(); return; } catch {}
+      const FS          = window.Capacitor?.Plugins?.Filesystem;
+      const SharePlugin = window.Capacitor?.Plugins?.Share;
+      if (FS && SharePlugin) {
+        try {
+          showToast('Preparing share…', 'info', 1500);
+          const base64 = await _blobToBase64(blob);
+          await FS.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+          const { uri } = await FS.getUri({ path: filename, directory: 'CACHE' });
+          await SharePlugin.share({ title: 'Finance Summary', files: [uri], dialogTitle: 'Share Dashboard' });
+          await FS.deleteFile({ path: filename, directory: 'CACHE' }).catch(() => {});
+          close(); return;
+        } catch (e) {
+          await FS.deleteFile({ path: filename, directory: 'CACHE' }).catch(() => {});
+          if (e.name === 'AbortError' || String(e.message).toLowerCase().includes('cancel')) { close(); return; }
+        }
       }
-      showToast('Sharing not supported — use Save instead', 'warning');
+      // Fallback: save to device
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      showToast('Image saved to device', 'success');
+      close();
     });
 
     document.getElementById('img-save-btn').addEventListener('click', () => {
@@ -433,6 +450,15 @@ export function txnRow(t, isLast = false) {
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${t.currency} · ${dateStr}</div>
       </div>
     </div>`;
+}
+
+// ── Internal helper ───────────────────────────────────────────────────────────
+function _blobToBase64(blob) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function categoryEmoji(cat) {

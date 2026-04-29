@@ -382,7 +382,7 @@ export async function renderSettings(container, params = {}) {
         </div>
       </div>
 
-      <div id="export-status" style="margin:12px 16px;font-size:13px;color:var(--text-muted);text-align:center;"></div>
+      <div id="export-status" style="margin:12px 16px;font-size:11px;color:var(--text-muted);text-align:center;word-break:break-all;overflow-wrap:break-word;line-height:1.5;"></div>
 
       <div class="section-title">Column Order (fixed)</div>
       <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 16px;">
@@ -501,8 +501,9 @@ export async function renderSettings(container, params = {}) {
       // Save to Documents/PersonalVault/exports/
       try {
         const savedPath = await saveXLSXToExports('finance', wb, filenameBase);
-        statusEl.textContent = `✅ Saved to ${savedPath}`;
-        showToast(`Saved to ${savedPath}`, 'success');
+        const displayName = savedPath.split('/').pop(); // just the filename
+        statusEl.textContent = `✅ Saved: ${displayName}`;
+        showToast(`Saved to ${savedPath}`, 'success', 5000);
       } catch (err) {
         statusEl.textContent = `⚠️ Save failed: ${err.message}`;
         showToast('Export failed', 'error');
