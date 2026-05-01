@@ -7,8 +7,9 @@ on:
       - master
     paths:
       - 'Travel-Vault_Android/Travel_app/**'
-      - 'Travel-Vault_PWA/shared/**'
       - '.github/workflows/build-travel.yml'
+      # NOTE: Travel-Vault_PWA/** is intentionally excluded.
+      # APK and HTML are fully independent builds. PWA changes never trigger APK builds.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
