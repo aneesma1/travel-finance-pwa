@@ -596,20 +596,36 @@ export async function renderDashboard(container) {
           close(); return;
         } catch (e) {
           await FS.deleteFile({ path: filename, directory: 'CACHE' }).catch(() => {});
-          if (e.name === 'AbortError' || String(e.message).toLowerCase().includes('cancel')) { close(); return; }
+          const msg = String(e?.message || e);
+          if (msg.toLowerCase().includes('cancel') || e.name === 'AbortError') { close(); return; }
+          // Show actual error so we can diagnose
+          showToast('Share error: ' + msg, 'warning', 5000);
+          close(); return;
         }
       }
-      // Fallback: save to device
+      // No Capacitor — browser download
       const a = document.createElement('a');
       a.href = url; a.download = filename; a.click();
-      showToast('Image saved to device', 'success');
+      showToast('Saved to Downloads', 'success');
       close();
     });
 
-    document.getElementById('img-save-btn').addEventListener('click', () => {
+    document.getElementById('img-save-btn').addEventListener('click', async () => {
+      // Save to Documents/TravelHub/exports/ via Capacitor Filesystem (visible in Files app)
+      const FS = window.Capacitor?.Plugins?.Filesystem;
+      if (FS) {
+        try {
+          const base64 = await _blobToBase64(blob);
+          const { saveFileToExports } = await import('../../shared/drive.js');
+          const savedPath = await saveFileToExports('travel', filename, base64);
+          showToast('Saved to ' + savedPath, 'success', 5000);
+          close(); return;
+        } catch (e) { /* fall through */ }
+      }
+      // Fallback
       const a = document.createElement('a');
       a.href = url; a.download = filename; a.click();
-      showToast('Image saved!', 'success');
+      showToast('Image saved to Downloads', 'success');
       close();
     });
 

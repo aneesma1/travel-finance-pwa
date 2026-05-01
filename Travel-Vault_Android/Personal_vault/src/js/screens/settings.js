@@ -148,7 +148,7 @@ export async function renderSettings(container, params = {}) {
             <span style="font-size:13px;font-weight:600;">All Files Access</span>
             <span id="sync-perm-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#E5E7EB;color:#374151;">Checking…</span>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">📂 /storage/emulated/0/Documents/PersonalVault/sync_folder/</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;word-break:break-all;overflow-wrap:break-word;">📂 /storage/emulated/0/Documents/PersonalVault/sync_folder/</div>
           <div id="sync-grant-row" style="display:none;margin-bottom:10px;">
             <button id="sync-grant-btn" class="btn btn-secondary btn-full" style="font-size:13px;">🔓 Grant All Files Access</button>
             <div style="font-size:10px;color:var(--text-muted);margin-top:4px;text-align:center;">Android Settings → Special App Access → All Files Access</div>
