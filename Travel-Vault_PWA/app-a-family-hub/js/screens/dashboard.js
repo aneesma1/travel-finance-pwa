@@ -574,22 +574,74 @@ export async function renderDashboard(container) {
     const close = () => { sheet.remove(); backdrop.remove(); URL.revokeObjectURL(url); };
     backdrop.addEventListener('click', close);
 
+    // ── Helper: blob → base64 string ─────────────────────────────────────────
+    function blobToBase64(b) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror   = reject;
+        reader.readAsDataURL(b);
+      });
+    }
+
+    // ── Share via apps ────────────────────────────────────────────────────────
     document.getElementById('img-share-btn').addEventListener('click', async () => {
+      // Capacitor native: use @capacitor/share with a temp CACHE file
+      if (window.Capacitor?.isNativePlatform?.()) {
+        try {
+          const { Filesystem, Share } = window.Capacitor.Plugins;
+          const base64 = await blobToBase64(blob);
+          // Write to cache so Share plugin can access it as a native URI
+          await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE', recursive: true });
+          const { uri } = await Filesystem.getUri({ path: filename, directory: 'CACHE' });
+          await Share.share({ title: 'Family Travel Status', url: uri, dialogTitle: 'Share dashboard image' });
+          close();
+          return;
+        } catch (err) {
+          if (err.message !== 'Share canceled') {
+            showToast('Share failed — try Save instead', 'warning');
+          }
+          return;
+        }
+      }
+      // Browser fallback — Web Share API with file
       if (navigator.canShare?.({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'Family Travel Status' }); close(); }
-        catch { /* cancelled */ }
+        catch { /* cancelled by user */ }
       } else {
-        showToast('Sharing not supported — use Save instead', 'warning');
+        showToast('Sharing not supported on this browser — use Save instead', 'warning');
       }
     });
 
-    document.getElementById('img-save-btn').addEventListener('click', () => {
+    // ── Save to device ────────────────────────────────────────────────────────
+    document.getElementById('img-save-btn').addEventListener('click', async () => {
+      // Capacitor native: save to Documents/FamilyHub/ using Filesystem plugin
+      if (window.Capacitor?.isNativePlatform?.()) {
+        try {
+          const { Filesystem } = window.Capacitor.Plugins;
+          const base64 = await blobToBase64(blob);
+          await Filesystem.writeFile({
+            path:      `FamilyHub/${filename}`,
+            data:      base64,
+            directory: 'DOCUMENTS',
+            recursive: true,
+          });
+          showToast('✅ Saved to Documents/FamilyHub/ folder', 'success', 4000);
+          close();
+          return;
+        } catch (err) {
+          showToast('Save failed: ' + err.message, 'warning');
+          return;
+        }
+      }
+      // Browser fallback — standard <a download>
       const a = document.createElement('a');
       a.href = url; a.download = filename; a.click();
-      showToast('Image saved!', 'success');
+      showToast('Image downloading to your Downloads folder', 'success');
       close();
     });
 
+    // ── Copy image ────────────────────────────────────────────────────────────
     document.getElementById('img-copy-btn').addEventListener('click', async () => {
       try {
         const data = new ClipboardItem({ 'image/png': blob });

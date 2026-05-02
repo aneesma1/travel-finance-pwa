@@ -341,7 +341,7 @@ export async function renderFamilyDefaults(container) {
           ${contacts.length} shared contact${contacts.length !== 1 ? 's' : ''}
         </span>
         <div style="display:flex;gap:8px;">
-          ${'contacts' in navigator ? `<button class="btn btn-secondary" style="padding:7px 12px;font-size:12px;" id="pick-contact-btn">📱 From Contacts</button>` : ''}
+          <button class="btn btn-secondary" style="padding:7px 12px;font-size:12px;" id="pick-contact-btn">📱 From Contacts</button>
           <button class="btn btn-primary" style="padding:7px 14px;font-size:12px;" id="add-ec-btn">+ Add</button>
         </div>
       </div>
@@ -355,21 +355,27 @@ export async function renderFamilyDefaults(container) {
     document.getElementById('add-ec-btn').addEventListener('click', () => openECModal(null));
 
     document.getElementById('pick-contact-btn')?.addEventListener('click', async () => {
+      // Browser Contact Picker API — not available in Capacitor WebView on most devices
+      if (!('contacts' in navigator) || typeof navigator.contacts?.select !== 'function') {
+        showToast('Contact picker not available. Enter details manually.', 'info', 3500);
+        openECModal(null);
+        return;
+      }
       try {
-        if (!('contacts' in navigator)) { showToast('Contact Picker not supported on this device', 'warning'); return; }
-        const props = ['name','tel'];
-        const opts  = { multiple: true };
-        const picked = await navigator.contacts.select(props, opts);
+        const picked = await navigator.contacts.select(['name', 'tel'], { multiple: true });
         if (!picked || !picked.length) return;
         picked.forEach(p => {
           const name  = p.name?.[0] || '';
           const phone = p.tel?.[0]  || '';
           if (!name && !phone) return;
+          // Pre-fill the manual form — editing this local copy does NOT affect device contacts
           const prefill = { id: uuidv4(), name, phone, relationship: '', description: '', priority: draftContacts.length + 1 };
           openECModal(prefill);
         });
       } catch (err) {
-        showToast('Could not open contacts: ' + err.message, 'warning');
+        // Contact picker failed (e.g. Capacitor WebView) — fall through to manual form
+        showToast('Contact picker unavailable. Enter details manually.', 'info', 3500);
+        openECModal(null);
       }
     });
 

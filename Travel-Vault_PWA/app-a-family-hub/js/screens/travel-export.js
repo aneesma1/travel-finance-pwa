@@ -1,4 +1,4 @@
-// v3.5.41 — 2026-03-31
+// v4.0.1 — 2026-05-02 — Fixed: lines var, getStayDays, personName/passengerName fallback
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -8,6 +8,21 @@
 
 import { timestampSuffix } from '../../../shared/drive.js';
 import { copyToClipboard, showToast, formatDisplayDate, daysBetween, today } from '../../../shared/utils.js';
+
+// ── Module-level helper: calculate stay days from a trip object ───────────────
+function getStayDays(t) {
+  let d = t.daysInQatar ? Number(t.daysInQatar) : null;
+  if (d === null || isNaN(d)) {
+    if (t.dateInQatar && t.dateOutQatar) d = daysBetween(t.dateInQatar, t.dateOutQatar);
+    else if (t.dateInQatar && !t.dateOutQatar) d = daysBetween(t.dateInQatar, today());
+  }
+  return d || 0;
+}
+
+// ── Resolve best display name from a trip (handles both field conventions) ────
+function getTripPersonName(t) {
+  return t.personName || t.passengerName || '';
+}
 
 // ── Entry point -- opens the export bottom sheet ───────────────────────────────
 export function openTravelExportSheet(persons, trips, documents) {
@@ -216,11 +231,12 @@ export function openTravelExportSheet(persons, trips, documents) {
 
     return trips
       .filter(t => {
-        // People filter — match by personId or personName (preserved name)
+        // People filter — match by personId, personName, or passengerName
         if (!selPeople.has('all')) {
-          const matchById = t.personId && selPeople.has(t.personId);
-          const matchByName = t.personName && selPeople.has(t.personName.trim());
-          if (!matchById && !matchByName) return false;
+          const matchById        = t.personId     && selPeople.has(t.personId);
+          const matchByName      = t.personName   && selPeople.has(t.personName.trim());
+          const matchByPassenger = t.passengerName && selPeople.has(t.passengerName.trim());
+          if (!matchById && !matchByName && !matchByPassenger) return false;
         }
         // Date range filter
         if (fromVal && t.dateOutIndia && t.dateOutIndia < fromVal) return false;
@@ -228,10 +244,13 @@ export function openTravelExportSheet(persons, trips, documents) {
         return true;
       })
       .sort((a, b) => new Date(a.dateOutIndia) - new Date(b.dateOutIndia))
-      .map(t => ({
-        ...t,
-        _person: personMap[t.personId] || personMap[t.personName] || { name: t.personName || 'Unknown', emoji: '👤' }
-      }));
+      .map(t => {
+        const name = getTripPersonName(t);
+        return {
+          ...t,
+          _person: personMap[t.personId] || personMap[name] || { name: name || 'Unknown', emoji: '👤' }
+        };
+      });
   }
 
   // ── Export actions ────────────────────────────────────────────────────────
@@ -278,10 +297,10 @@ async function exportPDF(trips, members, documents, deliver) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = 210, margin = 14, contentW = W - margin * 2;
 
-  // Group trips by person
+  // Group trips by person — use stable key (personId, else name)
   const byPerson = {};
   trips.forEach(t => {
-    const pid = t.personId;
+    const pid = t.personId || t._person?.name || getTripPersonName(t) || 'unknown';
     if (!byPerson[pid]) byPerson[pid] = { person: t._person, trips: [] };
     byPerson[pid].trips.push(t);
   });
@@ -485,7 +504,7 @@ async function exportExcel(trips, deliver) {
   ];
 
   const rows = trips.map(t => [
-    t._person?.name || t.personName || 'Unknown',
+    t._person?.name || getTripPersonName(t) || 'Unknown',
     t.destination   || 'Qatar',
     t.dateOutIndia  || '',
     t.dateInQatar   || '',
@@ -533,7 +552,7 @@ async function exportCSV(trips, deliver) {
   ];
 
   const rows = trips.map(t => [
-    t._person?.name || 'Unknown',
+    t._person?.name || getTripPersonName(t) || 'Unknown',
     t.destination   || 'Qatar',
     t.dateOutIndia  || '',
     t.dateInQatar   || '',
@@ -571,10 +590,12 @@ async function exportCSV(trips, deliver) {
 
 // ── WhatsApp Text Copy ────────────────────────────────────────────────────────
 async function exportWhatsApp(trips, persons) {
+  const lines = [];  // collect all output lines
+
   // Flatten and group by individual name
   const byPersonName = {};
   trips.forEach(t => {
-    const rawName = t.personName || 'Unknown';
+    const rawName = getTripPersonName(t) || t._person?.name || 'Unknown';
     const splitNames = rawName.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
     
     splitNames.forEach(name => {
@@ -588,15 +609,6 @@ async function exportWhatsApp(trips, persons) {
   });
 
   Object.values(byPersonName).sort((a,b) => a.name.localeCompare(b.name)).forEach(({ name, trips: pTrips }) => {
-    const getStayDays = (t) => {
-      let d = t.daysInQatar ? Number(t.daysInQatar) : null;
-      if (d === null || isNaN(d)) {
-        if (t.dateInQatar && t.dateOutQatar) d = daysBetween(t.dateInQatar, t.dateOutQatar);
-        else if (t.dateInQatar && !t.dateOutQatar) d = daysBetween(t.dateInQatar, today());
-      }
-      return d || 0;
-    };
-
     const totalDays = pTrips.reduce((s, t) => s + getStayDays(t), 0);
     
     // Yearly totals breakdown
