@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.6 — 2026-05-02 — Contact picker: always shown, graceful fallback on API failure
 
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
 // Family Defaults -- shared Qatar/India addresses, shared emergency contacts,
@@ -341,7 +341,7 @@ export async function renderFamilyDefaults(container) {
           ${contacts.length} shared contact${contacts.length !== 1 ? 's' : ''}
         </span>
         <div style="display:flex;gap:8px;">
-          ${'contacts' in navigator ? `<button class="btn btn-secondary" style="padding:7px 12px;font-size:12px;" id="pick-contact-btn">📱 From Contacts</button>` : ''}
+          <button class="btn btn-secondary" style="padding:7px 12px;font-size:12px;" id="pick-contact-btn">📱 From Contacts</button>
           <button class="btn btn-primary" style="padding:7px 14px;font-size:12px;" id="add-ec-btn">+ Add</button>
         </div>
       </div>
@@ -355,12 +355,18 @@ export async function renderFamilyDefaults(container) {
     document.getElementById('add-ec-btn').addEventListener('click', () => openECModal(null));
 
     document.getElementById('pick-contact-btn')?.addEventListener('click', async () => {
+      // Check API availability properly — presence check alone is unreliable on some WebViews
+      if (!('contacts' in navigator) || typeof navigator.contacts?.select !== 'function') {
+        showToast('Contact picker not available. Enter details manually.', 'info', 3500);
+        openECModal(null);
+        return;
+      }
       try {
-        if (!('contacts' in navigator)) { showToast('Contact Picker not supported on this device', 'warning'); return; }
-        const props = ['name','tel'];
+        const props = ['name', 'tel'];
         const opts  = { multiple: true };
         const picked = await navigator.contacts.select(props, opts);
         if (!picked || !picked.length) return;
+        // Pre-fill modal with picked contact — stored as LOCAL copy, does NOT modify device contact
         picked.forEach(p => {
           const name  = p.name?.[0] || '';
           const phone = p.tel?.[0]  || '';
@@ -369,7 +375,8 @@ export async function renderFamilyDefaults(container) {
           openECModal(prefill);
         });
       } catch (err) {
-        showToast('Could not open contacts: ' + err.message, 'warning');
+        showToast('Contact picker unavailable. Enter details manually.', 'info', 3500);
+        openECModal(null);
       }
     });
 

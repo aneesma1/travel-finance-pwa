@@ -1,4 +1,4 @@
-// v3.5.42 — 2026-04-26 — Fixed: getStayDays + lines[] crash; Passengers label; correct export folders; safe-area padding
+// v3.5.43 — 2026-05-02 — passengerName fallback: all exports now handle both personName and passengerName fields
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -20,6 +20,12 @@ function getStayDays(t) {
     else if (arrDate && !depDate) d = daysBetween(arrDate, today());
   }
   return (d != null && !isNaN(d) && d >= 0) ? d : 0;
+}
+
+// ── Module-level helper — resolve passenger name (handles both field naming conventions)
+// Trips stored via add-trip use passengerName; legacy/imported may use personName
+function getTripPersonName(t) {
+  return t.personName || t.passengerName || '';
 }
 
 // ── Entry point -- opens the export bottom sheet ───────────────────────────────
@@ -229,11 +235,12 @@ export function openTravelExportSheet(persons, trips, documents) {
 
     return trips
       .filter(t => {
-        // People filter — match by personId or personName (preserved name)
+        // People filter — match by personId or personName or passengerName
         if (!selPeople.has('all')) {
-          const matchById = t.personId && selPeople.has(t.personId);
-          const matchByName = t.personName && selPeople.has(t.personName.trim());
-          if (!matchById && !matchByName) return false;
+          const matchById      = t.personId     && selPeople.has(t.personId);
+          const matchByName    = t.personName   && selPeople.has(t.personName.trim());
+          const matchByPassenger = t.passengerName && selPeople.has(t.passengerName.trim());
+          if (!matchById && !matchByName && !matchByPassenger) return false;
         }
         // Date range filter
         if (fromVal && t.dateOutIndia && t.dateOutIndia < fromVal) return false;
@@ -243,7 +250,7 @@ export function openTravelExportSheet(persons, trips, documents) {
       .sort((a, b) => new Date(a.dateOutIndia) - new Date(b.dateOutIndia))
       .map(t => ({
         ...t,
-        _person: personMap[t.personId] || personMap[t.personName] || { name: t.personName || 'Unknown', emoji: '👤' }
+        _person: personMap[t.personId] || personMap[getTripPersonName(t)] || { name: getTripPersonName(t) || 'Unknown', emoji: '👤' }
       }));
   }
 
@@ -291,10 +298,10 @@ async function exportPDF(trips, members, documents, deliver) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = 210, margin = 14, contentW = W - margin * 2;
 
-  // Group trips by person
+  // Group trips by person — use stable key that handles both personId and passengerName conventions
   const byPerson = {};
   trips.forEach(t => {
-    const pid = t.personId;
+    const pid = t.personId || t._person?.name || getTripPersonName(t) || 'unknown';
     if (!byPerson[pid]) byPerson[pid] = { person: t._person, trips: [] };
     byPerson[pid].trips.push(t);
   });
@@ -514,7 +521,7 @@ async function exportExcel(trips, deliver) {
   ];
 
   const rows = trips.map(t => [
-    t._person?.name || t.personName || 'Unknown',
+    t._person?.name || getTripPersonName(t) || 'Unknown',
     t.destination   || 'Qatar',
     t.dateOutIndia  || '',
     t.dateInQatar   || '',
@@ -618,7 +625,7 @@ async function exportWhatsApp(trips, persons) {
   // Flatten and group by individual name
   const byPersonName = {};
   trips.forEach(t => {
-    const rawName = t.personName || 'Unknown';
+    const rawName = getTripPersonName(t) || t._person?.name || 'Unknown';
     const splitNames = rawName.split(/[&,]+/).map(n => n.trim()).filter(Boolean);
 
     splitNames.forEach(name => {
