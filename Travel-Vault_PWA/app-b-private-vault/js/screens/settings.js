@@ -12,6 +12,7 @@ import {
   copyToClipboard, showConfirmModal, getAppState, setAppState
 } from '../../../shared/utils.js';
 import { downloadLocalBackup, restoreFromLocalFile, timestampSuffix } from '../../../shared/drive.js';
+import { showRestoreDialog } from '../../../shared/restore-dialog.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { changePin, isPinSet } from '../pin.js';
 import { navigate } from '../router.js';
@@ -157,11 +158,17 @@ export async function renderSettings(container, params = {}) {
       input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        if (!confirm('Restore from this backup? Current data will be replaced.')) return;
+        input.value = '';
+        const strategy = await showRestoreDialog({
+          title: 'How should the backup be loaded?',
+          source: file.name,
+        });
+        if (!strategy) return;
         try {
           showToast('Restoring…', 'info', 2000);
-          await restoreFromLocalFile(file, 'finance');
-          showToast('✅ Restored successfully!', 'success');
+          await restoreFromLocalFile(file, 'finance', strategy);
+          const label = strategy === 'wipe' ? 'Wiped & replaced' : strategy === 'append' ? 'Appended' : 'Merged';
+          showToast('✅ ' + label + ' successfully!', 'success');
           setTimeout(() => window.location.reload(), 800);
         } catch (err) {
           showToast('❌ Restore failed: ' + err.message, 'error', 5000);
@@ -629,18 +636,19 @@ export async function renderSettings(container, params = {}) {
     renderImportTool(toolContainer, {
       appType: 'finance',
       existingData: { transactions: existingTransactions },
-      onImportComplete: async (records, progressCb) => {
+      onImportComplete: async (records, progressCb, strategy = 'merge') => {
         let imported = 0, skipped = 0;
 
-        const existingKeys = new Set(
-          existingTransactions.map(t => `${t.date}|${t.description}|${t.amountSpend}|${t.income}`)
-        );
-
         const newData = await localSave('finance', (remote) => {
-          const txns = remote.transactions || [];
+          const txns = strategy === 'wipe' ? [] : [...(remote.transactions || [])];
+
+          const existingKeys = (strategy === 'merge')
+            ? new Set(txns.map(t => `${t.date}|${(t.description||'').toLowerCase().trim()}|${t.amountSpend||''}|${t.income||''}`))
+            : new Set();
+
           records.forEach(rec => {
-            const key = `${rec.date}|${rec.description}|${rec.amountSpend}|${rec.income}`;
-            if (existingKeys.has(key)) { skipped++; return; }
+            const key = `${rec.date}|${(rec.description||'').toLowerCase().trim()}|${rec.amountSpend||''}|${rec.income||''}`;
+            if (strategy === 'merge' && existingKeys.has(key)) { skipped++; return; }
             txns.push(rec);
             existingKeys.add(key);
             imported++;

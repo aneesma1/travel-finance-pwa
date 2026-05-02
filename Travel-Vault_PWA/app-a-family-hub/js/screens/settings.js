@@ -6,6 +6,7 @@
 
 import { getCachedTravelData, setCachedTravelData, clearAllCachedData } from '../../../shared/db.js';
 import { downloadLocalBackup, restoreFromLocalFile, saveXLSXToExports, timestampSuffix } from '../../../shared/drive.js';
+import { showRestoreDialog } from '../../../shared/restore-dialog.js';
 import { localSave } from '../../../shared/sync-manager.js';
 import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
@@ -242,12 +243,18 @@ function renderDataTab(data, members, container) {
   document.getElementById('restore-file-input').addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!confirm('This will overwrite your current trip records. Continue?')) return;
+    e.target.value = ''; // reset so same file can be picked again
+    const strategy = await showRestoreDialog({
+      title: 'How should the backup be loaded?',
+      source: file.name,
+    });
+    if (!strategy) return; // cancelled
     try {
       showToast('Restoring…', 'info', 2000);
-      const restored = await restoreFromLocalFile(file, 'travel');
+      const restored = await restoreFromLocalFile(file, 'travel', strategy);
       await setCachedTravelData(restored);
-      showToast('✅ Restored!', 'success');
+      const label = strategy === 'wipe' ? 'Wiped & replaced' : strategy === 'append' ? 'Appended' : 'Merged';
+      showToast('✅ ' + label + ' successfully!', 'success');
       navigate('dashboard');
     } catch (err) { showToast('Restore failed: ' + err.message, 'error'); }
   });
@@ -407,16 +414,14 @@ function openImportModal(data, persons) {
   renderImportTool(toolContainer, {
     appType: 'travel',
     existingData: data,
-    onImportComplete: async (records, progressCb) => {
+    onImportComplete: async (records, progressCb, strategy = 'merge') => {
       importInProgress = true;
       setStatus(`Importing ${records.length} records…`);
       let imported = 0, skipped = 0;
       try {
         const newData = await localSave('travel', remote => {
-          const trips      = [...(remote.trips || [])];
-          const passengers = [...(remote.passengers || remote.travelPersons || [])];
-          const nameToId   = {};
-          passengers.forEach(p => { if (p.name) nameToId[p.name.toLowerCase().trim()] = p.id; });
+          const trips      = strategy === 'wipe' ? [] : [...(remote.trips || [])];
+          const passengers = strategy === 'wipe' ? [] : [...(remote.passengers || remote.travelPersons || [])];
 
           const getOrAddPassenger = (nameStr) => {
             const n = (nameStr || '').trim();
@@ -426,9 +431,10 @@ function openImportModal(data, persons) {
             return p;
           };
 
-          const existingKeys = new Set(
-            trips.map(t => ((t.passengerName || '').toLowerCase().trim()) + '|' + toISODate(t.dateLeftOrigin))
-          );
+          // For merge: track existing keys to skip dupes. For append/wipe: always insert.
+          const existingKeys = (strategy === 'merge')
+            ? new Set(trips.map(t => ((t.passengerName || '').toLowerCase().trim()) + '|' + toISODate(t.dateLeftOrigin)))
+            : new Set();
 
           records.forEach(rec => {
             const primaryName = (rec.personName || 'Unknown').trim();
@@ -440,11 +446,11 @@ function openImportModal(data, persons) {
             if (rec.travelWith) {
               String(rec.travelWith).split(/[,;]+/).map(n => n.trim()).filter(Boolean).forEach(n => companionsRaw.push(n));
             }
-            const allNames       = [...new Set([primaryName, ...companionsRaw])];
+            const allNames        = [...new Set([primaryName, ...companionsRaw])];
             const resolvedPersons = allNames.map(n => getOrAddPassenger(n)).filter(Boolean);
             resolvedPersons.forEach(person => {
               const key = person.name.toLowerCase() + '|' + doi;
-              if (existingKeys.has(key)) { skipped++; return; }
+              if (strategy === 'merge' && existingKeys.has(key)) { skipped++; return; }
               existingKeys.add(key);
               const companionsForThis = resolvedPersons.filter(p => p.id !== person.id).map(p => p.name).join(', ');
               const companionIds      = resolvedPersons.filter(p => p.id !== person.id).map(p => p.id);
@@ -463,8 +469,9 @@ function openImportModal(data, persons) {
         });
 
         await setCachedTravelData(newData);
+        const modeLabel = strategy === 'wipe' ? 'replaced' : strategy === 'append' ? 'appended' : 'merged';
         const msg = imported > 0
-          ? '✅ ' + imported + ' trips imported!' + (skipped > 0 ? ' (' + skipped + ' duplicates skipped)' : '')
+          ? '✅ ' + imported + ' trips imported (' + modeLabel + ')!' + (skipped > 0 ? ' (' + skipped + ' skipped)' : '')
           : '⚠️ 0 imported — all ' + skipped + ' already exist';
         setStatus(msg, imported > 0 ? 'var(--success)' : 'var(--warning)');
         progressCb(imported, skipped);

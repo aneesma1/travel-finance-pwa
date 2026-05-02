@@ -186,9 +186,16 @@
     document.getElementById('import-file').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      e.target.value = '';
       try {
+        const { showRestoreDialog } = await import('../shared/restore-dialog.js');
+        const strategy = await showRestoreDialog({
+          title: 'How should the backup be loaded?',
+          source: file.name,
+        });
+        if (!strategy) return;
         const { restoreFromLocalFile } = await import('../shared/drive.js');
-        await restoreFromLocalFile(file, 'travel');
+        await restoreFromLocalFile(file, 'travel', strategy);
         showToast('✅ Data restored!', 'success');
         setTimeout(() => { window.location.reload(); }, 800);
       } catch (err) {

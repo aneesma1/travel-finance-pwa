@@ -1,18 +1,20 @@
-// v4.0.0 — 2026-05-01 — Local-first rewrite: Google Drive removed
+// v4.1.0 — 2026-05-02 — restoreFromLocalFile now accepts strategy param
 // ─── shared/drive.js ─────────────────────────────────────────────────────────
 // Browser file utilities (replaces Google Drive API wrapper)
 // All storage is local: IndexedDB (runtime) + browser file download (export)
 //
 // Exports:
-//   downloadLocalBackup(appName, data)          — download JSON backup to browser Downloads
-//   saveFileToExports(appName, filename, text)  — download any text/JSON file
-//   saveXLSXToExports(appName, filename, wb)    — download XLSX workbook
-//   restoreFromLocalFile(file, appName)         — restore IndexedDB from picked .json file
-//   timestampSuffix()                           — "YYYY-MM-DD_HH-MM" string
+//   downloadLocalBackup(appName, data)                     — download JSON backup to browser Downloads
+//   saveFileToExports(appName, filename, text)             — download any text/JSON file
+//   saveXLSXToExports(appName, filename, wb)               — download XLSX workbook
+//   restoreFromLocalFile(file, appName, strategy?)         — restore IndexedDB from picked file
+//     strategy: 'merge' | 'append' | 'wipe' (default 'wipe')
+//   timestampSuffix()                                      — "YYYY-MM-DD_HH-MM" string
 
 'use strict';
 
-import { setCachedTravelData, setCachedFinanceData } from './db.js';
+import { getCachedTravelData, setCachedTravelData, getCachedFinanceData, setCachedFinanceData } from './db.js';
+import { applyMergeStrategy } from './restore-dialog.js';
 
 // ── Timestamp helper ──────────────────────────────────────────────────────────
 export function timestampSuffix() {
@@ -53,19 +55,32 @@ export function saveXLSXToExports(appName, filename, workbook) {
 }
 
 // ── Restore from local file (file picker result) ──────────────────────────────
-export async function restoreFromLocalFile(file, appName) {
+// strategy: 'merge' | 'append' | 'wipe'  (default: 'wipe' for backward compat)
+export async function restoreFromLocalFile(file, appName, strategy = 'wipe') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target.result);
-        if (!data.schemaVersion) throw new Error('Invalid backup file — missing schemaVersion');
-        if (appName === 'travel') {
-          await setCachedTravelData(data);
+        const incomingData = JSON.parse(e.target.result);
+        if (!incomingData.schemaVersion) throw new Error('Invalid backup file — missing schemaVersion');
+
+        let finalData;
+        if (strategy === 'wipe') {
+          finalData = incomingData;
         } else {
-          await setCachedFinanceData(data);
+          // Load current data for merge/append
+          const currentData = appName === 'travel'
+            ? (await getCachedTravelData() || {})
+            : (await getCachedFinanceData() || {});
+          finalData = applyMergeStrategy(strategy, currentData, incomingData, appName);
         }
-        resolve(data);
+
+        if (appName === 'travel') {
+          await setCachedTravelData(finalData);
+        } else {
+          await setCachedFinanceData(finalData);
+        }
+        resolve(finalData);
       } catch (err) {
         reject(err);
       }

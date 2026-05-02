@@ -205,9 +205,16 @@
     document.getElementById('import-file').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      e.target.value = '';
       try {
+        const { showRestoreDialog } = await import('../shared/restore-dialog.js');
+        const strategy = await showRestoreDialog({
+          title: 'How should the backup be loaded?',
+          source: file.name,
+        });
+        if (!strategy) return;
         const { restoreFromLocalFile } = await import('../shared/drive.js');
-        await restoreFromLocalFile(file, 'finance');
+        await restoreFromLocalFile(file, 'finance', strategy);
         showToast('✅ Data restored!', 'success');
         setTimeout(() => { window.location.reload(); }, 800);
       } catch (err) {
@@ -266,10 +273,17 @@
     document.getElementById('forgot-import').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      e.target.value = '';
       const status = document.getElementById('forgot-status');
       try {
+        const { showRestoreDialog } = await import('../shared/restore-dialog.js');
+        const strategy = await showRestoreDialog({
+          title: 'How should the backup be loaded?',
+          source: file.name,
+        });
+        if (!strategy) return;
         const { restoreFromLocalFile } = await import('../shared/drive.js');
-        await restoreFromLocalFile(file, 'finance');
+        await restoreFromLocalFile(file, 'finance', strategy);
         // Clear PIN so setup screen shows
         localStorage.removeItem('vault_pin_hash');
         localStorage.removeItem('vault_pin_salt');

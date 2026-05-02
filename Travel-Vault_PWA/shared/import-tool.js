@@ -1,4 +1,4 @@
-// v3.5.44 — 2026-03-31
+// v4.1.0 — 2026-05-02 — Import preview now shows 3-option restore dialog
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -7,6 +7,7 @@
 'use strict';
 
 import { uuidv4 } from './utils.js';
+import { showRestoreDialog } from './restore-dialog.js';
 
 export const TRAVEL_COLUMNS = [
   { key: 'personName',    label: 'Name of Person',            required: true  },
@@ -140,13 +141,21 @@ export function renderImportTool(container, { appType, existingData, onImportCom
             ${parsedRows.slice(0,10).map(r => `<tr>${COLUMNS.map(c=>`<td style="border:1px solid var(--border);padding:4px;">${r[c.key]}</td>`).join('')}</tr>`).join('')}
           </table>
         </div>
-        <button class="btn btn-primary btn-full" id="import-all-btn" style="margin-top:20px;">Import All Records</button>
+        ${parsedRows.length > 10 ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Showing first 10 of ${parsedRows.length} rows</div>` : ''}
+        <button class="btn btn-primary btn-full" id="import-all-btn" style="margin-top:20px;">Import ${parsedRows.length} Records →</button>
       </div>
     `;
     container.querySelector('#import-all-btn').onclick = async () => {
-      container.querySelector('#import-all-btn').disabled = true;
-      container.querySelector('#import-all-btn').textContent = 'Processing…';
-      await onImportComplete(parsedRows, () => {});
+      const btn = container.querySelector('#import-all-btn');
+      // Show 3-option restore dialog
+      const strategy = await showRestoreDialog({
+        title: 'How should these records be imported?',
+        source: `${parsedRows.length} ${appType === 'travel' ? 'trip' : 'finance'} rows from file`,
+      });
+      if (!strategy) return; // user cancelled
+      btn.disabled = true;
+      btn.textContent = 'Processing…';
+      await onImportComplete(parsedRows, () => {}, strategy);
       step = 'done'; render();
     };
   }
