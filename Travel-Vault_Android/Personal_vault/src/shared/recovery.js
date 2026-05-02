@@ -1,14 +1,12 @@
-// v4.8.0 — 2026-04-04
+// v4.8.1 — 2026-05-02 — runRestoreWizard: replaced nuclear-reset with 3-option dialog; removed Drive/auth remnants
 // ─── shared/recovery.js ──────────────────────────────────────────────────────
-// High-security backup and restoration engine for Standalone/Bunker mode
+// Backup and restoration engine for Personal Vault APK
 
 'use strict';
 
-import { showConfirmModal, showInputModal, showToast, isOnline, uuidv4 } from './utils.js';
+import { showToast } from './utils.js';
 import { getCachedTravelData, getCachedFinanceData, setCachedTravelData, setCachedFinanceData } from './db.js';
-import { localSave } from './sync-manager.js';
-// Local stubs
-function clearAuth() { return Promise.resolve(); }
+import { showRestoreDialog, applyMergeStrategy } from './restore-dialog.js';
 
 const JSZIP_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 
@@ -119,62 +117,49 @@ async function fetchAppManifest(appName) {
 /**
  * High-Security Restoration Wizard
  */
+/**
+ * Run restore wizard with 3-option dialog (merge / append / wipe).
+ * @param {'travel'|'vault'|'finance'} appName
+ * @param {File} file
+ */
 export async function runRestoreWizard(appName, file) {
+  if (!file) return;
+  // Normalise appName — settings.js calls with 'vault', db uses 'finance'
+  const dbApp = (appName === 'vault') ? 'finance' : appName;
   try {
-    const text = await file.text();
-    const backup = JSON.parse(text);
-    
-    // 1. Validity Check
-    if (!backup.lastModifiedLocal && !backup.timestamp) {
-       throw new Error('Invalid backup file: Missing metadata.');
+    const text         = await file.text();
+    const incomingData = JSON.parse(text);
+
+    if (!incomingData.schemaVersion && !incomingData.lastModifiedLocal && !incomingData.timestamp) {
+      throw new Error('Invalid backup file — missing schemaVersion or metadata');
     }
 
-    // 2. Timestamp Audit
-    const local = appName === 'travel' ? await getCachedTravelData() : await getCachedFinanceData();
-    const bUpdate = new Date(backup.lastModifiedLocal || backup.timestamp || 0);
-    const lUpdate = new Date(local?.lastModifiedLocal || local?.timestamp || 0);
+    // Show 3-option dialog
+    const strategy = await showRestoreDialog({
+      title: 'How should the backup be loaded?',
+      source: file.name,
+    });
+    if (!strategy) return; // user cancelled
 
-    if (bUpdate < lUpdate) {
-      const diffDays = Math.ceil((lUpdate - bUpdate) / (1000 * 60 * 60 * 24));
-      const ok = await showConfirmModal(
-        '⚠️ Restoring OLDER Data',
-        `This backup is <b>${diffDays} days OLDER</b> than the data currently on your device. Continuing will permanently roll back your history.`,
-        { danger: true, confirmText: 'I Understand, Proceed' }
-      );
-      if (!ok) return;
+    showToast('Restoring…', 'info', 2000);
+
+    let finalData;
+    if (strategy === 'wipe') {
+      finalData = incomingData;
+    } else {
+      const currentData = dbApp === 'travel'
+        ? (await getCachedTravelData()  || {})
+        : (await getCachedFinanceData() || {});
+      finalData = applyMergeStrategy(strategy, currentData, incomingData, dbApp);
     }
 
-    // 3. Handshake Verification Code
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    const code = chars[Math.floor(Math.random()*chars.length)] + chars[Math.floor(Math.random()*chars.length)];
-    
-    const input = await showInputModal(
-      'Security Handshake',
-      `Type <b>"${code}"</b> to confirm the data injection and nuclear reset:`,
-      '',
-      { placeholder: 'Enter code' }
-    );
+    if (dbApp === 'travel') await setCachedTravelData(finalData);
+    else                    await setCachedFinanceData(finalData);
 
-    if (input?.toUpperCase() !== code) {
-      if (input !== null) showToast('Verification failed.', 'warning');
-      return;
-    }
-
-    // 4. Data Injection
-    showToast('Injecting data...', 'info');
-    if (appName === 'travel') await setCachedTravelData(backup);
-    else await setCachedFinanceData(backup);
-
-    // 5. Nuclear Reset: Clear credentials and force login to re-establish Drive link
-    await showConfirmModal(
-      'Restore Successful',
-      'Data has been injected. The app will now log you out to re-establish a secure connection with your Google Drive.',
-      { confirmText: 'Finish & Logout', cancelText: '' }
-    );
-
-    clearAuth();
-    window.location.reload();
+    const label = strategy === 'wipe' ? 'Wiped & replaced' : strategy === 'append' ? 'Appended' : 'Merged';
+    showToast('✅ ' + label + ' successfully! Reloading…', 'success', 3000);
+    setTimeout(() => window.location.reload(), 1200);
   } catch (err) {
-    showToast('Restore Failed: ' + err.message, 'error');
+    showToast('Restore failed: ' + err.message, 'error', 5000);
   }
 }

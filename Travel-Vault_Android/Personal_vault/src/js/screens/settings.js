@@ -1,4 +1,4 @@
-// v4.11.0 — 2026-04-04 — 16:58
+// v4.12.0 — 2026-05-02 — 3-option restore dialog on all restore/import paths
 
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
@@ -655,20 +655,19 @@ export async function renderSettings(container, params = {}) {
     renderImportTool(toolContainer, {
       appType: 'finance',
       existingData: { transactions: existingTransactions },
-      onImportComplete: async (records, progressCb) => {
+      onImportComplete: async (records, progressCb, strategy = 'merge') => {
         let imported = 0, skipped = 0;
 
-        // Build a dedup key set from existing transactions
-        const existingKeys = new Set(
-          existingTransactions.map(t => `${t.date}|${t.description}|${t.amountSpend}|${t.income}`)
-        );
-
         const newData = await localSave('finance', (remote) => {
-          const txns = remote.transactions || [];
+          const txns = strategy === 'wipe' ? [] : [...(remote.transactions || [])];
+
+          const existingKeys = (strategy === 'merge')
+            ? new Set(txns.map(t => `${t.date}|${(t.description||'').toLowerCase().trim()}|${t.amountSpend||''}|${t.income||''}`))
+            : new Set();
 
           records.forEach(rec => {
-            const key = `${rec.date}|${rec.description}|${rec.amountSpend}|${rec.income}`;
-            if (existingKeys.has(key)) { skipped++; return; }
+            const key = `${rec.date}|${(rec.description||'').toLowerCase().trim()}|${rec.amountSpend||''}|${rec.income||''}`;
+            if (strategy === 'merge' && existingKeys.has(key)) { skipped++; return; }
             txns.push(rec);
             existingKeys.add(key);
             imported++;

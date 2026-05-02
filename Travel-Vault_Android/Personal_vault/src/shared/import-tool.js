@@ -1,4 +1,4 @@
-// v3.5.45 — 2026-04-24
+// v3.5.46 — 2026-05-02 — Import preview shows 3-option restore dialog before processing
 
 // ─── shared/import-tool.js ───────────────────────────────────────────────────
 // CSV / Excel import tool -- used by both App A (travel) and App B (finance)
@@ -7,6 +7,7 @@
 'use strict';
 
 import { uuidv4 } from './utils.js';
+import { showRestoreDialog } from './restore-dialog.js';
 
 export const TRAVEL_COLUMNS = [
   { key: 'personName',    label: 'Name of Person',            required: true  },
@@ -184,11 +185,17 @@ export function renderImportTool(container, { appType, existingData, onImportCom
 
     const btn = document.getElementById('import-all-btn');
     btn.onclick = async () => {
+      // Show 3-option restore dialog before processing
+      const strategy = await showRestoreDialog({
+        title: 'How should these records be imported?',
+        source: `${parsedRows.length} ${appType === 'travel' ? 'trip' : 'finance'} rows from file`,
+      });
+      if (!strategy) return; // user cancelled
       btn.disabled = true;
       btn.textContent = '⏳ Processing…';
       errEl.style.display = 'none';
       try {
-        await onImportComplete(parsedRows, () => {});
+        await onImportComplete(parsedRows, () => {}, strategy);
         if (actionBar) actionBar.innerHTML = ''; // clear external bar
         step = 'done'; render();
       } catch (err) {
