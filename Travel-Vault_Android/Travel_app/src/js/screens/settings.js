@@ -1,4 +1,4 @@
-// v4.11.1 — 2026-04-04 — 17:51
+// v4.12.0 — 2026-05-06 — Sync folder restore: 3-option merge dialog
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -11,6 +11,7 @@ import { isAdmin, renderAccessControl } from '../roles.js';
 import { uuidv4, formatDisplayDate, showToast, toISODate, showConfirmModal, showInputModal } from '../../shared/utils.js';
 import { renderImportTool } from '../../shared/import-tool.js';
 import { downloadLocalBackup, restoreFromLocalFile, hasPublicStorageAccess, requestPublicStorage, syncFolderWrite, syncFolderRestore } from '../../shared/drive.js';
+import { showRestoreDialog } from '../../shared/restore-dialog.js';
 import { openPersonManage } from './person-manage.js';
 import { exitApp } from '../../shared/app-utils.js';
 import { exportEncryptedBackup, importEncryptedBackup } from '../../shared/backup-engine.js';
@@ -394,11 +395,17 @@ function renderDataTab(data, members, container) {
     });
 
     document.getElementById('sync-restore-btn')?.addEventListener('click', async () => {
-      if (!confirm('Restore from sync_folder? This will overwrite current data with the latest synced version.')) return;
+      // Show 3-option dialog before loading — same pattern as file restore
+      const strategy = await showRestoreDialog({
+        title: 'How should the sync backup be loaded?',
+        source: 'TravelHub_latest.json (sync folder)',
+      });
+      if (!strategy) return; // user cancelled
       try {
         showToast('Restoring from sync folder…', 'info', 2000);
-        await syncFolderRestore('travel');
-        showToast('✅ Restored! Reloading…', 'success');
+        await syncFolderRestore('travel', strategy);
+        const label = strategy === 'wipe' ? 'Wiped & replaced' : strategy === 'append' ? 'Appended' : 'Merged';
+        showToast('✅ ' + label + ' successfully! Reloading…', 'success', 3000);
         setTimeout(() => window.location.reload(), 1200);
       } catch (err) {
         showToast('Restore failed: ' + err.message, 'error');

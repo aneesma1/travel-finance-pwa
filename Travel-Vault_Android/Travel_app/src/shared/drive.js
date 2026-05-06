@@ -1,4 +1,4 @@
-// v5.6.0 — 2026-04-28 — Sync folder: public Documents via EXTERNAL_STORAGE when permission granted
+// v5.7.0 — 2026-05-06 — syncFolderRestore: 3-option strategy (merge/append/wipe)
 
 // ─── shared/drive.js ─────────────────────────────────────────────────────────
 // Device Storage Utilities (formerly Google Drive wrapper — Drive removed in Blueprint V2)
@@ -6,7 +6,7 @@
 //   hasPublicStorageAccess()  — check if MANAGE_EXTERNAL_STORAGE is granted
 //   requestPublicStorage()    — open system prompt to grant All Files Access
 //   syncFolderWrite(appName, data)    — write _latest.json + dated snapshot to sync_folder/
-//   syncFolderRestore(appName)        — restore IndexedDB from sync_folder/_latest.json
+//   syncFolderRestore(appName, strategy) — restore IndexedDB from sync_folder/_latest.json (merge/append/wipe)
 //   downloadLocalBackup()  — manual JSON backup to <AppFolder>/exports/
 //   saveXLSXToExports()    — save XLSX workbook to <AppFolder>/exports/
 //   saveFileToExports()    — save any text/binary file to <AppFolder>/exports/
@@ -15,7 +15,8 @@
 
 'use strict';
 
-import { setCachedTravelData, setCachedFinanceData } from './db.js';
+import { getCachedTravelData, getCachedFinanceData, setCachedTravelData, setCachedFinanceData } from './db.js';
+import { applyMergeStrategy } from './restore-dialog.js';
 
 // ── Storage directory constants ───────────────────────────────────────────────
 // DIR_PUBLIC  → /storage/emulated/0/  (root of external storage — visible in Files)
@@ -142,8 +143,9 @@ export async function syncFolderWrite(appName, data) {
 
 // ── Sync folder — restore ─────────────────────────────────────────────────────
 // Reads <root>/sync_folder/<AppName>_latest.json and restores IndexedDB.
-// Returns the restored data object on success, throws on failure.
-export async function syncFolderRestore(appName) {
+// strategy: 'wipe' (default) | 'merge' | 'append'
+// Returns the final saved data object on success, throws on failure.
+export async function syncFolderRestore(appName, strategy = 'wipe') {
   if (!window.Capacitor?.Plugins?.Filesystem) throw new Error('Filesystem not available');
   const { Filesystem } = window.Capacitor.Plugins;
 
@@ -157,18 +159,28 @@ export async function syncFolderRestore(appName) {
     encoding:  'utf8',
   });
 
-  const raw  = typeof result.data === 'string' ? result.data : new TextDecoder().decode(result.data);
-  const data = JSON.parse(raw);
+  const raw          = typeof result.data === 'string' ? result.data : new TextDecoder().decode(result.data);
+  const incomingData = JSON.parse(raw);
 
-  if (!data.schemaVersion) throw new Error('Invalid sync file — missing schemaVersion');
+  if (!incomingData.schemaVersion) throw new Error('Invalid sync file — missing schemaVersion');
 
-  if (appName === 'travel') {
-    await setCachedTravelData(data);
+  let finalData;
+  if (strategy === 'wipe') {
+    finalData = incomingData;
   } else {
-    await setCachedFinanceData(data);
+    const currentData = appName === 'travel'
+      ? (await getCachedTravelData()  || {})
+      : (await getCachedFinanceData() || {});
+    finalData = applyMergeStrategy(strategy, currentData, incomingData, appName);
   }
 
-  return data;
+  if (appName === 'travel') {
+    await setCachedTravelData(finalData);
+  } else {
+    await setCachedFinanceData(finalData);
+  }
+
+  return finalData;
 }
 
 // ── Manual JSON backup to device ─────────────────────────────────────────────
