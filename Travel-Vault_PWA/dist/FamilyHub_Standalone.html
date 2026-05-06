@@ -19,9 +19,9 @@
 
   <title>Family Hub</title>
 
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <!-- manifest/icon link removed: not usable in standalone file:// mode -->
+  <!-- manifest/icon link removed: not usable in standalone file:// mode -->
+  <!-- manifest/icon link removed: not usable in standalone file:// mode -->
   <style>
 /* v3.5.5 — 2026-03-22 */
 /* v3.5.4 — 2026-03-22 */
@@ -1033,7 +1033,7 @@ function showToast(message, type = 'info', duration = 3000) {
   document.getElementById('standalone-deep-clean-btn')?.addEventListener('click', async () => {
     if (!confirm('Are you sure you want to perform a DEEP CLEAN of your Vault Drive? This will trash both root clutter and backups for deleted transactions.')) return;
     showToast('Scanning & Purging…', 'info');
-    const { purgeOrphanedFiles } = await import('../../shared/drive.js');
+    const { purgeOrphanedFiles } = await Promise.resolve(window.__modReg['D:/Drive_F/Documents/files backup/Document files/MY_SOFTWARES/Antigravity/travel-finance-pwa/shared/drive.js'] || window.__modReg['D:/Drive_F/Documents/files backup/Document files/MY_SOFTWARES/Antigravity/travel-finance-pwa/shared/drive.js'] || {});
     const count = await purgeOrphanedFiles('finance', data);
     showToast(`Cleaned ${count} orphaned files`, 'success');
   });
@@ -5337,7 +5337,7 @@ async function renderAddTrip(container, params = {}) {
     if (navigator.share) {
       await navigator.share({ title: `Travel Details - ${member?.name}`, text }).catch(() => {});
     } else {
-      const { copyToClipboard } = await import('../../../shared/utils.js');
+      const { copyToClipboard } = await Promise.resolve(window.__modReg['shared/utils.js'] || window.__modReg['D:/Drive_F/Documents/files backup/Document files/MY_SOFTWARES/Antigravity/travel-finance-pwa/Travel-Vault_PWA/shared/utils.js'] || {});
       const ok = await copyToClipboard(text);
       showToast(ok ? 'Details copied to clipboard!' : 'Failed to copy', ok ? 'success' : 'error');
     }
@@ -8673,7 +8673,7 @@ async function renderPersonProfile(container, params = {}) {
 
   // ── Share profile as WhatsApp text ──────────────────────────────────────────
   async function shareProfileText() {
-    const data2 = await import('../../../shared/db.js').then(m => m.getCachedTravelData());
+    const data2 = await Promise.resolve(window.__modReg['shared/db.js'] || window.__modReg['D:/Drive_F/Documents/files backup/Document files/MY_SOFTWARES/Antigravity/travel-finance-pwa/Travel-Vault_PWA/shared/db.js'] || {}).then(m => m.getCachedTravelData());
     const docs = (data2?.documents || []).filter(d => d.personId === draft.id);
     const trips = (data2?.trips || []).filter(t => t.personId === draft.id);
     const totalDays = trips.reduce((s, t) => s + (t.daysInQatar || 0), 0);
@@ -8725,7 +8725,7 @@ async function renderPersonProfile(container, params = {}) {
     lines.push('_Shared from Family Hub_');
 
     const text = lines.join('\n');
-    const { copyToClipboard } = await import('../../../shared/utils.js');
+    const { copyToClipboard } = await Promise.resolve(window.__modReg['shared/utils.js'] || window.__modReg['D:/Drive_F/Documents/files backup/Document files/MY_SOFTWARES/Antigravity/travel-finance-pwa/Travel-Vault_PWA/shared/utils.js'] || {});
     showTextShareSheet(text, draft.name + ' Profile');
   }
 
@@ -10996,7 +10996,7 @@ function showExpiryBanner(urgent) {
   document.getElementById('expiry-banner-view').addEventListener('click', () => {
     banner.remove();
     // Navigate to documents -- import navigate dynamically to avoid circular dep
-    import('./router.js').then(m => m.navigate('documents'));
+    Promise.resolve(window.__modReg['app-a-family-hub/js/router.js'] || window.__modReg['D:/Drive_F/Documents/files backup/Document files/MY_SOFTWARES/Antigravity/travel-finance-pwa/Travel-Vault_PWA/app-a-family-hub/js/router.js'] || {}).then(m => m.navigate('documents'));
   });
 
   document.getElementById('expiry-banner-close').addEventListener('click', () => banner.remove());

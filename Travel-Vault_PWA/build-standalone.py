@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-build-standalone.py — Travel-Vault_PWA Standalone Bundler v4.2.0
+build-standalone.py — Travel-Vault_PWA Standalone Bundler v4.2.1
 =================================================================
 Creates single-file HTML from ES module apps so they can be
 opened by double-clicking on PC (file:// protocol, no server needed).
@@ -100,6 +100,12 @@ RE_CSS_LINK_HREF_FIRST = re.compile(
 # CSP meta tag
 RE_CSP_META = re.compile(
     r"""<meta\s[^>]*http-equiv=['"]Content-Security-Policy['"][^>]*/?>""",
+    re.IGNORECASE
+)
+
+# <link> tags that don't work on file:// (manifest, icons)
+RE_LINK_MANIFEST = re.compile(
+    r"""<link\s[^>]*rel=['"](?:manifest|icon|apple-touch-icon|shortcut icon)['"][^>]*/?>""",
     re.IGNORECASE
 )
 
@@ -210,16 +216,34 @@ def process_module(abs_path: Path) -> str:
     # 6. Remove import lines (dependencies already in window.* from prior IIFEs)
     code = RE_IMPORT_LINE.sub('', code)
 
-    # 7. Clean up excess blank lines (cosmetic)
+    # 7. Replace any remaining dynamic import() calls inside the module body
+    #    e.g. await import('../../shared/drive.js')  →  Promise.resolve(window.__modReg[key])
+    def replace_dyn_in_module(m):
+        spec = m.group(1)
+        dep  = resolve_dep(spec, abs_path)
+        if dep:
+            key = path_key(dep)
+            # Also compute repo-relative key (registered as alias in __modReg)
+            try:
+                rel_key = str(dep.relative_to(REPO_BASE)).replace('\\', '/')
+            except ValueError:
+                rel_key = key
+            # Return an object with the same shape as the real module's __modReg entry
+            return f"Promise.resolve(window.__modReg['{rel_key}'] || window.__modReg['{key}'] || {{}})"
+        return f"Promise.resolve(window.__modReg['{spec}'] || {{}})"
+
+    code = RE_DYNAMIC_IMPORT.sub(replace_dyn_in_module, code)
+
+    # 8. Clean up excess blank lines (cosmetic)
     code = re.sub(r'\n{4,}', '\n\n', code.strip())
 
-    # 8. Build window assignments for exported names
+    # 9. Build window assignments for exported names
     win_assigns = '\n'.join(
         f"  if (typeof {n} !== 'undefined') window['{n}'] = {n};"
         for n in exported
     )
 
-    # 9. Build module registry entry
+    # 10. Build module registry entry
     if exported:
         props = ', '.join(f"'{n}': window['{n}']" for n in exported)
         reg_entry = (
@@ -324,13 +348,22 @@ def bundle_app(name: str, dir_name: str, out_rel: str):
     order   = []
     visited = {}
 
-    # Seed from all import lines in the inline script
+    # Seed from all static import lines in the inline script
     for m in re.finditer(r"""^[ \t]*import\s+(?:[^;'"]*?from\s+)?['"]([^'"]+)['"]""",
                          script_src, re.MULTILINE):
         spec = m.group(1)
         dep  = resolve_dep(spec, entry_html)
         if dep and dep.exists():
             collect_modules(dep, visited, order)
+
+    # Seed from dynamic import() calls in the inline script
+    # e.g. import('./js/screens/pin-lock.js').then(m => m.renderPinSetup(...))
+    for m in RE_DYNAMIC_IMPORT.finditer(script_src):
+        spec = m.group(1)
+        dep  = resolve_dep(spec, entry_html)
+        if dep and dep.exists():
+            collect_modules(dep, visited, order)
+            print(f'    [dynamic] {dep.relative_to(REPO_BASE)}')
 
     print(f'  Modules ({len(order)}):')
     for p in order:
@@ -366,6 +399,12 @@ def bundle_app(name: str, dir_name: str, out_rel: str):
     # ── Remove CSP meta (blocks inline scripts under file://) ───────────────
     html = RE_CSP_META.sub(
         '<!-- CSP removed: standalone file:// mode does not support strict CSP -->',
+        html
+    )
+
+    # ── Remove manifest / icon links (can't load from file://, causes CORS noise) ──
+    html = RE_LINK_MANIFEST.sub(
+        '<!-- manifest/icon link removed: not usable in standalone file:// mode -->',
         html
     )
 
