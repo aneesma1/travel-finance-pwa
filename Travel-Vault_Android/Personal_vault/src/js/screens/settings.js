@@ -1,4 +1,4 @@
-// v4.12.0 — 2026-05-02 — 3-option restore dialog on all restore/import paths
+// v4.13.0 — 2026-05-06 — Sync folder restore: 3-option merge dialog
 
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: export xlsx+email, change PIN, backup/restore, categories, sign-out
@@ -20,6 +20,7 @@ import { renderImportTool } from '../../shared/import-tool.js';
 import { openCategoryManager } from '../modals/category-manager.js';
 import { downloadRecoveryBundle, runRestoreWizard } from '../../shared/recovery.js';
 import { exportEncryptedBackup, importEncryptedBackup } from '../../shared/backup-engine.js';
+import { showRestoreDialog } from '../../shared/restore-dialog.js';
 import { exitApp } from '../../shared/app-utils.js';
 
 const CACHE_NAME = 'vault v4.11.0';
@@ -290,11 +291,17 @@ export async function renderSettings(container, params = {}) {
       });
 
       document.getElementById('sync-restore-btn')?.addEventListener('click', async () => {
-        if (!confirm('Restore from sync_folder? This will overwrite current data with the latest synced version.')) return;
+        // Show 3-option dialog before loading — same pattern as file restore
+        const strategy = await showRestoreDialog({
+          title: 'How should the sync backup be loaded?',
+          source: 'PersonalVault_latest.json (sync folder)',
+        });
+        if (!strategy) return; // user cancelled
         try {
           showToast('Restoring from sync folder…', 'info', 2000);
-          await syncFolderRestore('finance');
-          showToast('✅ Restored! Reloading…', 'success');
+          await syncFolderRestore('finance', strategy);
+          const label = strategy === 'wipe' ? 'Wiped & replaced' : strategy === 'append' ? 'Appended' : 'Merged';
+          showToast('✅ ' + label + ' successfully! Reloading…', 'success', 3000);
           setTimeout(() => window.location.reload(), 1200);
         } catch (err) {
           showToast('Restore failed: ' + err.message, 'error');

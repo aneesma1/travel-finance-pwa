@@ -1,4 +1,4 @@
-// v3.5.8 — 2026-04-29 — Share image via Capacitor Share plugin (reliable on Android WebView)
+// v3.5.9 — 2026-05-06 — Save image to Documents/share_images/ (root-level, easy to find)
 
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
@@ -611,18 +611,30 @@ export async function renderDashboard(container) {
     });
 
     document.getElementById('img-save-btn').addEventListener('click', async () => {
-      // Save to Documents/TravelHub/exports/ via Capacitor Filesystem (visible in Files app)
+      // Save to Documents/share_images/ — root-level public folder, easy to find in Files app
       const FS = window.Capacitor?.Plugins?.Filesystem;
       if (FS) {
         try {
           const base64 = await _blobToBase64(blob);
-          const { saveFileToExports } = await import('../../shared/drive.js');
-          const savedPath = await saveFileToExports('travel', filename, base64);
-          showToast('Saved to ' + savedPath, 'success', 5000);
-          close(); return;
-        } catch (e) { /* fall through */ }
+          // Try public external storage first (requires All Files Access permission)
+          // Falls back to app-private DOCUMENTS if permission not granted.
+          let saved = false;
+          for (const dir of ['EXTERNAL_STORAGE', 'DOCUMENTS']) {
+            try {
+              await FS.mkdir({ path: 'Documents/share_images', directory: dir, recursive: true }).catch(() => {});
+              await FS.writeFile({ path: `Documents/share_images/${filename}`, data: base64, directory: dir });
+              const displayPath = dir === 'EXTERNAL_STORAGE'
+                ? `/storage/emulated/0/Documents/share_images/${filename}`
+                : `Documents/share_images/${filename}`;
+              showToast('💾 Saved → ' + displayPath, 'success', 5000);
+              saved = true;
+              break;
+            } catch (_) { /* try next */ }
+          }
+          if (saved) { close(); return; }
+        } catch (e) { /* fall through to web fallback */ }
       }
-      // Fallback
+      // Web / PWA fallback
       const a = document.createElement('a');
       a.href = url; a.download = filename; a.click();
       showToast('Image saved to Downloads', 'success');
