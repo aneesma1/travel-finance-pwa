@@ -1,4 +1,4 @@
-// v3.5.7 — 2026-05-09 — Contact picker: use @capacitor/contacts native plugin with in-app search
+// v3.5.8 — 2026-05-09 — Fix contacts package: use @capacitor-community/contacts (not @capacitor/contacts)
 
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
 // Family Defaults -- shared Qatar/India addresses, shared emergency contacts,
@@ -878,7 +878,7 @@ function esc(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── In-app contact picker modal (used when @capacitor/contacts returns all contacts) ──
+// ── In-app contact picker modal (used when @capacitor-community/contacts returns all contacts) ──
 function _showContactPickerModal(contacts, onPick) {
   document.getElementById('_cap-contact-picker')?.remove();
 
