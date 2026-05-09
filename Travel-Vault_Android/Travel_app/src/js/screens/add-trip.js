@@ -1,4 +1,4 @@
-// v3.5.30 — 2026-03-31
+// v3.5.31 — 2026-05-09 — Share card: fix Directory.Cache crash; save card to Documents/share_images/
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
@@ -306,10 +306,12 @@ export async function renderAddTrip(container, params = {}) {
         const filename = `TripCard_${pName.replace(/\s+/g,'_')}_${today()}.jpg`;
 
         if (window.Capacitor?.Plugins?.Filesystem && window.Capacitor?.Plugins?.Share) {
-          const { Filesystem, Directory, Share } = window.Capacitor.Plugins;
-          await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
-          const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
+          const { Filesystem, Share } = window.Capacitor.Plugins;
+          // 'CACHE' string — Directory enum is NOT on Plugins, use string constants
+          await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+          const { uri } = await Filesystem.getUri({ path: filename, directory: 'CACHE' });
           await Share.share({ title: `Trip Card – ${pName}`, files: [uri], dialogTitle: 'Share Trip Card' });
+          await Filesystem.deleteFile({ path: filename, directory: 'CACHE' }).catch(() => {});
         } else {
           // Web fallback — download
           const a = document.createElement('a');
@@ -319,7 +321,7 @@ export async function renderAddTrip(container, params = {}) {
       } catch (err) { showToast('Share failed: ' + err.message, 'error'); }
     });
 
-    // Option 3: Save JPG locally to Documents/TravelHub/exports/
+    // Option 3: Save JPG to Documents/share_images/ (same root folder as dashboard images)
     sheet.querySelector('#share-opt-save').addEventListener('click', async () => {
       sheet.remove();
       try {
@@ -327,13 +329,22 @@ export async function renderAddTrip(container, params = {}) {
         const dataUrl = buildTripCardDataURL();
         const base64  = dataUrl.split(',')[1];
         const filename = `TripCard_${pName.replace(/\s+/g,'_')}_${today()}.jpg`;
-        const saveDir  = 'TravelHub/exports';
 
         if (window.Capacitor?.Plugins?.Filesystem) {
-          const { Filesystem, Directory } = window.Capacitor.Plugins;
-          await Filesystem.mkdir({ path: saveDir, directory: Directory.Documents, recursive: true }).catch(() => {});
-          await Filesystem.writeFile({ path: `${saveDir}/${filename}`, data: base64, directory: Directory.Documents });
-          showToast(`✅ Saved to Documents/${saveDir}/`, 'success', 3500);
+          const { Filesystem } = window.Capacitor.Plugins;
+          let saved = false;
+          for (const dir of ['EXTERNAL_STORAGE', 'DOCUMENTS']) {
+            try {
+              await Filesystem.mkdir({ path: 'Documents/share_images', directory: dir, recursive: true }).catch(() => {});
+              await Filesystem.writeFile({ path: `Documents/share_images/${filename}`, data: base64, directory: dir });
+              const displayPath = dir === 'EXTERNAL_STORAGE'
+                ? `/storage/emulated/0/Documents/share_images/${filename}`
+                : `Documents/share_images/${filename}`;
+              showToast('💾 Saved → ' + displayPath, 'success', 5000);
+              saved = true; break;
+            } catch (_) { /* try next */ }
+          }
+          if (!saved) throw new Error('Could not write to device storage');
         } else {
           const a = document.createElement('a');
           a.href = dataUrl; a.download = filename; a.click();

@@ -1,4 +1,4 @@
-// v3.7.2 — 2026-04-27 — Passenger filter primary-only + share image canShare bypass
+// v3.7.3 — 2026-05-09 — Summary share/save: Capacitor Share plugin + Documents/share_images/
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: Dual-tab architecture (Trip Log & Passenger Summary)
@@ -889,48 +889,70 @@ export async function renderTravelLog(container, params = {}) {
       });
     }
 
-    // ── Save Image (download to device) ──
+    // ── Save Image → Documents/share_images/ ──
     tabContent.querySelector('#sum-export-image').addEventListener('click', async () => {
       showToast('Generating image…', 'info');
       try {
         const blob  = await captureImageBlob();
         const fname = `Travel_Summary_${summaryState.selectedPassenger.replace(/ /g, '_')}_${Date.now()}.jpg`;
-        const url   = URL.createObjectURL(blob);
-        const a     = document.createElement('a');
-        a.href = url; a.download = fname; a.click();
-        URL.revokeObjectURL(url);
-        showToast('Image saved!', 'success');
+        const FS = window.Capacitor?.Plugins?.Filesystem;
+        if (FS) {
+          const reader = new FileReader();
+          const base64 = await new Promise(res => { reader.onloadend = () => res(reader.result.split(',')[1]); reader.readAsDataURL(blob); });
+          let saved = false;
+          for (const dir of ['EXTERNAL_STORAGE', 'DOCUMENTS']) {
+            try {
+              await FS.mkdir({ path: 'Documents/share_images', directory: dir, recursive: true }).catch(() => {});
+              await FS.writeFile({ path: `Documents/share_images/${fname}`, data: base64, directory: dir });
+              const displayPath = dir === 'EXTERNAL_STORAGE'
+                ? `/storage/emulated/0/Documents/share_images/${fname}`
+                : `Documents/share_images/${fname}`;
+              showToast('💾 Saved → ' + displayPath, 'success', 5000);
+              saved = true; break;
+            } catch (_) { /* try next */ }
+          }
+          if (!saved) throw new Error('Storage write failed');
+        } else {
+          // Web fallback
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = fname; a.click();
+          URL.revokeObjectURL(url);
+          showToast('Image saved!', 'success');
+        }
       } catch(err) {
         console.error(err);
-        showToast('Failed to create image', 'error');
+        showToast('Failed to save image', 'error');
       }
     });
 
-    // ── Share Image (navigator.share files → download fallback) ──
+    // ── Share Image → Capacitor Share plugin (reliable in Android WebView) ──
     tabContent.querySelector('#sum-share-img').addEventListener('click', async () => {
       showToast('Generating image…', 'info');
       try {
         const blob  = await captureImageBlob();
         const fname = `Travel_Summary_${summaryState.selectedPassenger.replace(/ /g, '_')}.jpg`;
-        const file  = new File([blob], fname, { type: 'image/jpeg' });
-        if (navigator.share) {
-          try {
-            await navigator.share({ files: [file], title: `Travel Summary: ${summaryState.selectedPassenger}` });
-            return;
-          } catch (e) {
-            if (e.name === 'AbortError') return;
-            // File share not supported on this device — fall through to download
-          }
+        const FS    = window.Capacitor?.Plugins?.Filesystem;
+        const SharePlugin = window.Capacitor?.Plugins?.Share;
+        if (FS && SharePlugin) {
+          const reader = new FileReader();
+          const base64 = await new Promise(res => { reader.onloadend = () => res(reader.result.split(',')[1]); reader.readAsDataURL(blob); });
+          await FS.writeFile({ path: fname, data: base64, directory: 'CACHE' });
+          const { uri } = await FS.getUri({ path: fname, directory: 'CACHE' });
+          await SharePlugin.share({ title: `Travel Summary: ${summaryState.selectedPassenger}`, files: [uri], dialogTitle: 'Share Summary' });
+          await FS.deleteFile({ path: fname, directory: 'CACHE' }).catch(() => {});
+        } else {
+          // Web fallback — save to browser download
+          const url = URL.createObjectURL(blob);
+          const a   = document.createElement('a');
+          a.href = url; a.download = fname; a.click();
+          URL.revokeObjectURL(url);
+          showToast('Image saved (no share API on this platform)', 'info');
         }
-        // Fallback: download
-        const url = URL.createObjectURL(blob);
-        const a   = document.createElement('a');
-        a.href = url; a.download = fname; a.click();
-        URL.revokeObjectURL(url);
-        showToast('Image downloaded', 'success');
       } catch(err) {
+        if (err?.name === 'AbortError' || String(err?.message).toLowerCase().includes('cancel')) return;
         console.error(err);
-        showToast('Failed to create image', 'error');
+        showToast('Share failed: ' + (err.message || err), 'error');
       }
     });
   }

@@ -1,4 +1,4 @@
-// v3.5.6 — 2026-05-02 — Contact picker: always shown, graceful fallback on API failure
+// v3.5.7 — 2026-05-09 — Contact picker: use @capacitor/contacts native plugin with in-app search
 
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
 // Family Defaults -- shared Qatar/India addresses, shared emergency contacts,
@@ -355,27 +355,40 @@ export async function renderFamilyDefaults(container) {
     document.getElementById('add-ec-btn').addEventListener('click', () => openECModal(null));
 
     document.getElementById('pick-contact-btn')?.addEventListener('click', async () => {
-      // Check API availability properly — presence check alone is unreliable on some WebViews
-      if (!('contacts' in navigator) || typeof navigator.contacts?.select !== 'function') {
+      const Contacts = window.Capacitor?.Plugins?.Contacts;
+      if (!Contacts) {
         showToast('Contact picker not available. Enter details manually.', 'info', 3500);
-        openECModal(null);
-        return;
+        openECModal(null); return;
       }
       try {
-        const props = ['name', 'tel'];
-        const opts  = { multiple: true };
-        const picked = await navigator.contacts.select(props, opts);
-        if (!picked || !picked.length) return;
-        // Pre-fill modal with picked contact — stored as LOCAL copy, does NOT modify device contact
-        picked.forEach(p => {
-          const name  = p.name?.[0] || '';
-          const phone = p.tel?.[0]  || '';
-          if (!name && !phone) return;
-          const prefill = { id: uuidv4(), name, phone, relationship: '', description: '', priority: draftContacts.length + 1 };
+        // Request permission first
+        const perm = await Contacts.requestPermissions();
+        if (perm?.contacts !== 'granted') {
+          showToast('Contacts permission denied. Enter details manually.', 'warning', 3500);
+          openECModal(null); return;
+        }
+        showToast('Loading contacts…', 'info', 1500);
+        const { contacts } = await Contacts.getContacts({
+          projection: { name: true, phones: true }
+        });
+        if (!contacts?.length) {
+          showToast('No contacts found. Enter details manually.', 'info', 3000);
+          openECModal(null); return;
+        }
+        // Show in-app searchable picker
+        _showContactPickerModal(contacts, (picked) => {
+          if (!picked) { openECModal(null); return; }
+          const prefill = {
+            id: uuidv4(),
+            name: picked.name?.display || picked.name?.given || '',
+            phone: picked.phones?.[0]?.number || '',
+            relationship: '', description: '',
+            priority: draftContacts.length + 1
+          };
           openECModal(prefill);
         });
       } catch (err) {
-        showToast('Contact picker unavailable. Enter details manually.', 'info', 3500);
+        showToast('Contact picker error. Enter details manually.', 'info', 3500);
         openECModal(null);
       }
     });
@@ -863,4 +876,72 @@ function generatePlusCode(lat, lng) {
 
 function esc(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── In-app contact picker modal (used when @capacitor/contacts returns all contacts) ──
+function _showContactPickerModal(contacts, onPick) {
+  document.getElementById('_cap-contact-picker')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = '_cap-contact-picker';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;';
+
+  overlay.innerHTML = `
+    <div style="width:100%;background:var(--surface);border-radius:20px 20px 0 0;
+      max-height:80vh;display:flex;flex-direction:column;padding-bottom:max(16px,env(safe-area-inset-bottom,16px));">
+      <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;"></div>
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+        <input id="_ccp-search" type="search" placeholder="Search contacts…"
+          style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;background:var(--bg);" />
+        <button id="_ccp-cancel" style="font-size:13px;color:var(--text-muted);background:none;border:none;padding:8px;cursor:pointer;">Cancel</button>
+      </div>
+      <div id="_ccp-list" style="overflow-y:auto;flex:1;padding:8px 0;"></div>
+    </div>
+  `;
+
+  const close = (picked) => { overlay.remove(); onPick(picked || null); };
+
+  // Render list helper
+  const sorted = [...contacts]
+    .filter(c => c.name?.display || c.name?.given || c.phones?.length)
+    .sort((a, b) => (a.name?.display || a.name?.given || '').localeCompare(b.name?.display || b.name?.given || ''));
+
+  function renderList(filter) {
+    const list = overlay.querySelector('#_ccp-list');
+    const q = filter.toLowerCase();
+    const filtered = sorted.filter(c => {
+      const name  = (c.name?.display || c.name?.given || '').toLowerCase();
+      const phone = (c.phones?.[0]?.number || '').toLowerCase();
+      return !q || name.includes(q) || phone.includes(q);
+    });
+    if (!filtered.length) {
+      list.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">No contacts found</div>`;
+      return;
+    }
+    list.innerHTML = filtered.map((c, i) => {
+      const name  = esc(c.name?.display || c.name?.given || 'Unknown');
+      const phone = esc(c.phones?.[0]?.number || '');
+      return `<div data-idx="${i}" data-contact="${encodeURIComponent(JSON.stringify({
+        name: { display: c.name?.display || c.name?.given || '' },
+        phones: c.phones || []
+      }))}" style="padding:12px 16px;border-bottom:1px solid var(--border-light);cursor:pointer;display:flex;flex-direction:column;gap:2px;active:background:var(--bg);">
+        <div style="font-size:14px;font-weight:600;">${name}</div>
+        ${phone ? `<div style="font-size:12px;color:var(--text-muted);">${phone}</div>` : ''}
+      </div>`;
+    }).join('');
+    list.querySelectorAll('[data-contact]').forEach(row => {
+      row.addEventListener('click', () => {
+        try { close(JSON.parse(decodeURIComponent(row.dataset.contact))); }
+        catch { close(null); }
+      });
+    });
+  }
+
+  renderList('');
+  overlay.querySelector('#_ccp-search').addEventListener('input', e => renderList(e.target.value));
+  overlay.querySelector('#_ccp-cancel').addEventListener('click', () => close(null));
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.querySelector('#_ccp-search').focus(), 50);
 }

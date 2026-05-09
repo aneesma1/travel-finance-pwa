@@ -1,4 +1,4 @@
-// v3.5.43 — 2026-05-02 — passengerName fallback: all exports now handle both personName and passengerName fields
+// v3.5.44 — 2026-05-09 — Hide FAB/anchors when export sheet opens; restore on close
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -32,6 +32,11 @@ function getTripPersonName(t) {
 export function openTravelExportSheet(persons, trips, documents) {
   document.getElementById('travel-export-sheet')?.remove();
   document.getElementById('travel-export-backdrop')?.remove();
+  // Restore any fixed elements hidden on open
+  ['add-trip-fab', 'share-popup-anchor'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = '';
+  });
 
   const years = [...new Set(
     trips.map(t => t.dateOutIndia?.slice(0, 4)).filter(Boolean)
@@ -147,12 +152,22 @@ export function openTravelExportSheet(persons, trips, documents) {
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
 
+  // Hide fixed elements that can bleed through the modal on some Android WebView versions
+  const _hiddenEls = ['add-trip-fab', 'share-popup-anchor'].map(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.display = 'none'; return el; }
+    return null;
+  }).filter(Boolean);
+
   // ── State ─────────────────────────────────────────────────────────────────
   let selPeople = new Set(['all']);  // 'all' or member IDs
   let selYear   = 'all';
   let selFmt    = 'pdf';
 
-  const close = () => { sheet.remove(); backdrop.remove(); };
+  const close = () => {
+    sheet.remove(); backdrop.remove();
+    _hiddenEls.forEach(el => { el.style.display = ''; });
+  };
   backdrop.addEventListener('click', close);
   document.getElementById('tex-close').addEventListener('click', close);
 

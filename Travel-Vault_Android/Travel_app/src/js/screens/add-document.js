@@ -1,7 +1,7 @@
-// v3.5.5 — 2026-03-22
+// v3.5.6 — 2026-05-09 — Replace dead Google Calendar toggle with Android Calendar + task.org reminder button
 
 // ─── app-a-family-hub/js/screens/add-document.js ────────────────────────────
-// Add / Edit Document: person pill, doc type, expiry, alert toggles, Calendar sync
+// Add / Edit Document: person pill, doc type, expiry, alert toggles, Reminder button
 
 'use strict';
 
@@ -12,7 +12,7 @@ import { PillSelect } from '../../shared/pill-select.js';
 import { renderPhotoSlots } from '../../shared/photo-picker.js';
 import { SmartInput } from '../../shared/smart-input.js';
 import { uuidv4, today, daysFromToday, expiryStatus, showToast } from '../../shared/utils.js';
-import { syncDocumentAlerts, deleteAllDocumentAlerts } from '../calendar.js';
+// calendar.js is fully stubbed — kept import for compatibility but no longer called
 
 const DOC_TYPES_DEFAULT = ['Passport','QID','Visa','Driving Licence'];
 const ALERT_DAYS = [90, 60, 30];
@@ -37,8 +37,7 @@ export async function renderAddDocument(container, params = {}) {
     docNumber:  existing?.docNumber  || '',
     expiryDate: existing?.expiryDate || '',
     alertDays:  existing?.alertDays  || [90, 60, 30],
-    calSynced:  existing?.calSynced  || false,
-    calEventIds: existing?.calEventIds || {}, // { 90: eventId, 60: eventId, 30: eventId }
+    // calSynced / calEventIds kept in schema for backward compat — not actively used
   };
 
   function render() {
@@ -98,33 +97,15 @@ export async function renderAddDocument(container, params = {}) {
           <div id="alert-toggles" style="display:flex;gap:8px;"></div>
         </div>
 
-        <div class="card" style="${expired ? 'opacity:0.5;pointer-events:none;' : ''}">
-          <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;">
-            <div>
-              <div style="font-size:15px;font-weight:600;color:var(--text);">📅 Google Calendar Sync</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
-                ${expired
-                  ? 'Disabled for expired documents'
-                  : 'Creates alerts in your Google Calendar'}
-              </div>
-            </div>
-            <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">
-              <input type="checkbox" id="cal-sync-toggle" ${state.calSynced ? 'checked' : ''}
-                style="opacity:0;width:0;height:0;position:absolute;" />
-              <span id="cal-toggle-track" style="
-                position:absolute;inset:0;border-radius:13px;
-                background:${state.calSynced ? 'var(--success)' : 'var(--border)'};
-                transition:background 0.2s;
-              ">
-                <span style="
-                  position:absolute;top:3px;left:${state.calSynced ? '25' : '3'}px;
-                  width:20px;height:20px;border-radius:50%;background:#fff;
-                  box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:left 0.2s;
-                "></span>
-              </span>
-            </label>
+        ${!expired && state.expiryDate ? `
+        <button id="add-reminder-btn" class="btn btn-secondary btn-full" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;">
+          <span style="font-size:20px;">📅</span>
+          <div style="text-align:left;">
+            <div style="font-size:14px;font-weight:600;">Add Reminder</div>
+            <div style="font-size:11px;color:var(--text-muted);">Opens Calendar or task.org with expiry alert pre-filled</div>
           </div>
-        </div>
+        </button>
+        ` : ''}
 
         <div id="save-error" style="color:var(--danger);font-size:13px;text-align:center;"></div>
 
@@ -256,15 +237,8 @@ export async function renderAddDocument(container, params = {}) {
     // Alert toggles
     renderAlertToggles();
 
-    // Calendar toggle
-    const calToggle = document.getElementById('cal-sync-toggle');
-    calToggle.addEventListener('change', () => {
-      state.calSynced = calToggle.checked;
-      const track = document.getElementById('cal-toggle-track');
-      const knob  = track.querySelector('span');
-      track.style.background = state.calSynced ? 'var(--success)' : 'var(--border)';
-      knob.style.left = state.calSynced ? '25px' : '3px';
-    });
+    // Reminder button — opens device Calendar (any app) or task.org if installed
+    document.getElementById('add-reminder-btn')?.addEventListener('click', () => openReminderIntent());
 
     // Save
     document.getElementById('save-btn').addEventListener('click', () => saveDocument());
@@ -332,25 +306,7 @@ export async function renderAddDocument(container, params = {}) {
         docNumber:   state.docNumber,
         expiryDate:  state.expiryDate,
         alertDays:   state.alertDays,
-        calSynced:   state.calSynced,
-        calEventIds: isEdit ? (existing.calEventIds || {}) : {}
       };
-
-      // If cal sync turned OFF and was previously ON, delete events
-      if (!state.calSynced && existing?.calSynced) {
-        await deleteAllDocumentAlerts(existing).catch(() => {});
-        docData.calEventIds = {};
-      }
-
-      // Sync calendar events if enabled
-      if (state.calSynced && member) {
-        try {
-          docData.calEventIds = await syncDocumentAlerts(docData, member.name);
-        } catch (calErr) {
-          showToast('Saved -- calendar sync had an error', 'warning');
-          console.warn('Calendar sync error:', calErr);
-        }
-      }
 
       const newData = await localSave('travel', (remote) => {
         const docs = remote.documents || [];
@@ -426,10 +382,51 @@ export async function renderAddDocument(container, params = {}) {
     });
   }
 
-  async function deleteDoc() {
-    if (!confirm('Delete this document record? Calendar events will also be removed.')) return;
+  // ── Reminder button — Android Calendar intent + task.org deep-link ─────────
+  async function openReminderIntent() {
+    if (!state.expiryDate) {
+      showToast('Set an expiry date first', 'warning'); return;
+    }
+    const App = window.Capacitor?.Plugins?.App;
+    if (!App) {
+      showToast('Reminder only works in the Android app', 'info', 3000); return;
+    }
+
+    // Reminder fires on the earliest alert day before expiry (default 30 days)
+    const alertDay = Math.min(...(state.alertDays.length ? state.alertDays : [30]));
+    const reminderDate = new Date(state.expiryDate);
+    reminderDate.setDate(reminderDate.getDate() - alertDay);
+
+    const member    = members.find(m => m.id === state.personId);
+    const personStr = member ? ` (${member.name})` : '';
+    const title     = `Renew ${state.docName}${personStr}`;
+    const notes     = `Document expires ${state.expiryDate}. Reminder set ${alertDay} days early.`;
+    const dueDateStr = reminderDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // ── Try task.org first (if installed — handles 'tasks://' URI scheme) ────
+    const tasksUri = `tasks://tasks/new?title=${encodeURIComponent(title)}&notes=${encodeURIComponent(notes)}&due=${dueDateStr}`;
     try {
-      if (existing?.calSynced) await deleteAllDocumentAlerts(existing).catch(() => {});
+      const { completed } = await App.openUrl({ url: tasksUri });
+      if (completed) return; // task.org opened successfully
+    } catch (_) { /* not installed — fall through to calendar */ }
+
+    // ── Android Calendar insert intent ────────────────────────────────────────
+    // All calendar apps (Google Calendar, Samsung, etc.) handle this intent.
+    const beginMs = reminderDate.setHours(9, 0, 0, 0); // 9 AM on reminder day
+    const endMs   = beginMs + 3_600_000; // 1 hour duration
+    const calUri  = `intent://insert?beginTime=${beginMs}&endTime=${endMs}` +
+      `&title=${encodeURIComponent(title)}&description=${encodeURIComponent(notes)}` +
+      `#Intent;scheme=content;host=com.android.calendar;action=android.intent.action.INSERT;end`;
+    try {
+      await App.openUrl({ url: calUri });
+    } catch (_) {
+      showToast('Could not open Calendar. Add reminder manually.', 'warning', 4000);
+    }
+  }
+
+  async function deleteDoc() {
+    if (!confirm('Delete this document record?')) return;
+    try {
       const newData = await localSave('travel', (remote) => ({
         ...remote,
         documents: (remote.documents || []).filter(d => d.id !== docId)

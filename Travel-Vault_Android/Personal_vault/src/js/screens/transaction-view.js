@@ -1,4 +1,4 @@
-// v3.5.25 — 2026-03-28
+// v3.5.26 — 2026-05-09 — Save image to Documents/share_images/; share via Capacitor Share; fix share-text fallback
 
 // ─── app-b-private-vault/js/screens/transaction-view.js ─────────────────────
 // Transaction View -- read-only display with edit button and WhatsApp copy
@@ -139,11 +139,21 @@ export async function renderTransactionView(container, params = {}) {
   });
 
   document.getElementById('share-text-btn').addEventListener('click', async () => {
-    if (navigator.share) {
-      await navigator.share({ title: 'Transaction Details', text: getShareText() }).catch(() => {});
-    } else {
-      document.getElementById('copy-btn').click();
+    // navigator.share is unreliable in Capacitor WebView — use clipboard + share sheet if available
+    const SharePlugin = window.Capacitor?.Plugins?.Share;
+    if (SharePlugin) {
+      try {
+        await SharePlugin.share({ title: 'Transaction Details', text: getShareText(), dialogTitle: 'Share Transaction' });
+        return;
+      } catch (e) {
+        if (e?.name === 'AbortError' || String(e?.message).toLowerCase().includes('cancel')) return;
+      }
     }
+    // Fallback — copy to clipboard
+    try {
+      await navigator.clipboard.writeText(getShareText());
+      showToast('Copied to clipboard (share not available)', 'info', 3000);
+    } catch { showToast('Copy failed', 'warning'); }
   });
 
   const generateImage = async () => {
@@ -188,28 +198,52 @@ export async function renderTransactionView(container, params = {}) {
   document.getElementById('save-image-btn').addEventListener('click', async () => {
     const dataUrl = await generateImage();
     if (!dataUrl) return;
+    const fname = `Txn_${t.date}_${t.description.replace(/\s+/g,'_').slice(0,20)}.png`;
+    const FS = window.Capacitor?.Plugins?.Filesystem;
+    if (FS) {
+      try {
+        const base64 = dataUrl.split(',')[1];
+        let saved = false;
+        for (const dir of ['EXTERNAL_STORAGE', 'DOCUMENTS']) {
+          try {
+            await FS.mkdir({ path: 'Documents/share_images', directory: dir, recursive: true }).catch(() => {});
+            await FS.writeFile({ path: `Documents/share_images/${fname}`, data: base64, directory: dir });
+            const displayPath = dir === 'EXTERNAL_STORAGE'
+              ? `/storage/emulated/0/Documents/share_images/${fname}`
+              : `Documents/share_images/${fname}`;
+            showToast('💾 Saved → ' + displayPath, 'success', 5000);
+            saved = true; break;
+          } catch (_) { /* try next */ }
+        }
+        if (saved) return;
+      } catch (_) { /* fall through */ }
+    }
+    // Web / PWA fallback
     const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `Txn_${t.date}_${t.description.replace(/\s+/g,'_').slice(0,20)}.png`;
-    a.click();
+    a.href = dataUrl; a.download = fname; a.click();
     showToast('Image saved!', 'success');
   });
 
   document.getElementById('share-image-btn').addEventListener('click', async () => {
     const dataUrl = await generateImage();
     if (!dataUrl) return;
-    try {
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], 'transaction.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Transaction' });
-      } else {
-        showToast('Direct file sharing not supported', 'warning');
-        document.getElementById('save-image-btn').click();
+    const fname = `Txn_${t.date}_${t.description.replace(/\s+/g,'_').slice(0,20)}.png`;
+    const FS    = window.Capacitor?.Plugins?.Filesystem;
+    const SharePlugin = window.Capacitor?.Plugins?.Share;
+    if (FS && SharePlugin) {
+      try {
+        const base64 = dataUrl.split(',')[1];
+        await FS.writeFile({ path: fname, data: base64, directory: 'CACHE' });
+        const { uri } = await FS.getUri({ path: fname, directory: 'CACHE' });
+        await SharePlugin.share({ title: 'Transaction', files: [uri], dialogTitle: 'Share Transaction' });
+        await FS.deleteFile({ path: fname, directory: 'CACHE' }).catch(() => {});
+        return;
+      } catch (e) {
+        if (e?.name === 'AbortError' || String(e?.message).toLowerCase().includes('cancel')) return;
       }
-    } catch {
-      document.getElementById('save-image-btn').click();
     }
+    // Web fallback — trigger save instead
+    document.getElementById('save-image-btn').click();
   });
 
   document.getElementById('delete-btn').addEventListener('click', async () => {

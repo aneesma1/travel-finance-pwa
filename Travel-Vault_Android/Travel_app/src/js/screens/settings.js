@@ -1,4 +1,4 @@
-// v4.12.0 — 2026-05-06 — Sync folder restore: 3-option merge dialog
+// v4.13.0 — 2026-05-09 — Remove sync folder Restore button (use JSON backup restore instead)
 // ─── app-a-family-hub/js/screens/settings.js ────────────────────────────────
 // Settings screen — People, Data, Security, Account tabs
 
@@ -10,8 +10,7 @@ import { navigate } from '../router.js';
 import { isAdmin, renderAccessControl } from '../roles.js';
 import { uuidv4, formatDisplayDate, showToast, toISODate, showConfirmModal, showInputModal } from '../../shared/utils.js';
 import { renderImportTool } from '../../shared/import-tool.js';
-import { downloadLocalBackup, restoreFromLocalFile, hasPublicStorageAccess, requestPublicStorage, syncFolderWrite, syncFolderRestore } from '../../shared/drive.js';
-import { showRestoreDialog } from '../../shared/restore-dialog.js';
+import { downloadLocalBackup, restoreFromLocalFile, hasPublicStorageAccess, requestPublicStorage, syncFolderWrite } from '../../shared/drive.js';
 import { openPersonManage } from './person-manage.js';
 import { exitApp } from '../../shared/app-utils.js';
 import { exportEncryptedBackup, importEncryptedBackup } from '../../shared/backup-engine.js';
@@ -216,9 +215,8 @@ function renderDataTab(data, members, container) {
           <button id="sync-grant-btn" class="btn btn-secondary btn-full" style="font-size:13px;">🔓 Grant All Files Access</button>
           <div style="font-size:10px;color:var(--text-muted);margin-top:4px;text-align:center;">Android Settings → Special App Access → All Files Access</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-          <button id="sync-now-btn" class="btn btn-primary" style="font-size:13px;">🔄 Sync Now</button>
-          <button id="sync-restore-btn" class="btn btn-secondary" style="font-size:13px;">📥 Restore</button>
+        <div style="margin-bottom:8px;">
+          <button id="sync-now-btn" class="btn btn-primary btn-full" style="font-size:13px;">🔄 Sync Now</button>
         </div>
         <div id="sync-last-time" style="font-size:11px;color:var(--text-muted);text-align:center;min-height:16px;"></div>
       </div>
@@ -394,23 +392,6 @@ function renderDataTab(data, members, container) {
       }
     });
 
-    document.getElementById('sync-restore-btn')?.addEventListener('click', async () => {
-      // Show 3-option dialog before loading — same pattern as file restore
-      const strategy = await showRestoreDialog({
-        title: 'How should the sync backup be loaded?',
-        source: 'TravelHub_latest.json (sync folder)',
-      });
-      if (!strategy) return; // user cancelled
-      try {
-        showToast('Restoring from sync folder…', 'info', 2000);
-        await syncFolderRestore('travel', strategy);
-        const label = strategy === 'wipe' ? 'Wiped & replaced' : strategy === 'append' ? 'Appended' : 'Merged';
-        showToast('✅ ' + label + ' successfully! Reloading…', 'success', 3000);
-        setTimeout(() => window.location.reload(), 1200);
-      } catch (err) {
-        showToast('Restore failed: ' + err.message, 'error');
-      }
-    });
   })();
 }
 
