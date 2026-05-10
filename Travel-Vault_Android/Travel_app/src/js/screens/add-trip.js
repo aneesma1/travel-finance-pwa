@@ -1,4 +1,4 @@
-// v3.5.31 — 2026-05-09 — Share card: fix Directory.Cache crash; save card to Documents/share_images/
+// v3.5.32 — 2026-05-10 — Trip card: show Departure/Arrival/Flight matching trip details (was Arrived/Duration)
 
 // ─── app-a-family-hub/js/screens/add-trip.js ────────────────────────────────
 // Add / Edit Trip: 5-step form with smart search and live computed fields
@@ -163,10 +163,6 @@ export async function renderAddTrip(container, params = {}) {
     const name = member?.name || 'Unknown';
     const origin = state.originCountry || 'India';
     const dest   = state.destinationCountry || 'Qatar';
-    const arrived = formatDisplayDate(state.dateArrivedDest);
-    const duration = state.dateArrivedDest && state.dateLeftDest
-      ? daysBetween(state.dateArrivedDest, state.dateLeftDest) + ' days'
-      : daysBetween(state.dateArrivedDest, today()) + ' days';
     const flagMap = { Qatar: '🇶🇦', India: '🇮🇳' };
 
     const W = 640, H = 360;
@@ -205,12 +201,12 @@ export async function renderAddTrip(container, params = {}) {
     ctx.font = '600 18px sans-serif';
     ctx.fillText(`${flagMap[origin] || '📍'} ${origin}   →   ${flagMap[dest] || '📍'} ${dest}`, 40, 123);
 
-    // Stats row
+    // Stats row — mirrors trip details: Departure date, Arrival date, Flight number
     const stats = [
-      ['Arrived', arrived],
-      ['Duration', duration],
+      ['Departure', formatDisplayDate(state.dateLeftOrigin)],
+      ['Arrival',   formatDisplayDate(state.dateArrivedDest)],
     ];
-    if (state.flightInward) stats.push(['Flight', state.flightInward]);
+    if (state.flightNumber) stats.push(['Flight', state.flightNumber]);
 
     stats.forEach(([label, val], i) => {
       const x = 28 + i * 200;
