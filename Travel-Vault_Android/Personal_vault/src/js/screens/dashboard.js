@@ -312,7 +312,7 @@ export async function renderDashboard(container) {
 
   function showImageShareSheet(url, filename, file, blob) {
     const sheet = document.createElement('div');
-    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px calc(32px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
     sheet.innerHTML =
       '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>' +
       '<img src="' + url + '" style="width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;" />' +

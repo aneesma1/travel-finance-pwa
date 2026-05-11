@@ -359,7 +359,7 @@ export async function renderAddDocument(container, params = {}) {
 
   function showTextShareSheet(text) {
     const sheet = document.createElement('div');
-    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 36px;box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px calc(36px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 24px rgba(0,0,0,0.2);';
     sheet.innerHTML = '<div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>' +
       '<pre style="font-size:12px;color:var(--text-secondary);background:var(--surface-3);border-radius:8px;padding:12px;max-height:140px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin-bottom:14px;">' + text.replace(/</g,'&lt;') + '</pre>' +
       '<div style="display:flex;flex-direction:column;gap:10px;">' +

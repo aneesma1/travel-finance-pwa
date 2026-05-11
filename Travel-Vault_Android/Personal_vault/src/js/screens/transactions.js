@@ -42,7 +42,7 @@ export async function renderTransactions(container) {
 
     const sheet = document.createElement('div');
     sheet.id = 'export-sheet';
-    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px 40px;box-shadow:0 -4px 24px rgba(0,0,0,0.15);';
+    sheet.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:16px 20px calc(40px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 24px rgba(0,0,0,0.15);';
 
     const { timestampSuffix } = window._driveHelpers || {};
     const ts = new Date().toISOString().replace('T','_').slice(0,16).replace(':','-');
