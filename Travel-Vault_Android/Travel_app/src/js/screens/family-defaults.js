@@ -1,4 +1,4 @@
-// v3.5.9 — 2026-05-11 — Contact picker: Web Contact Picker API primary; Capacitor plugin fallback
+// v3.5.10 — 2026-05-11 — Contact picker: native ACTION_PICK via inline ContactPickerPlugin (Java)
 
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
 // Family Defaults -- shared Qatar/India addresses, shared emergency contacts,
@@ -355,64 +355,29 @@ export async function renderFamilyDefaults(container) {
     document.getElementById('add-ec-btn').addEventListener('click', () => openECModal(null));
 
     document.getElementById('pick-contact-btn')?.addEventListener('click', async () => {
-
-      // ── Primary: Web Contact Picker API (native system picker, Chrome 80+ Android) ──
-      if ('contacts' in navigator && typeof navigator.contacts?.select === 'function') {
-        try {
-          const results = await navigator.contacts.select(['name', 'tel'], { multiple: false });
-          if (results?.length) {
-            const c = results[0];
-            const prefill = {
-              id: uuidv4(),
-              name: (c.name || [])[0] || '',
-              phone: (c.tel  || [])[0] || '',
-              relationship: '', description: '',
-              priority: draftContacts.length + 1
-            };
-            openECModal(prefill); return;
-          }
-          return; // user cancelled — no toast
-        } catch (e) {
-          if (e?.name === 'AbortError' || String(e?.message).toLowerCase().includes('cancel')) return;
-          console.warn('[contacts] Web API failed, trying plugin fallback:', e);
-        }
+      // Uses native Android ACTION_PICK via inline ContactPickerPlugin (ContactPickerPlugin.java)
+      const ContactPicker = window.Capacitor?.Plugins?.ContactPicker;
+      if (!ContactPicker) {
+        showToast('Contact picker not available in this build.', 'info', 3000);
+        openECModal(null); return;
       }
-
-      // ── Fallback: Capacitor Community Contacts plugin ──
-      const Contacts = window.Capacitor?.Plugins?.Contacts;
-      if (Contacts) {
-        try {
-          const perm = await Contacts.requestPermissions();
-          if (perm?.contacts !== 'granted') {
-            showToast('Contacts permission denied. Enter details manually.', 'warning', 3500);
-            openECModal(null); return;
-          }
-          showToast('Loading contacts…', 'info', 1500);
-          const { contacts } = await Contacts.getContacts({ projection: { name: true, phones: true } });
-          if (!contacts?.length) {
-            showToast('No contacts found.', 'info', 3000);
-            openECModal(null); return;
-          }
-          _showContactPickerModal(contacts, (picked) => {
-            if (!picked) { openECModal(null); return; }
-            const prefill = {
-              id: uuidv4(),
-              name: picked.name?.display || picked.name?.given || '',
-              phone: picked.phones?.[0]?.number || '',
-              relationship: '', description: '',
-              priority: draftContacts.length + 1
-            };
-            openECModal(prefill);
-          });
-          return;
-        } catch (err) {
-          console.error('[contacts] Plugin error:', err);
+      try {
+        const picked = await ContactPicker.pickContact();
+        openECModal({
+          id: uuidv4(),
+          name: picked.name  || '',
+          phone: picked.phone || '',
+          relationship: '', description: '',
+          priority: draftContacts.length + 1
+        });
+      } catch (e) {
+        // 'cancelled' = user pressed back — open manual entry silently
+        if (!String(e?.message).toLowerCase().includes('cancel')) {
+          console.error('[ContactPicker]', e);
+          showToast('Could not read contact. Enter details manually.', 'warning', 3000);
         }
+        openECModal(null);
       }
-
-      // ── Last resort: manual entry ──
-      showToast('Contact picker unavailable. Enter details manually.', 'info', 3000);
-      openECModal(null);
     });
 
     body.querySelectorAll('[data-edit-ec]').forEach(btn => {
