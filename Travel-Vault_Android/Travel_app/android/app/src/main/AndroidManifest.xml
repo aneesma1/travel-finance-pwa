@@ -45,8 +45,11 @@
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Contacts: needed for @capacitor/contacts native picker -->
+    <!-- Contacts: needed for ContactPickerPlugin (ACTION_PICK) -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Location: GPS picker in Addresses tab (navigator.geolocation) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Storage: legacy write for Android 9/10 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />

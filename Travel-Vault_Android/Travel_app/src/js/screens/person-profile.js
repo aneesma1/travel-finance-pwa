@@ -22,8 +22,8 @@ export async function renderPersonProfile(container, params = {}) {
   let isViewMode = !isNew && mode !== 'edit';  // view by default, edit on demand
 
   const data = await getCachedTravelData();
-  const { members = [], documents = [] } = data || {};
-  const member = isNew ? createEmptyMember() : members.find(m => m.id === memberId);
+  const { members = [], documents = [], familyDefaults = {} } = data || {};
+  const member = isNew ? createEmptyMember(familyDefaults) : members.find(m => m.id === memberId);
 
   if (!member && !isNew) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Member not found</div></div>`;
@@ -1323,13 +1323,21 @@ export async function renderPersonProfile(container, params = {}) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function createEmptyMember() {
+function createEmptyMember(familyDefaults = {}) {
+  // Pre-fill home addresses from family defaults so new members don't start blank.
+  // Each member gets their own copy — editing a member's address won't affect defaults.
+  const homeQatar = familyDefaults.homeQatar?.address
+    ? { ...familyDefaults.homeQatar }
+    : null;
+  const homeIndia = familyDefaults.homeIndia?.address
+    ? { ...familyDefaults.homeIndia }
+    : null;
   return {
     id: uuidv4(), name: '', emoji: '👤', color: '#EEF2FF',
     photo: null, dateOfBirth: null, nationality: '', bloodGroup: null,
     phone: '', email: '', occupation: '', employer: '', employerPhone: '',
     medicalNotes: '', personalNotes: '',
-    homeQatar: null, homeIndia: null,
+    homeQatar, homeIndia,
     emergencyContacts: [],
   };
 }
