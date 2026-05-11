@@ -1,4 +1,4 @@
-// v3.5.8 — 2026-05-09 — Fix contacts package: use @capacitor-community/contacts (not @capacitor/contacts)
+// v3.5.9 — 2026-05-11 — Contact picker: Web Contact Picker API primary; Capacitor plugin fallback
 
 // ─── app-a-family-hub/js/screens/family-defaults.js ─────────────────────────
 // Family Defaults -- shared Qatar/India addresses, shared emergency contacts,
@@ -355,42 +355,64 @@ export async function renderFamilyDefaults(container) {
     document.getElementById('add-ec-btn').addEventListener('click', () => openECModal(null));
 
     document.getElementById('pick-contact-btn')?.addEventListener('click', async () => {
+
+      // ── Primary: Web Contact Picker API (native system picker, Chrome 80+ Android) ──
+      if ('contacts' in navigator && typeof navigator.contacts?.select === 'function') {
+        try {
+          const results = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+          if (results?.length) {
+            const c = results[0];
+            const prefill = {
+              id: uuidv4(),
+              name: (c.name || [])[0] || '',
+              phone: (c.tel  || [])[0] || '',
+              relationship: '', description: '',
+              priority: draftContacts.length + 1
+            };
+            openECModal(prefill); return;
+          }
+          return; // user cancelled — no toast
+        } catch (e) {
+          if (e?.name === 'AbortError' || String(e?.message).toLowerCase().includes('cancel')) return;
+          console.warn('[contacts] Web API failed, trying plugin fallback:', e);
+        }
+      }
+
+      // ── Fallback: Capacitor Community Contacts plugin ──
       const Contacts = window.Capacitor?.Plugins?.Contacts;
-      if (!Contacts) {
-        showToast('Contact picker not available. Enter details manually.', 'info', 3500);
-        openECModal(null); return;
-      }
-      try {
-        // Request permission first
-        const perm = await Contacts.requestPermissions();
-        if (perm?.contacts !== 'granted') {
-          showToast('Contacts permission denied. Enter details manually.', 'warning', 3500);
-          openECModal(null); return;
+      if (Contacts) {
+        try {
+          const perm = await Contacts.requestPermissions();
+          if (perm?.contacts !== 'granted') {
+            showToast('Contacts permission denied. Enter details manually.', 'warning', 3500);
+            openECModal(null); return;
+          }
+          showToast('Loading contacts…', 'info', 1500);
+          const { contacts } = await Contacts.getContacts({ projection: { name: true, phones: true } });
+          if (!contacts?.length) {
+            showToast('No contacts found.', 'info', 3000);
+            openECModal(null); return;
+          }
+          _showContactPickerModal(contacts, (picked) => {
+            if (!picked) { openECModal(null); return; }
+            const prefill = {
+              id: uuidv4(),
+              name: picked.name?.display || picked.name?.given || '',
+              phone: picked.phones?.[0]?.number || '',
+              relationship: '', description: '',
+              priority: draftContacts.length + 1
+            };
+            openECModal(prefill);
+          });
+          return;
+        } catch (err) {
+          console.error('[contacts] Plugin error:', err);
         }
-        showToast('Loading contacts…', 'info', 1500);
-        const { contacts } = await Contacts.getContacts({
-          projection: { name: true, phones: true }
-        });
-        if (!contacts?.length) {
-          showToast('No contacts found. Enter details manually.', 'info', 3000);
-          openECModal(null); return;
-        }
-        // Show in-app searchable picker
-        _showContactPickerModal(contacts, (picked) => {
-          if (!picked) { openECModal(null); return; }
-          const prefill = {
-            id: uuidv4(),
-            name: picked.name?.display || picked.name?.given || '',
-            phone: picked.phones?.[0]?.number || '',
-            relationship: '', description: '',
-            priority: draftContacts.length + 1
-          };
-          openECModal(prefill);
-        });
-      } catch (err) {
-        showToast('Contact picker error. Enter details manually.', 'info', 3500);
-        openECModal(null);
       }
+
+      // ── Last resort: manual entry ──
+      showToast('Contact picker unavailable. Enter details manually.', 'info', 3000);
+      openECModal(null);
     });
 
     body.querySelectorAll('[data-edit-ec]').forEach(btn => {
