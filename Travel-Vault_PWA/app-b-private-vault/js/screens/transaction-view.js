@@ -93,7 +93,11 @@ export async function renderTransactionView(container, params = {}) {
           </button>
         </div>
 
-        <button id="delete-btn" style="margin-top:12px;padding:14px;border-radius:var(--radius-lg);border:1.5px solid #FEE2E2;background:#FEF2F2;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">
+        <button id="clone-btn" style="padding:14px;border-radius:var(--radius-lg);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;width:100%;">
+          🔁 Clone as New Entry
+        </button>
+
+        <button id="delete-btn" style="margin-top:4px;padding:14px;border-radius:var(--radius-lg);border:1.5px solid #FEE2E2;background:#FEF2F2;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">
           🗑️ Delete Transaction
         </button>
       </div>

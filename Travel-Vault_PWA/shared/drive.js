@@ -62,7 +62,10 @@ export async function restoreFromLocalFile(file, appName, strategy = 'wipe') {
     reader.onload = async (e) => {
       try {
         const incomingData = JSON.parse(e.target.result);
-        if (!incomingData.schemaVersion) throw new Error('Invalid backup file — missing schemaVersion');
+        if (!incomingData || typeof incomingData !== 'object' || Array.isArray(incomingData)) {
+          throw new Error('Invalid backup file — not a valid JSON object');
+        }
+        // Accept files with or without schemaVersion (APK backups omit it)
 
         let finalData;
         if (strategy === 'wipe') {

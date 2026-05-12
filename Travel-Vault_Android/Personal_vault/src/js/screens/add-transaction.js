@@ -1,4 +1,4 @@
-// v3.5.26 — 2026-05-12 — Category/sub-cat suggestions from transaction history; sub-cat uses cat2 list
+// v3.5.27 — 2026-05-12 — Clone as New Entry; export cat multi-select; restore schemaVersion fix; pill color
 
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form
@@ -21,12 +21,13 @@ function toTitleCase(str) {
 
 export async function renderAddTransaction(container, params = {}) {
   const { txnId, mode } = params;
-  const isEdit = mode === 'edit' && txnId;
+  const isEdit  = mode === 'edit'  && txnId;
+  const isClone = mode === 'clone' && txnId;
 
   const data = await getCachedFinanceData();
   const { transactions = [], categories: savedCats = [], accounts: savedAccounts = [] } = data || {};
 
-  const existing = isEdit ? transactions.find(t => t.id === txnId) : null;
+  const existing = (isEdit || isClone) ? transactions.find(t => t.id === txnId) : null;
 
   // Build category lists from saved categories + transaction history
   const dynamicCats1 = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
@@ -39,7 +40,7 @@ export async function renderAddTransaction(container, params = {}) {
   const notesSuggestions = [...new Set(transactions.map(t => t.notes1).filter(Boolean))];
 
   const state = {
-    date:        existing?.date        || today(),
+    date:        isClone ? today() : (existing?.date        || today()),  // Clone → today's date
     description: existing?.description || '',
     amountSpend: existing?.amountSpend != null ? String(existing.amountSpend) : '',
     income:      existing?.income      != null ? String(existing.income)      : '',
@@ -48,14 +49,14 @@ export async function renderAddTransaction(container, params = {}) {
     category2:   existing?.category2   || '',
     notes1:      existing?.notes1      || '',
     account:     existing?.account     || (allAccounts[0] || 'Cash'),
-    photos:      existing?.photos      || [],
+    photos:      isClone ? [] : (existing?.photos || []),  // Clone → no photos carried over
   };
 
   function render() {
     container.innerHTML = `
       <div class="app-header">
         <button class="app-header-action" id="back-btn">←</button>
-        <span class="app-header-title">${isEdit ? 'Edit Transaction' : 'Add Transaction'}</span>
+        <span class="app-header-title">${isEdit ? 'Edit Transaction' : isClone ? '🔁 Clone Entry' : 'Add Transaction'}</span>
         ${isEdit ? `<button class="app-header-action" id="delete-btn" style="color:#FCA5A5;">🗑️</button>` : '<span style="width:32px;"></span>'}
       </div>
 

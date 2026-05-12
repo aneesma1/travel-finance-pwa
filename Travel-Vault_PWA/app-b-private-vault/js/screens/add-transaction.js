@@ -1,4 +1,4 @@
-// v3.5.26 — 2026-05-12 — Category/sub-cat suggestions from transaction history; sub-cat uses cat2 list
+// v3.5.27 — 2026-05-12 — Clone mode: prefill from existing transaction with new id/date/no photos
 
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form
@@ -15,12 +15,13 @@ import { uuidv4, today, showToast, formatAmount, showConfirmModal, showInputModa
 
 export async function renderAddTransaction(container, params = {}) {
   const { txnId, mode } = params;
-  const isEdit = mode === 'edit' && txnId;
+  const isEdit  = mode === 'edit'  && txnId;
+  const isClone = mode === 'clone' && txnId;
 
   const data = await getCachedFinanceData();
   const { transactions = [], categories: savedCats = [], accounts: savedAccounts = [] } = data || {};
 
-  const existing = isEdit ? transactions.find(t => t.id === txnId) : null;
+  const existing = (isEdit || isClone) ? transactions.find(t => t.id === txnId) : null;
 
   // Build category lists from saved categories + transaction history
   const dynamicCats1 = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
@@ -33,7 +34,7 @@ export async function renderAddTransaction(container, params = {}) {
   const notesSuggestions = [...new Set(transactions.map(t => t.notes1).filter(Boolean))];
 
   const state = {
-    date:        existing?.date        || today(),
+    date:        isClone ? today() : (existing?.date        || today()),
     description: existing?.description || '',
     amountSpend: existing?.amountSpend != null ? String(existing.amountSpend) : '',
     income:      existing?.income      != null ? String(existing.income)      : '',
@@ -42,14 +43,14 @@ export async function renderAddTransaction(container, params = {}) {
     category2:   existing?.category2   || '',
     notes1:      existing?.notes1      || '',
     account:     existing?.account     || (allAccounts[0] || 'Cash'),
-    photos:      existing?.photos      || [],
+    photos:      isClone ? [] : (existing?.photos || []),
   };
 
   function render() {
     container.innerHTML = `
       <div class="app-header">
         <button class="app-header-action" id="back-btn">←</button>
-        <span class="app-header-title">${isEdit ? 'Edit Transaction' : 'Add Transaction'}</span>
+        <span class="app-header-title">${isEdit ? 'Edit Transaction' : isClone ? '🔁 Clone Entry' : 'Add Transaction'}</span>
         ${isEdit ? `<button class="app-header-action" id="delete-btn" style="color:#FCA5A5;">🗑️</button>` : '<span style="width:32px;"></span>'}
       </div>
 
@@ -123,7 +124,7 @@ export async function renderAddTransaction(container, params = {}) {
         <div id="save-error" style="color:var(--danger);font-size:13px;text-align:center;min-height:18px;"></div>
 
         <button class="btn btn-primary btn-full" id="save-btn">
-          ${isEdit ? '💾 Save Changes' : '✅ Save Transaction'}
+          ${isEdit ? '💾 Save Changes' : isClone ? '🔁 Save as New Entry' : '✅ Save Transaction'}
         </button>
 
       </div>
@@ -312,7 +313,7 @@ export async function renderAddTransaction(container, params = {}) {
 
     const txnData = {
       id:          isEdit ? existing.id : uuidv4(),
-      timestamp:   isEdit ? existing.timestamp : new Date().toISOString(),
+      timestamp:   isEdit ? existing.timestamp : new Date().toISOString(), // clone always gets new id/timestamp
       date:        state.date,
       description: state.description.trim(),
       amountSpend: state.amountSpend ? Number(state.amountSpend) : null,
@@ -339,18 +340,18 @@ export async function renderAddTransaction(container, params = {}) {
           const idx = txns.findIndex(t => t.id === txnData.id);
           if (idx > -1) txns[idx] = txnData; else txns.push(txnData);
         } else {
-          txns.push(txnData);
+          txns.push(txnData); // clone always gets a new UUID so this is always a new entry
         }
         return { ...remote, transactions: txns, categories: cats, accounts: accs };
       });
 
       await setCachedFinanceData(newData);
-      showToast(isEdit ? 'Transaction updated!' : 'Transaction saved!', 'success');
+      showToast(isEdit ? 'Transaction updated!' : isClone ? 'Cloned as new entry!' : 'Transaction saved!', 'success');
       navigate('transactions');
     } catch (err) {
       document.getElementById('save-error').textContent = 'Save failed: ' + err.message;
       document.getElementById('save-btn').disabled = false;
-      document.getElementById('save-btn').textContent = isEdit ? '💾 Save Changes' : '✅ Save Transaction';
+      document.getElementById('save-btn').textContent = isEdit ? '💾 Save Changes' : isClone ? '🔁 Save as New Entry' : '✅ Save Transaction';
     }
   }
 

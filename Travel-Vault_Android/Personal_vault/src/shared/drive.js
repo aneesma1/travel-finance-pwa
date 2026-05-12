@@ -299,23 +299,36 @@ export async function saveFileToExports(appName, filename, content, encoding) {
   return filename;
 }
 
-// ── Restore IndexedDB from a user-picked .json backup file ───────────────────
-// Validates schema, writes directly to IndexedDB (no Drive involved).
-export async function restoreFromLocalFile(file, appName) {
+// ── Restore IndexedDB from a user-picked .json / .vaultbox / .travelbox file ─
+// Accepts merge/append/wipe strategy. schemaVersion is NOT required.
+export async function restoreFromLocalFile(file, appName, strategy = 'wipe') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        if (!data.schemaVersion) throw new Error('Invalid backup file — missing schemaVersion');
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('Invalid backup file — not a valid JSON object');
+        }
+        // Accept files with or without schemaVersion (APK backups omit it)
 
-        if (appName === 'travel') {
-          await setCachedTravelData(data);
+        let finalData;
+        if (strategy === 'wipe') {
+          finalData = data;
         } else {
-          await setCachedFinanceData(data);
+          const { applyMergeStrategy } = await import('./restore-dialog.js');
+          const currentData = appName === 'travel'
+            ? (await getCachedTravelData()  || {})
+            : (await getCachedFinanceData() || {});
+          finalData = applyMergeStrategy(strategy, currentData, data, appName);
         }
 
-        resolve(data);
+        if (appName === 'travel') {
+          await setCachedTravelData(finalData);
+        } else {
+          await setCachedFinanceData(finalData);
+        }
+        resolve(finalData);
       } catch (err) {
         reject(err);
       }

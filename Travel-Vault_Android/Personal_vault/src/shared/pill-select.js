@@ -33,8 +33,8 @@ export class PillSelect {
 
   _colors() {
     return this.color === 'emerald'
-      ? { active: '#065F46', activeBg: '#D1FAE5', activeBorder: '#6EE7B7', inactiveBg: '#F0FDF4', inactiveBorder: '#A7F3D0', text: '#065F46' }
-      : { active: '#3730A3', activeBg: '#EEF2FF', activeBorder: '#A5B4FC', inactiveBg: '#F8FAFC', inactiveBorder: '#E2E8F0', text: '#3730A3' };
+      ? { active: '#fff', activeBg: '#059669', activeBorder: '#059669', inactiveBg: '#F8FAFC', inactiveBorder: '#D1D5DB', inactiveText: '#374151' }
+      : { active: '#fff', activeBg: '#4F46E5', activeBorder: '#4F46E5', inactiveBg: '#F8FAFC', inactiveBorder: '#D1D5DB', inactiveText: '#374151' };
   }
 
   _render() {
@@ -54,7 +54,8 @@ export class PillSelect {
             font-size:14px; font-weight:500; min-height:40px;
             border:1.5px solid ${active ? colors.activeBorder : colors.inactiveBorder};
             background:${active ? colors.activeBg : colors.inactiveBg};
-            color:${active ? colors.active : '#64748B'};
+            color:${active ? colors.active : colors.inactiveText};
+            font-weight:${active ? '600' : '500'};
             transition:all 0.15s; user-select:none;
             -webkit-tap-highlight-color:transparent;
           "

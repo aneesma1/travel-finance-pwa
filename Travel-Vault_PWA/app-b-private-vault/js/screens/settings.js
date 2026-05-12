@@ -279,21 +279,13 @@ export async function renderSettings(container, params = {}) {
             ${['QAR', 'INR', 'USD'].map(c => `<option value="${c}" ${c === 'QAR' ? 'selected' : ''}>${c}</option>`).join('')}
           </select>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-          <div>
-            <label class="form-label">Category 1</label>
-            <select class="form-input" id="exp-cat1" style="padding:10px 12px;">
-              <option value="">All</option>
-              ${savedCats.sort().map(c => `<option value="${c}">${c}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label class="form-label">Category 2</label>
-            <select class="form-input" id="exp-cat2" style="padding:10px 12px;">
-              <option value="">All</option>
-              ${savedCats.sort().map(c => `<option value="${c}">${c}</option>`).join('')}
-            </select>
-          </div>
+        <div style="margin-bottom:12px;">
+          <label class="form-label">Category 1 <span style="color:var(--text-muted);font-weight:400;">(tap to filter)</span></label>
+          <div id="exp-cat1-chips" style="display:flex;flex-wrap:wrap;gap:6px;max-height:90px;overflow-y:auto;padding:4px 0;"></div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label class="form-label">Category 2 <span style="color:var(--text-muted);font-weight:400;">(tap to filter)</span></label>
+          <div id="exp-cat2-chips" style="display:flex;flex-wrap:wrap;gap:6px;max-height:90px;overflow-y:auto;padding:4px 0;"></div>
         </div>
         <div id="export-count" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;"></div>
       </div>
@@ -329,27 +321,68 @@ export async function renderSettings(container, params = {}) {
       </div>
     `;
 
+    // Build category lists from saved + transaction history
+    const allCat1 = [...new Set([...savedCats, ...transactions.map(t => t.category1).filter(Boolean)])].sort();
+    const allCat2 = [...new Set(transactions.map(t => t.category2).filter(Boolean))].sort();
+    let selectedCat1 = [];
+    let selectedCat2 = [];
+
+    function renderCatChips(containerId, cats, selected, onToggle) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = cats.length === 0
+        ? `<span style="font-size:12px;color:var(--text-muted);">No categories found</span>`
+        : cats.map(c => {
+            const active = selected.includes(c);
+            return `<button type="button" data-cat="${c}" style="
+              padding:5px 12px;border-radius:99px;cursor:pointer;font-size:12px;font-weight:${active ? '700' : '500'};
+              border:1.5px solid ${active ? '#4F46E5' : '#D1D5DB'};
+              background:${active ? '#4F46E5' : '#F8FAFC'};
+              color:${active ? '#fff' : '#374151'};
+              white-space:nowrap;
+            ">${c}</button>`;
+          }).join('');
+      el.querySelectorAll('button[data-cat]').forEach(btn => {
+        btn.addEventListener('click', () => { onToggle(btn.dataset.cat); });
+      });
+    }
+
     // Live count update
     function updateCount() {
-      const yr   = document.getElementById('exp-year').value;
-      const mo   = document.getElementById('exp-month').value;
-      const cur  = document.getElementById('exp-currency').value;
-      const cat1 = document.getElementById('exp-cat1').value;
-      const cat2 = document.getElementById('exp-cat2').value;
+      const yr  = document.getElementById('exp-year').value;
+      const mo  = document.getElementById('exp-month').value;
+      const cur = document.getElementById('exp-currency').value;
       const filtered = transactions.filter(t => {
-        if (yr   && t.date?.slice(0, 4) !== yr)             return false;
-        if (mo   && Number(t.date?.slice(5, 7)) !== Number(mo)) return false;
-        if (cur  && t.currency  !== cur)                    return false;
-        if (cat1 && t.category1 !== cat1)                   return false;
-        if (cat2 && t.category2 !== cat2)                   return false;
+        if (yr  && t.date?.slice(0, 4) !== yr)                  return false;
+        if (mo  && Number(t.date?.slice(5, 7)) !== Number(mo))  return false;
+        if (cur && t.currency !== cur)                           return false;
+        if (selectedCat1.length > 0 && !selectedCat1.includes(t.category1)) return false;
+        if (selectedCat2.length > 0 && !selectedCat2.includes(t.category2)) return false;
         return true;
       });
       document.getElementById('export-count').textContent =
         filtered.length + ' transaction' + (filtered.length !== 1 ? 's' : '') + ' will be exported';
       return filtered;
     }
+
+    function toggleCat1(cat) {
+      const idx = selectedCat1.indexOf(cat);
+      if (idx > -1) selectedCat1.splice(idx, 1); else selectedCat1.push(cat);
+      renderCatChips('exp-cat1-chips', allCat1, selectedCat1, toggleCat1);
+      updateCount();
+    }
+    function toggleCat2(cat) {
+      const idx = selectedCat2.indexOf(cat);
+      if (idx > -1) selectedCat2.splice(idx, 1); else selectedCat2.push(cat);
+      renderCatChips('exp-cat2-chips', allCat2, selectedCat2, toggleCat2);
+      updateCount();
+    }
+
+    renderCatChips('exp-cat1-chips', allCat1, selectedCat1, toggleCat1);
+    renderCatChips('exp-cat2-chips', allCat2, selectedCat2, toggleCat2);
+
     updateCount();
-    ['exp-year', 'exp-month', 'exp-currency', 'exp-cat1', 'exp-cat2'].forEach(id => {
+    ['exp-year', 'exp-month', 'exp-currency'].forEach(id => {
       document.getElementById(id).addEventListener('change', updateCount);
     });
 

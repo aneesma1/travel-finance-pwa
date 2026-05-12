@@ -512,7 +512,7 @@ export async function renderAddTrip(container, params = {}) {
           <label class="form-label">Travelling with</label>
           <div id="travel-with-pills"></div>
           <div style="margin-top:12px; display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--surface-3); border-radius:var(--radius-md); border:1px solid var(--border);">
-            <input type="checkbox" id="create-copy-check" ${!isEdit ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;" />
+            <input type="checkbox" id="create-copy-check" ${state.createCopyForCompanions !== false && !isEdit ? 'checked' : (state.createCopyForCompanions ? 'checked' : '')} style="width:18px;height:18px;cursor:pointer;" />
             <label for="create-copy-check" style="font-size:12px;font-weight:600;color:var(--text);cursor:pointer;">
               Create individual copies for companions
             </label>
@@ -546,6 +546,14 @@ export async function renderAddTrip(container, params = {}) {
           state.travelWith = selected.map(s => s.id);
         }
       });
+    }
+
+    // Persist checkbox state to avoid DOM-gone issue when Save runs from review step
+    const chk = document.getElementById('create-copy-check');
+    if (chk) {
+      // Set initial state
+      if (!isEdit && state.createCopyForCompanions === undefined) state.createCopyForCompanions = true;
+      chk.addEventListener('change', () => { state.createCopyForCompanions = chk.checked; });
     }
   }
 
@@ -692,7 +700,8 @@ export async function renderAddTrip(container, params = {}) {
     const selectedPerson = persons.find(m => m.id === state.passengerId);
     const passengerName = state.passengerName || selectedPerson?.name || 'Unknown';
 
-    const shouldDuplicate = !isEdit && state.travelWith.length > 0 && document.getElementById('create-copy-check')?.checked;
+    // Use state.createCopyForCompanions — saved when checkbox rendered (DOM gone by review step)
+    const shouldDuplicate = !isEdit && state.travelWith.length > 0 && (state.createCopyForCompanions !== false);
 
     const tripData = {
       id:           isEdit ? existingTrip.id : uuidv4(),
