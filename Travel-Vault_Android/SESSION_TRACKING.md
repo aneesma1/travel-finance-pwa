@@ -509,3 +509,132 @@ No code change needed.
 | `Personal_vault/src/shared/drive.js` | `downloadLocalBackup` fixed, `saveXLSXToExports` added |
 | `Personal_vault/src/shared/sync-manager.js` | Auto-backup to `VaultboxFiles` subfolder |
 | `Personal_vault/src/index.html` | Exit confirmation dialog |
+
+---
+
+### Session 12: Sync Folder, Share Image, Export Crashes, Storage Permissions (2026-04-27 → 2026-05-10)
+**Context:** Multiple follow-up sessions covering Android storage visibility, sync folder setup, share/export crash fixes, APK and PWA build infrastructure, and a batch of UI/UX bug fixes.
+
+---
+
+#### v5.5.3 → v5.5.6 (commits `121f347` → `5639f53` → `1750fcc`)
+- **Sync-manager boot backup**: Exported `bootBackup(appName)` called in both `index.html` boot sequences — creates today's backup on every app open, not just on data save
+- **drive.js crash fix**: `Directory.Documents` / `Encoding.UTF8` were TypeScript enum references, not valid at runtime. Replaced with string literals `'DOCUMENTS'` / `'utf8'`. Crashed ALL exports/backups before fix.
+- **Travel export crashes** (`travel-export.js`): `getStayDays()` hoisted to module level; missing `const lines = []` declaration added; PDF/Excel/CSV now save to `Documents/TravelHub/exports/` via Capacitor
+- **Travel log**: Horizontal scroll passenger chips → bottom-sheet popup picker; filter matches primary passenger only (companions excluded); Summary tab added Share Text + Share Image
+- **Vault transactions**: FAB `＋` z-index raised to 105; filter sheet Cancel button + safe-area padding
+
+#### v5.6.0 → v5.6.3 (commits `f36f21a` → `c4d30cc` → `09a3b43`)
+- **Sync folder — public Documents**: Both apps write `TravelHub_latest.json` / `PersonalVault_latest.json` to public `Documents/` path using `MANAGE_EXTERNAL_STORAGE`
+- **AndroidManifest.xml** (both apps): Added `MANAGE_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` (≤Android 9), `READ_EXTERNAL_STORAGE` (≤Android 12), `android:requestLegacyExternalStorage="true"`
+- **Settings "Sync Folder" section** (both apps): Permission status badge, Grant All Files Access button, Sync Now, Last sync timestamp, Restore from sync_folder (reads `_latest.json` directly)
+- **3-option restore dialog**: merge/append/wipe choice on all restore and import paths (both apps)
+- **Save image to Documents/share_images/**: Native Capacitor Filesystem write; share sheet fallback
+- **Contacts picker graceful fallback**: `passengerName` fallback in all Travel export formats
+
+#### PWA Infrastructure (commits `8b7c72a` → `9c5972c` → `e8880c6`)
+- **Standalone bundler** (`Travel-Vault_PWA/build-standalone.py` v4.2.1): Bundles both apps into single-file HTML (no server needed, double-click to open); handles ES module → IIFE transform, dynamic import replacement, CSS inlining
+- **PWA dist files** (`FamilyHub_Standalone.html` ~526KB, `PrivateVault_Standalone.html` ~296KB): First production builds
+
+---
+
+#### Issues Resolved (F-series Travel, V-series Vault)
+- **F1**: Share button in Travel Log → native Android share sheet via `@capacitor/share`
+- **F2**: Save image → `Documents/TravelHub/share_images/` via Capacitor Filesystem
+- **F3**: Contacts picker — graceful fallback when no plugin available
+- **F4**: Dashboard reminder button — wired correctly
+- **F5**: UI safe-area fixes across sheets
+- **F6**: Export layout (People → Passengers label)
+- **V1**: Save image in Vault transaction view
+- **V2**: Category manager action bar above Android nav bar
+
+**Key commits:** `121f347`, `5639f53`, `1750fcc`, `f36f21a`, `c4d30cc`, `09a3b43`, `8b7c72a`, `9c5972c`, `e8880c6`
+
+---
+
+### Session 13: Contact Picker, GPS, Family Defaults, Share Card, Safe Area, Vault UX (2026-05-11 → 2026-05-12)
+**Context:** User-testing batch of fixes across both APKs and PWA. Six separate issues resolved across two commits.
+
+---
+
+#### Issues Resolved — Travel App
+
+**1. APK Build Fix — contacts plugin 404** (`3a7adf6`)
+- `@capacitor/contacts` does not exist on npm. Corrected to `@capacitor-community/contacts@^7.2.0` in `Travel_app/package.json`
+
+**2. Trip Share Card — wrong data** (`3dd91f2`)
+- Card was showing "ARRIVED / DURATION" computed fields. Fixed to show actual trip data:
+  - `Departure` → `formatDisplayDate(state.dateLeftOrigin)`
+  - `Arrival` → `formatDisplayDate(state.dateArrivedDest)`
+  - `Flight` → `state.flightNumber` (shown only if set)
+- Was also using `state.flightInward` (non-existent field). Removed.
+- **File:** `Travel_app/src/js/screens/add-trip.js` v3.5.32
+
+**3. Android bottom nav bar hiding modal content** (`e88c096`)
+- `.modal-sheet` CSS: added `padding: 8px 0 env(safe-area-inset-bottom, 0px)` (both `app.css` files)
+- Inline JS bottom sheets in 5 files updated: `padding-bottom` → `calc(Xpx + env(safe-area-inset-bottom, 0px))`
+- **Files:** `Travel_app/src/css/app.css`, `Personal_vault/src/css/app.css`, `Travel_app/add-document.js`, `Travel_app/dashboard.js`, `Travel_app/person-profile.js`, `Personal_vault/dashboard.js`, `Personal_vault/transactions.js`
+
+**4. Contact Picker** (`bd14278` → `337d046`)
+- Primary: Web Contact Picker API (`navigator.contacts.select()`)
+- Fallback: `@capacitor-community/contacts` plugin
+- Last resort: manual entry toast
+- Note: `@capacitor-community/contacts` v7 has runtime permission API incompatibility with Capacitor 8; Web API confirmed working on user's device
+- **File:** `Travel_app/src/js/screens/family-defaults.js` v3.5.9
+
+**5. GPS Location — "User denied Geolocation"** (`841e00a`)
+- Root cause: `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` missing from `AndroidManifest.xml`. OS immediately rejects without showing permission dialog.
+- Fix: Added both permissions to `Travel_app/android/app/src/main/AndroidManifest.xml`
+
+**6. Auto-populate home address for new family member** (`841e00a`)
+- `createEmptyMember()` always set `homeQatar: null, homeIndia: null`
+- Fixed: function now accepts `familyDefaults` parameter; copies address from defaults if set
+- Call site updated: `createEmptyMember(familyDefaults)` — data destructuring updated to extract `familyDefaults`
+- Independent copies via spread (`{ ...familyDefaults.homeQatar }`) so edits don't affect defaults
+- **File:** `Travel_app/src/js/screens/person-profile.js`
+
+---
+
+#### Issues Resolved — Personal Vault
+
+**7. Category & Sub-category auto-suggest** (`77cb93d`)
+- `cat1` SmartInput: suggestions now built from `savedCats` UNION `transactions.map(t => t.category1)` — all ever-used categories appear
+- `cat2` SmartInput: now uses `allSubCategories` built exclusively from `transactions.map(t => t.category2)` — proper sub-category list
+- **File:** `Personal_vault/src/js/screens/add-transaction.js` v3.5.26
+
+**8. Click category → filtered transaction list** (`77cb93d`)
+- Clicking any category row in Manage Categories: closes modal, sets `sessionStorage('vault_search_cats', JSON.stringify([cat]))`, navigates to `transactions`
+- Added `import { navigate } from '../router.js'` to category-manager.js
+- **File:** `Personal_vault/src/js/modals/category-manager.js` v3.6.1
+
+**9. Cancel button + safe area in Manage Categories** (`77cb93d`)
+- Action bar is now always visible (`display:flex; position:fixed; bottom:0`) with `env(safe-area-inset-bottom, 0px)` padding
+- Shows **Cancel** when no items selected; switches to **Delete / Merge** when items are checked
+- List container has `padding-bottom:100px` so last item is always reachable
+- **File:** `Personal_vault/src/js/modals/category-manager.js` v3.6.1
+
+---
+
+#### PWA Updates
+
+- All changes applied to corresponding PWA source files:
+  - `Travel-Vault_PWA/app-b-private-vault/js/screens/add-transaction.js` v3.5.26
+  - `Travel-Vault_PWA/app-b-private-vault/js/modals/category-manager.js` v3.5.11
+- PWA rebuilt: `PrivateVault_Standalone.html` (298 KB)
+
+**Files Changed (10):**
+
+| File | Change |
+|------|--------|
+| `Travel_app/package.json` | `@capacitor-community/contacts@^7.2.0` (was wrong package) |
+| `Travel_app/src/js/screens/add-trip.js` | Share card: Departure/Arrival/Flight (was Arrived/Duration/wrong field) |
+| `Travel_app/src/css/app.css` | `.modal-sheet` safe-area bottom padding |
+| `Travel_app/android/app/src/main/AndroidManifest.xml` | Added ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION |
+| `Travel_app/src/js/screens/family-defaults.js` | Contact picker 3-tier; safe-area on inline sheets |
+| `Travel_app/src/js/screens/person-profile.js` | `createEmptyMember(familyDefaults)` auto-populates home addresses |
+| `Personal_vault/src/css/app.css` | `.modal-sheet` safe-area bottom padding |
+| `Personal_vault/src/js/screens/add-transaction.js` | Category from history; sub-cat from cat2 history |
+| `Personal_vault/src/js/modals/category-manager.js` | Click-to-filter; always-visible bar; Cancel button |
+| `Travel-Vault_PWA/dist/PrivateVault_Standalone.html` | Rebuilt with all vault changes |
+
+**Git Commits:** `3dd91f2`, `e88c096`, `bd14278`, `337d046`, `841e00a`, `77cb93d`
