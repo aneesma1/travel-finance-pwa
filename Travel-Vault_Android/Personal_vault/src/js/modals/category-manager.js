@@ -1,4 +1,4 @@
-// v3.6.0 — 2026-04-24 — Title Case normalization, case-insensitive comparisons
+// v3.6.1 — 2026-05-12 — Click row to filter transactions; always-visible Cancel; safe-area bottom padding
 // ─── app-b-private-vault/js/modals/category-manager.js ───────────────────────
 // Category Manager Modal: Multi-select, Rename, Merge, Delete
 
@@ -6,6 +6,7 @@ import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
 import { localSave } from '../../shared/sync-manager.js';
 import { showToast, uuidv4 } from '../../shared/utils.js';
 import { SmartInput } from '../../shared/smart-input.js';
+import { navigate } from '../router.js';
 
 // Normalize any category string to Title Case
 function toTitleCase(str) {
@@ -48,19 +49,25 @@ export async function openCategoryManager(containerEl) {
           </div>
         </div>
 
-        <div id="cat-list-container" style="flex:1; overflow-y:auto; padding:12px 0; padding-bottom:${selected.size > 0 ? '100px' : '12px'};">
+        <div id="cat-list-container" style="flex:1; overflow-y:auto; padding:12px 0; padding-bottom:100px;">
           ${renderList()}
         </div>
       </div>
 
-      <!-- Action bar OUTSIDE modal-sheet so it sits above Android nav bar -->
-      <div id="multi-action-bar" style="display:${selected.size > 0 ? 'flex' : 'none'}; position:fixed; bottom:0; left:0; right:0; padding:12px 20px; padding-bottom:calc(12px + env(safe-area-inset-bottom)); gap:10px; background:var(--surface); border-top:1px solid var(--border); box-shadow:0 -4px 12px rgba(0,0,0,0.12); z-index:1000;">
-        <button id="bulk-delete-btn" class="btn btn-secondary" style="flex:1; color:var(--danger); border-color:var(--danger-light);">
-          🗑️ Delete (${selected.size})
-        </button>
-        <button id="bulk-merge-btn" class="btn btn-primary" style="flex:1;">
-          🔄 Merge (${selected.size})
-        </button>
+      <!-- Action bar: always visible above Android nav bar -->
+      <div id="multi-action-bar" style="display:flex; position:fixed; bottom:0; left:0; right:0; padding:12px 20px; padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px)); gap:10px; background:var(--surface); border-top:1px solid var(--border); box-shadow:0 -4px 12px rgba(0,0,0,0.12); z-index:1000;">
+        ${selected.size > 0 ? `
+          <button id="bulk-delete-btn" class="btn btn-secondary" style="flex:1; color:var(--danger); border-color:var(--danger-light);">
+            🗑️ Delete (${selected.size})
+          </button>
+          <button id="bulk-merge-btn" class="btn btn-primary" style="flex:1;">
+            🔄 Merge (${selected.size})
+          </button>
+        ` : `
+          <button id="cancel-cat-mgr" class="btn btn-secondary" style="flex:1;">
+            Cancel
+          </button>
+        `}
       </div>
     `;
 
@@ -91,6 +98,7 @@ export async function openCategoryManager(containerEl) {
 
   function bindEvents() {
     document.getElementById('close-cat-mgr').addEventListener('click', () => modalEl.classList.add('hidden'));
+    document.getElementById('cancel-cat-mgr')?.addEventListener('click', () => modalEl.classList.add('hidden'));
 
     // New Cat Input
     const smartInput = new SmartInput(document.getElementById('new-cat-input-wrap'), {
@@ -125,6 +133,15 @@ export async function openCategoryManager(containerEl) {
     // List events
     modalEl.querySelectorAll('.cat-row').forEach(row => {
       const cat = row.dataset.cat;
+
+      // Click row body → navigate to filtered transaction list for that category
+      row.addEventListener('click', (e) => {
+        if (e.target.classList.contains('cat-check') || e.target.closest('.rename-cat-btn')) return;
+        modalEl.classList.add('hidden');
+        sessionStorage.setItem('vault_search_cats', JSON.stringify([cat]));
+        navigate('transactions');
+      });
+
       row.querySelector('.cat-check').addEventListener('change', (e) => {
         if (e.target.checked) selected.add(cat);
         else selected.delete(cat);
@@ -146,15 +163,26 @@ export async function openCategoryManager(containerEl) {
 
   function updateActionBar() {
     const bar = document.getElementById('multi-action-bar');
-    const listContainer = document.getElementById('cat-list-container');
     if (!bar) return;
-    const show = selected.size > 0;
-    bar.style.display = show ? 'flex' : 'none';
-    if (listContainer) listContainer.style.paddingBottom = show ? '100px' : '12px';
-    const delBtn = document.getElementById('bulk-delete-btn');
-    const mrgBtn = document.getElementById('bulk-merge-btn');
-    if (delBtn) delBtn.innerHTML = `🗑️ Delete (${selected.size})`;
-    if (mrgBtn) mrgBtn.innerHTML = `🔄 Merge (${selected.size})`;
+    if (selected.size > 0) {
+      bar.innerHTML = `
+        <button id="bulk-delete-btn" class="btn btn-secondary" style="flex:1; color:var(--danger); border-color:var(--danger-light);">
+          🗑️ Delete (${selected.size})
+        </button>
+        <button id="bulk-merge-btn" class="btn btn-primary" style="flex:1;">
+          🔄 Merge (${selected.size})
+        </button>
+      `;
+      document.getElementById('bulk-delete-btn').addEventListener('click', handleBulkDelete);
+      document.getElementById('bulk-merge-btn').addEventListener('click', handleBulkMerge);
+    } else {
+      bar.innerHTML = `
+        <button id="cancel-cat-mgr" class="btn btn-secondary" style="flex:1;">
+          Cancel
+        </button>
+      `;
+      document.getElementById('cancel-cat-mgr').addEventListener('click', () => modalEl.classList.add('hidden'));
+    }
   }
 
   async function handleBulkDelete() {

@@ -1,4 +1,4 @@
-// v3.5.25 — 2026-03-28
+// v3.5.26 — 2026-05-12 — Category/sub-cat suggestions from transaction history; sub-cat uses cat2 list
 
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form
@@ -28,8 +28,10 @@ export async function renderAddTransaction(container, params = {}) {
 
   const existing = isEdit ? transactions.find(t => t.id === txnId) : null;
 
-  // Rely on saved categories/accounts from data
-  const allCategories = [...new Set(savedCats)].sort();
+  // Build category lists from saved categories + transaction history
+  const dynamicCats1 = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
+  const allCategories = [...new Set([...savedCats.map(c => c), ...dynamicCats1])].sort();
+  const allSubCategories = [...new Set(transactions.map(t => t.category2).filter(Boolean))].sort();
   const allAccounts   = [...new Set(savedAccounts.length ? savedAccounts : ['Cash', 'Card', 'Bank'])].sort();
 
   // Smart-search suggestions from history
@@ -180,7 +182,7 @@ export async function renderAddTransaction(container, params = {}) {
 
     // Category 2
     new SmartInput(document.getElementById('cat2-pills'), {
-      suggestions: allCategories,
+      suggestions: allSubCategories,
       value: state.category2,
       placeholder: 'Sub-category (optional)',
       onInput: v => { state.category2 = (v || '').trim(); },
