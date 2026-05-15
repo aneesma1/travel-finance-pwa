@@ -30,8 +30,9 @@ export async function renderAddTransaction(container, params = {}) {
   const allAccounts   = [...new Set(savedAccounts.length ? savedAccounts : ['Cash', 'Card', 'Bank'])].sort();
 
   // Smart-search suggestions from history
-  const descSuggestions = [...new Set(transactions.map(t => t.description).filter(Boolean))];
-  const notesSuggestions = [...new Set(transactions.map(t => t.notes1).filter(Boolean))];
+  const descSuggestions     = [...new Set(transactions.map(t => t.description).filter(Boolean))];
+  const notesSuggestions    = [...new Set(transactions.map(t => t.notes1).filter(Boolean))];
+  const bankNameSuggestions = [...new Set(transactions.map(t => t.bankName).filter(Boolean))];
 
   const state = {
     date:        isClone ? today() : (existing?.date        || today()),
@@ -43,6 +44,7 @@ export async function renderAddTransaction(container, params = {}) {
     category2:   existing?.category2   || '',
     notes1:      existing?.notes1      || '',
     account:     existing?.account     || (allAccounts[0] || 'Cash'),
+    bankName:    isClone ? '' : (existing?.bankName || ''),
     photos:      isClone ? [] : (existing?.photos || []),
   };
 
@@ -117,6 +119,12 @@ export async function renderAddTransaction(container, params = {}) {
           <div id="account-pills"></div>
         </div>
 
+        <!-- Bank / Card name -->
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Bank / Card Name <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+          <div id="bank-name-input"></div>
+        </div>
+
         <!-- Preview -->
         <div id="txn-preview" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;display:flex;align-items:center;gap:12px;">
         </div>
@@ -125,6 +133,10 @@ export async function renderAddTransaction(container, params = {}) {
 
         <button class="btn btn-primary btn-full" id="save-btn">
           ${isEdit ? '💾 Save Changes' : isClone ? '🔁 Save as New Entry' : '✅ Save Transaction'}
+        </button>
+
+        <button class="btn btn-secondary btn-full" id="cancel-btn" style="margin-top:0;">
+          ✕ Cancel
         </button>
 
       </div>
@@ -203,7 +215,17 @@ export async function renderAddTransaction(container, params = {}) {
       onAdd: () => promptAddOption('account', 'account-pills', allAccounts, null)
     });
 
+    // Bank / Card name
+    new SmartInput(document.getElementById('bank-name-input'), {
+      suggestions: bankNameSuggestions,
+      value: state.bankName,
+      placeholder: 'e.g. HSBC, Mashreq, Visa Gold…',
+      onInput: v => { state.bankName = v; },
+      onSelect: v => { state.bankName = v; }
+    });
+
     document.getElementById('save-btn').addEventListener('click', saveTxn);
+    document.getElementById('cancel-btn').addEventListener('click', () => navigate('transactions'));
     updatePreview();
   }
 
@@ -323,6 +345,7 @@ export async function renderAddTransaction(container, params = {}) {
       category2:   state.category2 || null,
       notes1:      state.notes1    || null,
       account:     state.account,
+      bankName:    state.bankName  || null,
       photos:      state.photos    || [],
     };
 

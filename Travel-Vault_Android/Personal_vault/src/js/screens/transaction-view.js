@@ -58,6 +58,7 @@ export async function renderTransactionView(container, params = {}) {
         ${row('🏷️', 'Primary Category', t.category1 || '--')}
         ${t.category2 ? row('🏷️', 'Sub-Category', t.category2) : ''}
         ${row('🏦', 'Account', t.account || '--')}
+        ${t.bankName ? row('🏛️', 'Bank / Card', t.bankName) : ''}
         ${t.notes1 ? row('💬', 'Notes', t.notes1) : ''}
         ${row('🕐', 'Recorded', t.timestamp ? new Date(t.timestamp).toLocaleString() : '--')}
       </div>

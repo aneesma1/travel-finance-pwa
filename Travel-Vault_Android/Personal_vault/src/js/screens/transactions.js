@@ -1,4 +1,4 @@
-// v3.5.7 — 2026-04-27 — FAB z-index above nav bar (CSS already positions correctly)
+// v3.5.8 — 2026-05-15 — Fix blank export (currency 'All' bug); Word export; Capacitor Share; Share Text option
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -63,21 +63,23 @@ export async function renderTransactions(container) {
 
       <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Format</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="export-format-pills">
-        <button class="sheet-pill active" data-fmt="xlsx">📊 Excel</button>
+        <button class="sheet-pill active" data-fmt="word">📝 Word</button>
+        <button class="sheet-pill" data-fmt="xlsx">📊 Excel</button>
         <button class="sheet-pill" data-fmt="csv">📄 CSV</button>
       </div>
 
       <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Scope</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;" id="export-scope-pills">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="export-scope-pills">
         <button class="sheet-pill active" data-scope="filtered">Current filters</button>
         <button class="sheet-pill" data-scope="all">All data</button>
       </div>
 
       <div id="export-status" style="font-size:13px;color:var(--text-muted);min-height:20px;margin-bottom:12px;"></div>
 
-      <div style="display:flex;gap:10px;">
-        <button id="export-download" class="btn btn-primary" style="flex:1;">📥 Download</button>
-        <button id="export-share" class="btn btn-secondary" style="flex:1;">📤 Share</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="export-download" class="btn btn-primary" style="flex:1;min-width:120px;">📥 Download</button>
+        <button id="export-share-file" class="btn btn-secondary" style="flex:1;min-width:120px;">📤 Share File</button>
+        <button id="export-share-text" class="btn btn-secondary" style="flex:1;min-width:120px;">💬 Share Text</button>
       </div>
     `;
 
@@ -111,86 +113,166 @@ export async function renderTransactions(container) {
       });
     });
 
+    function getScopedTxns(allTxns) {
+      if (selectedScope !== 'filtered') return allTxns;
+      return allTxns.filter(t => {
+        if (activeCurrency !== 'All' && t.currency !== activeCurrency) return false;
+        if (activeYear  && t.date?.slice(0,4) !== String(activeYear))    return false;
+        if (activeMonth && Number(t.date?.slice(5,7)) !== activeMonth)   return false;
+        if (activeAccount && t.account !== activeAccount)                  return false;
+        if (selectedCategories.length > 0) {
+          if (filterLogic === 'OR') {
+            if (!selectedCategories.includes(t.category1) && !selectedCategories.includes(t.category2)) return false;
+          } else {
+            const tCats = [t.category1, t.category2].filter(Boolean);
+            if (!selectedCategories.every(c => tCats.includes(c))) return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    async function shareFile(blob, filename, mimeType) {
+      const SharePlugin = window.Capacitor?.Plugins?.Share;
+      const FS = window.Capacitor?.Plugins?.Filesystem;
+      if (FS && SharePlugin) {
+        try {
+          const reader = new FileReader();
+          const base64 = await new Promise((res, rej) => {
+            reader.onload = e => res(e.target.result.split(',')[1]);
+            reader.onerror = rej;
+            reader.readAsDataURL(blob);
+          });
+          await FS.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+          const { uri } = await FS.getUri({ path: filename, directory: 'CACHE' });
+          await SharePlugin.share({ title: 'Finance Export', files: [uri], dialogTitle: 'Share Export' });
+          await FS.deleteFile({ path: filename, directory: 'CACHE' }).catch(() => {});
+          return;
+        } catch (e) {
+          if (e?.name === 'AbortError' || String(e?.message).toLowerCase().includes('cancel')) return;
+        }
+      }
+      // Web fallback
+      if (navigator.share && navigator.canShare?.({ files: [new File([blob], filename, { type: mimeType })] })) {
+        await navigator.share({ files: [new File([blob], filename, { type: mimeType })] }).catch(()=>{});
+      } else {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+      }
+    }
+
     async function doExport(deliver) {
       const status = document.getElementById('export-status');
       status.textContent = 'Preparing export…';
 
       const allTxns = (await getCachedFinanceData())?.transactions || [];
-      const scopedTxns = selectedScope === 'filtered'
-        ? allTxns.filter(t => {
-            if (t.currency !== activeCurrency) return false;
-            if (activeYear && t.date?.slice(0,4) !== String(activeYear)) return false;
-            if (activeMonth && Number(t.date?.slice(5,7)) !== activeMonth) return false;
-            if (activeAccount && t.account !== activeAccount) return false;
-            
-            if (selectedCategories.length > 0) {
-              if (filterLogic === 'OR') {
-                if (!selectedCategories.includes(t.category1) && !selectedCategories.includes(t.category2)) return false;
-              } else {
-                const tCats = [t.category1, t.category2].filter(Boolean);
-                if (!selectedCategories.every(c => tCats.includes(c))) return false;
-              }
-            }
-            return true;
-          })
-        : allTxns;
-
-      const scopeLabel = selectedScope === 'filtered' ? filterSummary.replace(/ · /g,'_') : 'All';
-      const filename = 'Finance_' + scopeLabel + '_' + ts + '.' + selectedFmt;
-
+      const scopedTxns = getScopedTxns(allTxns);
+      const scopeLabel = selectedScope === 'filtered' ? (filterSummary.replace(/ · /g,'_') || 'Filtered') : 'All';
       status.textContent = 'Exporting ' + scopedTxns.length + ' records…';
 
+      // ── Word (HTML-based .doc) ─────────────────────────────────────────────
+      if (selectedFmt === 'word') {
+        const cards = scopedTxns.map(t => `
+          <div style="border:1px solid #D1D5DB;border-radius:8px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid;">
+            <h3 style="margin:0 0 10px;color:#1a56db;font-size:15px;">${t.description || 'Transaction'}</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <tr><td style="color:#6B7280;padding:3px 10px 3px 0;width:38%;">📅 Date</td><td style="font-weight:600;">${t.date || '--'}</td></tr>
+              ${t.amountSpend ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">💸 Spend</td><td style="font-weight:700;color:#DC2626;">${t.currency || ''} ${t.amountSpend}</td></tr>` : ''}
+              ${t.income ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">💰 Income</td><td style="font-weight:700;color:#16A34A;">${t.currency || ''} ${t.income}</td></tr>` : ''}
+              <tr><td style="color:#6B7280;padding:3px 10px 3px 0;">🏷️ Category</td><td>${t.category1 || '--'}${t.category2 ? ' › ' + t.category2 : ''}</td></tr>
+              <tr><td style="color:#6B7280;padding:3px 10px 3px 0;">🏦 Account</td><td>${t.account || '--'}</td></tr>
+              ${t.bankName ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">🏛️ Bank/Card</td><td>${t.bankName}</td></tr>` : ''}
+              ${t.notes1 ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">💬 Notes</td><td>${t.notes1}</td></tr>` : ''}
+            </table>
+          </div>`).join('');
+
+        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body style="font-family:Calibri,Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px;"><h1 style="color:#1e3a5f;font-size:20px;">Finance Records · ${filterSummary || 'All'}</h1><p style="color:#6B7280;">${scopedTxns.length} transactions · ${new Date().toLocaleDateString()}</p><hr style="border-color:#E5E7EB;margin:12px 0;">${cards}</body></html>`;
+        const blob = new Blob([html], { type: 'application/msword' });
+        const fname = 'Finance_' + scopeLabel + '_' + ts + '.doc';
+        if (deliver === 'download') {
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click(); URL.revokeObjectURL(a.href);
+        } else {
+          await shareFile(blob, fname, 'application/msword');
+        }
+        status.textContent = '✅ ' + fname; setTimeout(close, 1800); return;
+      }
+
+      // ── CSV ───────────────────────────────────────────────────────────────
       if (selectedFmt === 'csv') {
-        const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Currency'];
+        const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Bank/Card','Currency'];
         const rows = scopedTxns.map(t => [
           t.timestamp||'', t.date||'', t.description||'',
           t.amountSpend??'', t.income??'', t.category1||'',
-          t.category2||'', t.notes1||'', t.account||'', t.currency||''
+          t.category2||'', t.notes1||'', t.account||'', t.bankName||'', t.currency||''
         ]);
-        const csv = [headers, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+        const csv = [headers, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
+        const fname = 'Finance_' + scopeLabel + '_' + ts + '.csv';
         if (deliver === 'download') {
-          const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-          a.download = filename; a.click(); URL.revokeObjectURL(a.href);
-        } else if (navigator.share) {
-          await navigator.share({ files: [new File([blob], filename, { type: 'text/csv' })] }).catch(()=>{});
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click(); URL.revokeObjectURL(a.href);
+        } else {
+          await shareFile(blob, fname, 'text/csv');
         }
-        status.textContent = '✅ ' + filename;
-        return;
+        status.textContent = '✅ ' + fname; setTimeout(close, 1800); return;
       }
 
-      // XLSX export via SheetJS
+      // ── XLSX ──────────────────────────────────────────────────────────────
       if (!window.XLSX) {
         await new Promise((res,rej) => {
           const s = document.createElement('script');
           s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
+          s.onload = res; s.onerror = rej; document.head.appendChild(s);
         });
       }
-      const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Currency'];
+      const headers = ['Timestamp','Date','Description','Amount Spend','Income','Category 1','Category 2','Notes 1','Account','Bank/Card','Currency'];
       const rows = scopedTxns.map(t => [
         t.timestamp||'', t.date||'', t.description||'',
         t.amountSpend??'', t.income??'', t.category1||'',
-        t.category2||'', t.notes1||'', t.account||'', t.currency||''
+        t.category2||'', t.notes1||'', t.account||'', t.bankName||'', t.currency||''
       ]);
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
-
+      const fname = 'Finance_' + scopeLabel + '_' + ts + '.xlsx';
       if (deliver === 'download') {
-        XLSX.writeFile(wb, filename);
-      } else if (navigator.share) {
+        XLSX.writeFile(wb, fname);
+      } else {
         const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-        const blob = new Blob([wbout], { type:'application/octet-stream' });
-        await navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(()=>{});
+        await shareFile(new Blob([wbout], { type:'application/octet-stream' }), fname, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       }
-      status.textContent = '✅ ' + filename;
-      setTimeout(close, 1500);
+      status.textContent = '✅ ' + fname;
+      setTimeout(close, 1800);
+    }
+
+    async function shareText() {
+      const allTxns = (await getCachedFinanceData())?.transactions || [];
+      const scopedTxns = getScopedTxns(allTxns);
+      const lines = [
+        `💰 *Finance Records · ${filterSummary || 'All'}*`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ...scopedTxns.map(t => [
+          `📝 ${t.description || 'Transaction'} · 📅 ${t.date || ''}`,
+          t.amountSpend ? `   💸 ${t.currency} ${t.amountSpend}` : '',
+          t.income      ? `   💰 ${t.currency} ${t.income}` : '',
+          `   🏷️ ${t.category1 || '--'}${t.category2 ? ' › ' + t.category2 : ''} · 🏦 ${t.account || '--'}${t.bankName ? ' (' + t.bankName + ')' : ''}`,
+          t.notes1 ? `   💬 ${t.notes1}` : '',
+        ].filter(Boolean).join('\n')),
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `${scopedTxns.length} transactions · _Private Vault_`
+      ];
+      const text = lines.join('\n');
+      const SharePlugin = window.Capacitor?.Plugins?.Share;
+      if (SharePlugin) {
+        try { await SharePlugin.share({ title: 'Finance Records', text, dialogTitle: 'Share Records' }); return; }
+        catch (e) { if (e?.name === 'AbortError' || String(e?.message).toLowerCase().includes('cancel')) return; }
+      }
+      try { await navigator.clipboard.writeText(text); showToast('Copied to clipboard', 'success'); }
+      catch { showToast('Copy failed', 'warning'); }
     }
 
     document.getElementById('export-download').addEventListener('click', () => doExport('download'));
-    document.getElementById('export-share').addEventListener('click', () => doExport('share'));
+    document.getElementById('export-share-file').addEventListener('click', () => doExport('share'));
+    document.getElementById('export-share-text').addEventListener('click', () => shareText());
   }
 
   // Wait for data to be structurally ready (via global event)

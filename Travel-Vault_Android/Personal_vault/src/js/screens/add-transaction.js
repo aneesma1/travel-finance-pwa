@@ -1,4 +1,4 @@
-// v3.5.27 — 2026-05-12 — Clone as New Entry; export cat multi-select; restore schemaVersion fix; pill color
+// v3.5.28 — 2026-05-15 — Cancel button; bank/card name field with auto-suggest
 
 // ─── app-b-private-vault/js/screens/add-transaction.js ──────────────────────
 // Add / Edit Transaction form
@@ -36,11 +36,12 @@ export async function renderAddTransaction(container, params = {}) {
   const allAccounts   = [...new Set(savedAccounts.length ? savedAccounts : ['Cash', 'Card', 'Bank'])].sort();
 
   // Smart-search suggestions from history
-  const descSuggestions = [...new Set(transactions.map(t => t.description).filter(Boolean))];
-  const notesSuggestions = [...new Set(transactions.map(t => t.notes1).filter(Boolean))];
+  const descSuggestions     = [...new Set(transactions.map(t => t.description).filter(Boolean))];
+  const notesSuggestions    = [...new Set(transactions.map(t => t.notes1).filter(Boolean))];
+  const bankNameSuggestions = [...new Set(transactions.map(t => t.bankName).filter(Boolean))];
 
   const state = {
-    date:        isClone ? today() : (existing?.date        || today()),  // Clone → today's date
+    date:        isClone ? today() : (existing?.date        || today()),
     description: existing?.description || '',
     amountSpend: existing?.amountSpend != null ? String(existing.amountSpend) : '',
     income:      existing?.income      != null ? String(existing.income)      : '',
@@ -49,7 +50,8 @@ export async function renderAddTransaction(container, params = {}) {
     category2:   existing?.category2   || '',
     notes1:      existing?.notes1      || '',
     account:     existing?.account     || (allAccounts[0] || 'Cash'),
-    photos:      isClone ? [] : (existing?.photos || []),  // Clone → no photos carried over
+    bankName:    isClone ? '' : (existing?.bankName || ''),
+    photos:      isClone ? [] : (existing?.photos || []),
   };
 
   function render() {
@@ -123,6 +125,12 @@ export async function renderAddTransaction(container, params = {}) {
           <div id="account-pills"></div>
         </div>
 
+        <!-- Bank / Card name -->
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Bank / Card Name <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+          <div id="bank-name-input"></div>
+        </div>
+
         <!-- Preview -->
         <div id="txn-preview" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;display:flex;align-items:center;gap:12px;">
         </div>
@@ -130,7 +138,11 @@ export async function renderAddTransaction(container, params = {}) {
         <div id="save-error" style="color:var(--danger);font-size:13px;text-align:center;min-height:18px;"></div>
 
         <button class="btn btn-primary btn-full" id="save-btn">
-          ${isEdit ? '💾 Save Changes' : '✅ Save Transaction'}
+          ${isEdit ? '💾 Save Changes' : isClone ? '🔁 Save as New Entry' : '✅ Save Transaction'}
+        </button>
+
+        <button class="btn btn-secondary btn-full" id="cancel-btn" style="margin-top:0;">
+          ✕ Cancel
         </button>
 
       </div>
@@ -209,7 +221,17 @@ export async function renderAddTransaction(container, params = {}) {
       onAdd: () => promptAddOption('account', 'account-pills', allAccounts, null)
     });
 
+    // Bank / Card name
+    new SmartInput(document.getElementById('bank-name-input'), {
+      suggestions: bankNameSuggestions,
+      value: state.bankName,
+      placeholder: 'e.g. HSBC, Mashreq, Visa Gold…',
+      onInput: v => { state.bankName = v; },
+      onSelect: v => { state.bankName = v; }
+    });
+
     document.getElementById('save-btn').addEventListener('click', saveTxn);
+    document.getElementById('cancel-btn').addEventListener('click', () => navigate('transactions'));
     updatePreview();
   }
 
@@ -329,6 +351,7 @@ export async function renderAddTransaction(container, params = {}) {
       category2:   state.category2 ? toTitleCase(state.category2) : null,
       notes1:      state.notes1    || null,
       account:     state.account,
+      bankName:    state.bankName  || null,
       photos:      state.photos    || [],
     };
 

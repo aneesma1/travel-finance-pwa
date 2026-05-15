@@ -1,4 +1,4 @@
-// v3.7.3 — 2026-05-09 — Summary share/save: Capacitor Share plugin + Documents/share_images/
+// v3.7.4 — 2026-05-15 — params.person pre-filter from dashboard person chip click
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: Dual-tab architecture (Trip Log & Passenger Summary)
@@ -102,10 +102,12 @@ export async function renderTravelLog(container, params = {}) {
   // ── 2. State Management ──
   const urlYear = params.year || getHashParams().year;
   let filterYear = urlYear || 'all';
-  
-  // Load persisted passenger filter from localStorage (falls back to URL param)
+
+  // params.person from dashboard → pre-filter to that person (overrides saved filter)
   const _savedFilter = (() => { try { return JSON.parse(localStorage.getItem('travellog_filter_passengers') || '[]'); } catch { return []; } })();
-  let filterPassenger = _savedFilter.length > 0 ? _savedFilter.join(',') : (getHashParams().passenger || '');
+  let filterPassenger = params.person
+    ? params.person
+    : (_savedFilter.length > 0 ? _savedFilter.join(',') : (getHashParams().passenger || ''));
   let searchQuery = getHashParams().q || '';
 
   // Tab State
