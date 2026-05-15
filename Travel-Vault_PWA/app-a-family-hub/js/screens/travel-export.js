@@ -1,4 +1,4 @@
-// v4.0.1 — 2026-05-02 — Fixed: lines var, getStayDays, personName/passengerName fallback
+// v4.0.2 — 2026-05-15 — Added: Destination Country filter pills
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -30,9 +30,14 @@ export function openTravelExportSheet(persons, trips, documents) {
   document.getElementById('travel-export-backdrop')?.remove();
 
   const years = [...new Set(
-    trips.map(t => t.dateOutIndia?.slice(0, 4)).filter(Boolean)
+    trips.flatMap(t => [t.dateLeftOrigin, t.dateOutIndia, t.dateArrivedDest])
+      .map(d => d?.slice(0, 4)).filter(Boolean)
   )].sort((a, b) => b - a);
   if (!years.length) years.push(String(new Date().getFullYear()));
+
+  const allCountries = [...new Set(
+    trips.map(t => t.destinationCountry || t.destination).filter(Boolean)
+  )].sort();
 
   const sheet = document.createElement('div');
   sheet.id = 'travel-export-sheet';
@@ -124,6 +129,27 @@ export function openTravelExportSheet(persons, trips, documents) {
           'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">💬 WhatsApp</button>',
       '</div>',
 
+      // ── Destination Country ──
+      allCountries.length > 1 ? [
+        '<div style="font-size:12px;font-weight:700;color:var(--text-muted);',
+          'text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">',
+          'Destination Country',
+        '</div>',
+        '<div id="tex-countries" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">',
+          '<button class="tex-country active" data-country="all" style="',
+            'padding:7px 14px;border-radius:20px;border:1.5px solid var(--primary);',
+            'background:var(--primary-bg);color:var(--primary);font-size:13px;',
+            'font-weight:600;cursor:pointer;">🌍 All</button>',
+          allCountries.map(c => {
+            const flag = c === 'India' ? '🇮🇳' : c === 'Qatar' ? '🇶🇦' : '📍';
+            return '<button class="tex-country" data-country="' + c + '" style="' +
+              'padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);' +
+              'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">' +
+              flag + ' ' + c + '</button>';
+          }).join(''),
+        '</div>',
+      ].join('') : '',
+
       '<div id="tex-status" style="font-size:13px;color:var(--text-muted);min-height:18px;',
         'text-align:center;margin-bottom:8px;"></div>',
     '</div>',
@@ -144,9 +170,10 @@ export function openTravelExportSheet(persons, trips, documents) {
   document.body.appendChild(sheet);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let selPeople = new Set(['all']);  // 'all' or member IDs
-  let selYear   = 'all';
-  let selFmt    = 'pdf';
+  let selPeople  = new Set(['all']);  // 'all' or member IDs
+  let selYear    = 'all';
+  let selFmt     = 'pdf';
+  let selCountry = 'all';
 
   const close = () => { sheet.remove(); backdrop.remove(); };
   backdrop.addEventListener('click', close);
@@ -223,6 +250,20 @@ export function openTravelExportSheet(persons, trips, documents) {
     });
   });
 
+  // ── Country pills ─────────────────────────────────────────────────────────
+  sheet.querySelectorAll('.tex-country').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selCountry = btn.dataset.country;
+      sheet.querySelectorAll('.tex-country').forEach(b => {
+        const active = b.dataset.country === selCountry;
+        b.style.border = '1.5px solid ' + (active ? 'var(--primary)' : 'var(--border)');
+        b.style.background = active ? 'var(--primary-bg)' : 'transparent';
+        b.style.color = active ? 'var(--primary)' : 'var(--text)';
+        b.style.fontWeight = active ? '600' : '400';
+      });
+    });
+  });
+
   // ── Build filtered trips ──────────────────────────────────────────────────
   function getFilteredTrips() {
     const fromVal = document.getElementById('tex-from').value;
@@ -238,12 +279,18 @@ export function openTravelExportSheet(persons, trips, documents) {
           const matchByPassenger = t.passengerName && selPeople.has(t.passengerName.trim());
           if (!matchById && !matchByName && !matchByPassenger) return false;
         }
-        // Date range filter
-        if (fromVal && t.dateOutIndia && t.dateOutIndia < fromVal) return false;
-        if (toVal   && t.dateOutIndia && t.dateOutIndia > toVal)   return false;
+        // Country filter
+        if (selCountry !== 'all') {
+          const dest = t.destinationCountry || t.destination || '';
+          if (dest !== selCountry) return false;
+        }
+        // Date range filter — use primary date field with fallbacks
+        const tripDate = t.dateLeftOrigin || t.dateOutIndia || t.dateArrivedDest || '';
+        if (fromVal && tripDate && tripDate < fromVal) return false;
+        if (toVal   && tripDate && tripDate > toVal)   return false;
         return true;
       })
-      .sort((a, b) => new Date(a.dateOutIndia) - new Date(b.dateOutIndia))
+      .sort((a, b) => new Date(a.dateLeftOrigin || a.dateOutIndia) - new Date(b.dateLeftOrigin || b.dateOutIndia))
       .map(t => {
         const name = getTripPersonName(t);
         return {

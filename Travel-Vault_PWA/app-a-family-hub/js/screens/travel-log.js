@@ -1,4 +1,4 @@
-// v3.7.0 — 2026-04-03
+// v3.7.1 — 2026-05-15
 
 // ─── app-a-family-hub/js/screens/travel-log.js ──────────────────────────────
 // Travel Log: Dual-tab architecture (Trip Log & Passenger Summary)
@@ -105,7 +105,9 @@ export async function renderTravelLog(container, params = {}) {
   
   if (params.passengerId) setHashParams({ passenger: params.passengerId });
   const hashParams = getHashParams();
-  let filterPassenger = hashParams.passenger || '';
+  let filterPassenger = params.person
+    ? params.person
+    : (hashParams.passenger || '');
   let searchQuery = hashParams.q || '';
 
   // Tab State

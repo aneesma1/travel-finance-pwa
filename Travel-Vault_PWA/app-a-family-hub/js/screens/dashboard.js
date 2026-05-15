@@ -1,4 +1,4 @@
-// v3.5.5 — 2026-03-22
+// v3.5.6 — 2026-05-15
 
 // ─── app-a-family-hub/js/screens/dashboard.js ───────────────────────────────
 // Family Hub Dashboard
@@ -187,10 +187,10 @@ export async function renderDashboard(container) {
             <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:6px;">${flagMap[loc] || '📍'} ${loc} (${groups[loc].length})</div>
             <div style="display:flex; flex-wrap:wrap; gap:6px;">
               ${groups[loc].map(p => `
-                <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:99px; border:1px solid; ${colorMap[loc] || 'background:var(--surface-3); color:var(--text); border-color:var(--border)'}; font-size:13px; font-weight:600;">
+                <button class="loc-person-btn" data-person="${p.name}" style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:99px; border:1px solid; ${colorMap[loc] || 'background:var(--surface-3); color:var(--text); border-color:var(--border)'}; font-size:13px; font-weight:600; cursor:pointer; background:inherit;">
                   ${p.name}
                   ${p.days !== null ? `<span style="font-size:10px; opacity:0.7; margin-left:2px;">·&nbsp;${p.days}d</span>` : ''}
-                </div>
+                </button>
               `).join('')}
             </div>
           </div>
@@ -200,6 +200,13 @@ export async function renderDashboard(container) {
 
     // Inject at the top of dashboard-content
     content.insertAdjacentHTML('afterbegin', widgetHtml);
+
+    // Make person chips tappable → navigate to travel-log filtered by person
+    content.querySelectorAll('.loc-person-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        navigate('travel-log', { person: btn.dataset.person });
+      });
+    });
   }
 
   function renderFilterBar(members, filterPerson, filterLocation, filterDocStatus) {

@@ -1,4 +1,4 @@
-// v4.0.0 — 2026-05-02 — Local-first rewrite: Drive/auth/security-dashboard removed
+// v4.1.0 — 2026-05-15 — Modal filter pickers for export; Bank/Card column; multi-select year+month
 
 // ─── app-b-private-vault/js/screens/settings.js ─────────────────────────────
 // Settings: data management, XLSX export, PIN/security, about
@@ -248,47 +248,115 @@ export async function renderSettings(container, params = {}) {
   // ── EXPORT TAB ────────────────────────────────────────────────────────────
   function renderExportTab(transactions, data) {
     const tab = document.getElementById('tab-content');
-    const yr = currentYear();
-    const mo = currentMonth();
+
+    // ── Build filter data ─────────────────────────────────────────────────
+    const allYears = [...new Set(transactions.map(t => t.date?.slice(0, 4)).filter(Boolean))].sort((a, b) => b - a);
+    const allCat1  = [...new Set([...savedCats, ...transactions.map(t => t.category1).filter(Boolean)])].sort();
+    const allCat2  = [...new Set(transactions.map(t => t.category2).filter(Boolean))].sort();
+
+    let selectedYears  = [];
+    let selectedMonths = [];
+    let selectedCur    = '';
+    let selectedCat1   = [];
+    let selectedCat2   = [];
+
+    function updateCount() {
+      const filtered = transactions.filter(t => {
+        if (selectedYears.length  && !selectedYears.includes(t.date?.slice(0, 4))) return false;
+        if (selectedMonths.length && !selectedMonths.includes(Number(t.date?.slice(5, 7)))) return false;
+        if (selectedCur && t.currency !== selectedCur) return false;
+        if (selectedCat1.length > 0 && !selectedCat1.includes(t.category1)) return false;
+        if (selectedCat2.length > 0 && !selectedCat2.includes(t.category2)) return false;
+        return true;
+      });
+      const countEl = document.getElementById('export-count');
+      if (countEl) countEl.textContent = filtered.length + ' transaction' + (filtered.length !== 1 ? 's' : '') + ' will be exported';
+      const sumEl = document.getElementById('export-filter-summary');
+      if (sumEl) {
+        const parts = [];
+        if (selectedYears.length)  parts.push(selectedYears.join(', '));
+        if (selectedMonths.length) parts.push(selectedMonths.map(m => MONTHS[m-1]).join(', '));
+        if (selectedCur)           parts.push(selectedCur);
+        if (selectedCat1.length)   parts.push('Cat: ' + selectedCat1.join(', '));
+        if (selectedCat2.length)   parts.push('Sub: ' + selectedCat2.join(', '));
+        sumEl.textContent = parts.length ? parts.join(' · ') : 'All records';
+      }
+      return filtered;
+    }
+
+    function refreshFilterRows() {
+      const R = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
+      R('frow-year',  selectedYears.length  ? selectedYears.join(', ')               : 'All years');
+      R('frow-month', selectedMonths.length ? selectedMonths.map(m => MONTHS[m-1]).join(', ') : 'All months');
+      R('frow-cur',   selectedCur || 'All');
+      R('frow-cat1',  selectedCat1.length   ? selectedCat1.join(', ')                : 'All');
+      R('frow-cat2',  selectedCat2.length   ? selectedCat2.join(', ')                : 'All');
+      updateCount();
+    }
+
+    function openPickerModal(title, options, selected, multi, onDone) {
+      document.getElementById('exp-picker-modal')?.remove();
+      document.getElementById('exp-picker-backdrop')?.remove();
+      const backdrop = document.createElement('div');
+      backdrop.id = 'exp-picker-backdrop';
+      backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1100;';
+      const modal = document.createElement('div');
+      modal.id = 'exp-picker-modal';
+      modal.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:1101;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);max-height:50vh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px);';
+      let cur = multi ? [...selected] : (selected.length ? selected[0] : '');
+      const render = () => {
+        modal.innerHTML = `
+          <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;flex-shrink:0;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px 8px;flex-shrink:0;">
+            <span style="font-size:15px;font-weight:700;">${title}</span>
+            <div style="display:flex;gap:8px;">
+              ${multi && cur.length > 0 ? `<button id="pm-clear" style="font-size:12px;color:var(--danger);background:none;border:none;cursor:pointer;padding:4px 8px;">Clear all</button>` : ''}
+              <button id="pm-done" class="btn btn-primary" style="padding:6px 16px;font-size:13px;">Done</button>
+            </div>
+          </div>
+          <div style="overflow-y:auto;flex:1;padding:8px 16px 16px;">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              ${options.map(opt => {
+                const val = typeof opt === 'object' ? opt.value : opt;
+                const label = typeof opt === 'object' ? opt.label : opt;
+                const active = multi ? cur.includes(val) : cur === val;
+                return `<button type="button" data-val="${val}" style="padding:8px 14px;border-radius:99px;cursor:pointer;font-size:13px;font-weight:${active?'700':'500'};white-space:nowrap;border:1.5px solid ${active?'#4F46E5':'#D1D5DB'};background:${active?'#4F46E5':'#F8FAFC'};color:${active?'#fff':'#374151'};">${label}</button>`;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        modal.querySelectorAll('button[data-val]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const v = btn.dataset.val;
+            if (multi) { const idx = cur.indexOf(v); if (idx > -1) cur.splice(idx, 1); else cur.push(v); }
+            else { cur = cur === v ? '' : v; }
+            render();
+          });
+        });
+        modal.querySelector('#pm-done')?.addEventListener('click', () => { onDone(cur); backdrop.remove(); modal.remove(); });
+        modal.querySelector('#pm-clear')?.addEventListener('click', () => { cur = multi ? [] : ''; render(); });
+      };
+      render();
+      backdrop.addEventListener('click', () => { backdrop.remove(); modal.remove(); });
+      document.body.appendChild(backdrop);
+      document.body.appendChild(modal);
+    }
+
+    function filterRowHtml(id, label, valueId) {
+      return `<div id="${id}" style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border-light);cursor:pointer;"><span style="font-size:13px;color:var(--text-muted);font-weight:600;min-width:90px;">${label}</span><span id="${valueId}" style="font-size:13px;color:var(--text);flex:1;text-align:right;padding-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><span style="color:var(--text-muted);">›</span></div>`;
+    }
 
     tab.innerHTML = `
       <div class="section-title">Filter to Export</div>
-      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:16px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-          <div>
-            <label class="form-label">Year</label>
-            <select class="form-input" id="exp-year" style="padding:10px 12px;">
-              <option value="">All years</option>
-              ${[...new Set(transactions.map(t => t.date?.slice(0, 4)).filter(Boolean))].sort((a, b) => b - a).map(y => `
-                <option value="${y}" ${y === String(yr) ? 'selected' : ''}>${y}</option>
-              `).join('')}
-            </select>
-          </div>
-          <div>
-            <label class="form-label">Month</label>
-            <select class="form-input" id="exp-month" style="padding:10px 12px;">
-              <option value="">All months</option>
-              ${MONTHS.map((m, i) => `<option value="${i + 1}" ${i + 1 === mo ? 'selected' : ''}>${m}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label class="form-label">Currency</label>
-          <select class="form-input" id="exp-currency" style="padding:10px 12px;">
-            <option value="">All currencies</option>
-            ${['QAR', 'INR', 'USD'].map(c => `<option value="${c}" ${c === 'QAR' ? 'selected' : ''}>${c}</option>`).join('')}
-          </select>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label class="form-label">Category 1 <span style="color:var(--text-muted);font-weight:400;">(tap to filter)</span></label>
-          <div id="exp-cat1-chips" style="display:flex;flex-wrap:wrap;gap:6px;max-height:90px;overflow-y:auto;padding:4px 0;"></div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label class="form-label">Category 2 <span style="color:var(--text-muted);font-weight:400;">(tap to filter)</span></label>
-          <div id="exp-cat2-chips" style="display:flex;flex-wrap:wrap;gap:6px;max-height:90px;overflow-y:auto;padding:4px 0;"></div>
-        </div>
-        <div id="export-count" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;"></div>
+      <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:4px 16px 0;">
+        ${filterRowHtml('open-year-picker', '📅 Year', 'frow-year')}
+        ${filterRowHtml('open-month-picker', '📆 Month', 'frow-month')}
+        ${filterRowHtml('open-cur-picker', '💱 Currency', 'frow-cur')}
+        ${filterRowHtml('open-cat1-picker', '🏷️ Category 1', 'frow-cat1')}
+        ${filterRowHtml('open-cat2-picker', '🏷️ Category 2', 'frow-cat2')}
+        <div id="export-count" style="font-size:13px;color:var(--primary);font-weight:600;padding:10px 0;text-align:center;"></div>
       </div>
+      <div id="export-filter-summary" style="margin:6px 16px;font-size:11px;color:var(--text-muted);text-align:center;"></div>
 
       <div class="section-title">Export Options</div>
       <div class="card" style="margin:0 16px;">
@@ -316,75 +384,28 @@ export async function renderSettings(container, params = {}) {
       <div class="section-title">Column Order (fixed)</div>
       <div style="margin:0 16px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 16px;">
         <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;font-family:'DM Mono',monospace;">
-          Timestamp · Date · Description · Amount Spend · Income · Category 1 · Category 2 · Notes 1 · Account · Currency
+          Timestamp · Date · Description · Amount Spend · Income · Category 1 · Category 2 · Notes 1 · Account · Bank/Card · Currency
         </div>
       </div>
     `;
 
-    // Build category lists from saved + transaction history
-    const allCat1 = [...new Set([...savedCats, ...transactions.map(t => t.category1).filter(Boolean)])].sort();
-    const allCat2 = [...new Set(transactions.map(t => t.category2).filter(Boolean))].sort();
-    let selectedCat1 = [];
-    let selectedCat2 = [];
-
-    function renderCatChips(containerId, cats, selected, onToggle) {
-      const el = document.getElementById(containerId);
-      if (!el) return;
-      el.innerHTML = cats.length === 0
-        ? `<span style="font-size:12px;color:var(--text-muted);">No categories found</span>`
-        : cats.map(c => {
-            const active = selected.includes(c);
-            return `<button type="button" data-cat="${c}" style="
-              padding:5px 12px;border-radius:99px;cursor:pointer;font-size:12px;font-weight:${active ? '700' : '500'};
-              border:1.5px solid ${active ? '#4F46E5' : '#D1D5DB'};
-              background:${active ? '#4F46E5' : '#F8FAFC'};
-              color:${active ? '#fff' : '#374151'};
-              white-space:nowrap;
-            ">${c}</button>`;
-          }).join('');
-      el.querySelectorAll('button[data-cat]').forEach(btn => {
-        btn.addEventListener('click', () => { onToggle(btn.dataset.cat); });
-      });
-    }
-
-    // Live count update
-    function updateCount() {
-      const yr  = document.getElementById('exp-year').value;
-      const mo  = document.getElementById('exp-month').value;
-      const cur = document.getElementById('exp-currency').value;
-      const filtered = transactions.filter(t => {
-        if (yr  && t.date?.slice(0, 4) !== yr)                  return false;
-        if (mo  && Number(t.date?.slice(5, 7)) !== Number(mo))  return false;
-        if (cur && t.currency !== cur)                           return false;
-        if (selectedCat1.length > 0 && !selectedCat1.includes(t.category1)) return false;
-        if (selectedCat2.length > 0 && !selectedCat2.includes(t.category2)) return false;
-        return true;
-      });
-      document.getElementById('export-count').textContent =
-        filtered.length + ' transaction' + (filtered.length !== 1 ? 's' : '') + ' will be exported';
-      return filtered;
-    }
-
-    function toggleCat1(cat) {
-      const idx = selectedCat1.indexOf(cat);
-      if (idx > -1) selectedCat1.splice(idx, 1); else selectedCat1.push(cat);
-      renderCatChips('exp-cat1-chips', allCat1, selectedCat1, toggleCat1);
-      updateCount();
-    }
-    function toggleCat2(cat) {
-      const idx = selectedCat2.indexOf(cat);
-      if (idx > -1) selectedCat2.splice(idx, 1); else selectedCat2.push(cat);
-      renderCatChips('exp-cat2-chips', allCat2, selectedCat2, toggleCat2);
-      updateCount();
-    }
-
-    renderCatChips('exp-cat1-chips', allCat1, selectedCat1, toggleCat1);
-    renderCatChips('exp-cat2-chips', allCat2, selectedCat2, toggleCat2);
-
-    updateCount();
-    ['exp-year', 'exp-month', 'exp-currency'].forEach(id => {
-      document.getElementById(id).addEventListener('change', updateCount);
+    document.getElementById('open-year-picker').addEventListener('click', () => {
+      openPickerModal('📅 Select Year(s)', allYears, selectedYears, true, val => { selectedYears = val; refreshFilterRows(); });
     });
+    document.getElementById('open-month-picker').addEventListener('click', () => {
+      openPickerModal('📆 Select Month(s)', MONTHS.map((m, i) => ({ value: i + 1, label: m })), selectedMonths, true, val => { selectedMonths = val.map(Number); refreshFilterRows(); });
+    });
+    document.getElementById('open-cur-picker').addEventListener('click', () => {
+      openPickerModal('💱 Currency', ['QAR', 'INR', 'USD'], [selectedCur].filter(Boolean), false, val => { selectedCur = val; refreshFilterRows(); });
+    });
+    document.getElementById('open-cat1-picker').addEventListener('click', () => {
+      openPickerModal('🏷️ Category 1', allCat1, selectedCat1, true, val => { selectedCat1 = val; refreshFilterRows(); });
+    });
+    document.getElementById('open-cat2-picker').addEventListener('click', () => {
+      openPickerModal('🏷️ Category 2 / Sub', allCat2, selectedCat2, true, val => { selectedCat2 = val; refreshFilterRows(); });
+    });
+
+    refreshFilterRows();
 
     document.getElementById('download-xlsx').addEventListener('click', () => {
       const filtered = updateCount();
@@ -416,7 +437,7 @@ export async function renderSettings(container, params = {}) {
     const XLSX = window.XLSX;
     const headers = [
       'Timestamp', 'Date', 'Description', 'Amount Spend', 'Income',
-      'Category 1', 'Category 2', 'Notes 1', 'Account', 'Currency'
+      'Category 1', 'Category 2', 'Notes 1', 'Account', 'Bank/Card', 'Currency'
     ];
 
     const rows = transactions
@@ -431,6 +452,7 @@ export async function renderSettings(container, params = {}) {
         t.category2    || '',
         t.notes1       || '',
         t.account      || '',
+        t.bankName     || '',
         t.currency     || '',
       ]);
 
@@ -439,7 +461,7 @@ export async function renderSettings(container, params = {}) {
 
     ws['!cols'] = [
       { wch: 22 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
-      { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 10 }, { wch: 8 }
+      { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 8 }
     ];
 
     headers.forEach((_, i) => {
@@ -449,10 +471,9 @@ export async function renderSettings(container, params = {}) {
 
     XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
 
-    const expYr  = document.getElementById('exp-year')?.value || 'All';
-    const expMo  = document.getElementById('exp-month')?.value;
-    const expCur = document.getElementById('exp-currency')?.value || 'All';
-    const moLabel = expMo ? MONTHS[Number(expMo) - 1] : 'All';
+    const expYr  = document.getElementById('frow-year')?.textContent  || 'All';
+    const expCur = document.getElementById('frow-cur')?.textContent   || 'All';
+    const moLabel = document.getElementById('frow-month')?.textContent || 'All';
     const ts = timestampSuffix();
     const filename = `Finance_Export_${expCur}_${expYr}${moLabel ? '_' + moLabel : ''}_${ts}.xlsx`;
 
