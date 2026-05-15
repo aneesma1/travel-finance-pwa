@@ -638,3 +638,131 @@ No code change needed.
 | `Travel-Vault_PWA/dist/PrivateVault_Standalone.html` | Rebuilt with all vault changes |
 
 **Git Commits:** `3dd91f2`, `e88c096`, `bd14278`, `337d046`, `841e00a`, `77cb93d`
+
+---
+
+### Session 14: Clone Mode, Export Category Chips, PWA Sync (2026-05-13)
+**Context:** Completing pending items from Session 13 carried over to this session: add-transaction clone mode in PWA and export category multi-select chips in PWA settings. Rebuild + commit.
+
+---
+
+#### Issues Resolved — PWA Private Vault
+
+**1. Clone transaction mode in PWA add-transaction.js**
+- `isClone = mode === 'clone' && txnId` — loads existing data, generates new UUID on save, sets date to today, clears photos
+- Save button shows `📋 Clone Transaction` label in clone mode
+- **File:** `Travel-Vault_PWA/app-b-private-vault/js/screens/add-transaction.js` v3.5.27
+
+**2. Export category multi-select chips in PWA settings.js**
+- Settings export tab: two category filter rows (Category 1, Category 2) now rendered as scrollable chip buttons (multi-select), matching APK behaviour
+- Chips use named functions (`toggleCat1`, `toggleCat2`) for strict-mode compliance (no `arguments.callee`)
+- **File:** `Travel-Vault_PWA/app-b-private-vault/js/screens/settings.js` v4.0.x
+
+**PWA rebuilt:** `dist/PrivateVault_Standalone.html` and `dist/FamilyHub_Standalone.html`
+
+**Git Commit:** `e6a9e75`
+
+---
+
+### Session 15: Cancel Button, Bank/Card Name, Word Export, Modal Picker, Person Chips, Country Filter (2026-05-14 → 2026-05-15)
+**Context:** Large batch of new features and fixes across both APKs and both PWA apps.
+
+---
+
+#### Issues Resolved — Both APKs
+
+**1. Cancel (✕) button in New/Clone entry screens**
+- Added `✕ Cancel` button below Save button in `add-transaction.js` (Vault) and `add-trip.js` (Travel)
+- Navigates back to transactions/travel-log without saving
+- **Files:** `Personal_vault/src/js/screens/add-transaction.js` v3.5.28, `Travel_app/src/js/screens/add-trip.js`
+
+**2. Bank/Card Name optional field in Vault add-transaction**
+- `SmartInput` field below Account/Method pills with auto-suggest from history
+- Saved as `bankName` field in transaction data; shown in transaction-view with 🏛️ icon
+- Included in CSV, XLSX, and Word export columns
+- **Files:** `Personal_vault/src/js/screens/add-transaction.js` v3.5.28, `transaction-view.js`, `transactions.js` v3.5.8, `settings.js` v4.15.0
+
+**3. Export from transactions record view (Vault) — blank bug + Word format + Share**
+- **Blank export bug fix:** `if (t.currency !== activeCurrency)` when `activeCurrency === 'All'` filtered out all records. Fixed to `if (activeCurrency !== 'All' && t.currency !== activeCurrency)`
+- **Word (.doc) export:** HTML-based file with `application/msword` MIME; each transaction as vertical card
+- **3 export buttons:** Download / Share File / Share Text (was 2 buttons)
+- **Share File:** Capacitor `Filesystem` + `Share` plugin (writes to CACHE, gets URI, shares, deletes)
+- **Share Text:** Capacitor `Share` → clipboard fallback
+- **File:** `Personal_vault/src/js/screens/transactions.js` v3.5.8
+
+**4. Settings export tab — modal picker system (Vault)**
+- Replaced congested inline chips/dropdowns with tappable modal picker rows (bottom sheet, max-height:50vh)
+- Year, Month, Category 1, Category 2 → multi-select arrays; Currency → single string
+- `openPickerModal()` pattern; `refreshFilterRows()` updates display after selection
+- `exportToXlsx`: filename built from `frow-*` text content (not removed DOM selects); Bank/Card column added; column widths extended to 11 entries
+- **File:** `Personal_vault/src/js/screens/settings.js` v4.15.0
+
+**5. Travel Dashboard — person chip navigation (Travel APK)**
+- Location widget person chips changed from `<div>` to `<button class="loc-person-btn" data-person="...">`
+- Click → `navigate('travel-log', { person: btn.dataset.person })`
+- **File:** `Travel_app/src/js/screens/dashboard.js` v3.5.10
+
+**6. Travel Log — params.person pre-filter (Travel APK)**
+- `filterPassenger` pre-set from `params.person` when navigating from dashboard chip
+- **File:** `Travel_app/src/js/screens/travel-log.js` v3.7.4
+
+**7. Travel Export — Destination Country filter pills (Travel APK)**
+- `allCountries` built from trip `destinationCountry` data
+- Country pills section: 🌍 All / flag + country name per unique destination
+- `selCountry` state variable; `getFilteredTrips()` filters by it
+- Year detection extended to all date fields; date filter uses `dateLeftOrigin` fallback
+- **File:** `Travel_app/src/js/screens/travel-export.js` v3.5.45
+
+---
+
+#### Issues Resolved — Both PWA Apps
+
+**8. All Batch 2 changes ported to PWA Private Vault**
+- `add-transaction.js` v3.5.28: Cancel button + Bank/Card name SmartInput
+- `transaction-view.js`: bankName row with 🏛️ icon
+- `transactions.js` v3.5.8: Word export, 3 buttons, Share Text (uses `navigator.share` + `navigator.canShare`; no Capacitor in PWA); blank-export fix was already present
+- `settings.js` v4.1.0: Modal picker rewrite; Bank/Card column in XLSX; filename builder uses `frow-*` text content
+- **Files:** `Travel-Vault_PWA/app-b-private-vault/js/screens/` (4 files)
+
+**9. PWA FamilyHub — person chip navigation (dashboard.js v3.5.6)**
+- Location widget chips → `<button class="loc-person-btn" data-person="...">` with click → `navigate('travel-log', { person })`
+- **File:** `Travel-Vault_PWA/app-a-family-hub/js/screens/dashboard.js` v3.5.6
+
+**10. PWA FamilyHub — params.person pre-filter (travel-log.js v3.7.1)**
+- `filterPassenger` pre-set from `params.person` when navigating from dashboard chip
+- **File:** `Travel-Vault_PWA/app-a-family-hub/js/screens/travel-log.js` v3.7.1
+
+**11. PWA FamilyHub — Destination Country filter (travel-export.js v4.0.2)**
+- `allCountries` from trip data; country pills section; `selCountry` state
+- `getFilteredTrips()`: country filter + date filter uses `dateLeftOrigin` fallback; sort uses `dateLeftOrigin`
+- **File:** `Travel-Vault_PWA/app-a-family-hub/js/screens/travel-export.js` v4.0.2
+
+**PWA rebuilt:** `dist/FamilyHub_Standalone.html` (528 KB) + `dist/PrivateVault_Standalone.html` (310 KB)
+
+**Files Changed (APK, commit `77d5a20`):**
+
+| File | Change |
+|------|--------|
+| `Personal_vault/src/js/screens/add-transaction.js` v3.5.28 | Cancel button + Bank/Card Name SmartInput |
+| `Personal_vault/src/js/screens/transaction-view.js` | bankName row |
+| `Personal_vault/src/js/screens/transactions.js` v3.5.8 | Word export, 3 buttons, Share File/Text, blank-export fix |
+| `Personal_vault/src/js/screens/settings.js` v4.15.0 | Modal picker system, Bank/Card col, filename fix |
+| `Travel_app/src/js/screens/dashboard.js` v3.5.10 | Person chip → navigate('travel-log') |
+| `Travel_app/src/js/screens/travel-log.js` v3.7.4 | params.person pre-filter |
+| `Travel_app/src/js/screens/travel-export.js` v3.5.45 | Country filter pills, date fix |
+
+**Files Changed (PWA, commit `0667186`):**
+
+| File | Change |
+|------|--------|
+| `Travel-Vault_PWA/app-b-private-vault/js/screens/add-transaction.js` | Cancel button + Bank/Card Name |
+| `Travel-Vault_PWA/app-b-private-vault/js/screens/transaction-view.js` | bankName row |
+| `Travel-Vault_PWA/app-b-private-vault/js/screens/transactions.js` | Word export, 3 buttons, Share |
+| `Travel-Vault_PWA/app-b-private-vault/js/screens/settings.js` | Modal picker, Bank/Card col |
+| `Travel-Vault_PWA/app-a-family-hub/js/screens/dashboard.js` v3.5.6 | Person chip → navigate |
+| `Travel-Vault_PWA/app-a-family-hub/js/screens/travel-log.js` v3.7.1 | params.person pre-filter |
+| `Travel-Vault_PWA/app-a-family-hub/js/screens/travel-export.js` v4.0.2 | Country filter pills |
+| `Travel-Vault_PWA/dist/FamilyHub_Standalone.html` | Rebuilt (528 KB) |
+| `Travel-Vault_PWA/dist/PrivateVault_Standalone.html` | Rebuilt (310 KB) |
+
+**Git Commits:** `77d5a20` (APK + PWA Vault), `0667186` (PWA FamilyHub + dist)
