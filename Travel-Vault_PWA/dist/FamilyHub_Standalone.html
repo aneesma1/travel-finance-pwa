@@ -1760,9 +1760,9 @@ async function renderDashboard(container) {
 
     // Compute current location for each passenger
     const located = allPassengerNames.map(name => {
-      const { location, country, days } = getCurrentLocationFromTrips(name, trips);
+      const { location, country, days, tripId } = getCurrentLocationFromTrips(name, trips);
       const yearDays = getYearlyDestDays(name, trips, year);
-      return { name, location, country, days, yearDays };
+      return { name, location, country, days, yearDays, tripId };
     });
 
     // Group by location
@@ -1801,7 +1801,7 @@ async function renderDashboard(container) {
             <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:6px;">${flagMap[loc] || '📍'} ${loc} (${groups[loc].length})</div>
             <div style="display:flex; flex-wrap:wrap; gap:6px;">
               ${groups[loc].map(p => `
-                <button class="loc-person-btn" data-person="${p.name}" style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:99px; border:1px solid; ${colorMap[loc] || 'background:var(--surface-3); color:var(--text); border-color:var(--border)'}; font-size:13px; font-weight:600; cursor:pointer; background:inherit;">
+                <button class="loc-person-btn" data-person="${p.name}" data-trip-id="${p.tripId || ''}" style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:99px; border:1px solid; ${colorMap[loc] || 'background:var(--surface-3); color:var(--text); border-color:var(--border)'}; font-size:13px; font-weight:600; cursor:pointer; background:inherit;">
                   ${p.name}
                   ${p.days !== null ? `<span style="font-size:10px; opacity:0.7; margin-left:2px;">·&nbsp;${p.days}d</span>` : ''}
                 </button>
@@ -1815,10 +1815,15 @@ async function renderDashboard(container) {
     // Inject at the top of dashboard-content
     content.insertAdjacentHTML('afterbegin', widgetHtml);
 
-    // Make person chips tappable → navigate to travel-log filtered by person
+    // Tap person chip → open that specific current trip entry (not the full log)
     content.querySelectorAll('.loc-person-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        navigate('travel-log', { person: btn.dataset.person });
+        const tripId = btn.dataset.tripId;
+        if (tripId) {
+          navigate('add-trip', { tripId, mode: 'view' });
+        } else {
+          navigate('travel-log', { person: btn.dataset.person });
+        }
       });
     });
   }
