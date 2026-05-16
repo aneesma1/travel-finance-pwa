@@ -766,3 +766,48 @@ No code change needed.
 | `Travel-Vault_PWA/dist/PrivateVault_Standalone.html` | Rebuilt (310 KB) |
 
 **Git Commits:** `77d5a20` (APK + PWA Vault), `0667186` (PWA FamilyHub + dist)
+
+---
+
+### Session 16: Export Bug Fixes — PDF Days, WhatsApp Info, Word Android, Account Dedup (2026-05-16)
+**Context:** Four bugs reported from testing Session 15 deliverables.
+
+---
+
+#### Issues Resolved
+
+**1. [Vault APK + PWA] Account items duplicated in filter bar**
+- `allAccounts` was `['Cash','Card','Bank','Other', ...savedAccounts]` — if savedAccounts already contained 'Cash' etc., they appeared twice.
+- Fix: `[...new Set(['Cash','Card','Bank','Other', ...savedAccounts])]`
+- **Files:** `Personal_vault/src/js/screens/transactions.js` v3.5.10, `Travel-Vault_PWA/app-b-private-vault/js/screens/transactions.js` v3.5.10
+
+**2. [Travel APK + PWA] PDF export — one year shows more than 365 days**
+- Root cause: `getStayDays(t)` for trips with no `dateOutQatar` fell back to `daysBetween(arrDate, today())` — computing from original arrival all the way to today regardless of subsequent trips (e.g. arrived Jan 2024 → 500+ days counted in 2024).
+- Fix: Added `computeStayContext(pTrips)` — returns `{ stayMap, endDateMap }`. End-of-stay = next trip's `dateArrivedDest` (bridging logic), or `today()` if last/only trip. Yearly totals now group by `dateLeftOrigin` not `dateOutIndia`.
+- PDF table: updated field references to `dateLeftOrigin`, `dateArrivedDest`, `destinationCountry`. Column headers: "Departed India"→"Departed", "Left"→"Returned". "Returned" shows next trip's arrival date or "Ongoing".
+- **Files:** `Travel_app/src/js/screens/travel-export.js` v3.5.47, `Travel-Vault_PWA/app-a-family-hub/js/screens/travel-export.js` v4.0.4
+
+**3. [Travel APK + PWA] WhatsApp export shows incorrect info**
+- Root cause: `exportWhatsApp()` used legacy field names (`dateOutIndia`, `dateInIndia`, `destination`) instead of one-way model fields.
+- Fix: updated all field refs to `dateLeftOrigin`, `dateArrivedDest`, `destinationCountry`, `originCountry`. Dedup key updated. Yearly totals use `dateLeftOrigin` year. Line format now: `India → Qatar: Left DD-Mon-YYYY, Arrived DD-Mon-YYYY` + `↩️ Return: DD-Mon-YYYY  🕐 N days`.
+- Also uses `computeStayContext(pTrips)` for correct stay-days per trip.
+
+**4. [Travel APK] Word export not opening on Android**
+- Root cause: `saveFileToExports()` saves to app's internal Documents folder — Android system has no URI to open it directly with Word/WPS.
+- Fix: On Android (Capacitor available), always write to `CACHE` directory then call `Share.share({ files: [uri] })` which presents the system share/open-with sheet. User taps WPS/Word to open. `saveFileToExports` fallback retained for web/PWA.
+- Word export also now uses `computeStayContext(pTrips)` so days column is correct.
+
+---
+
+#### Files Changed
+
+| File | Version | Change |
+|------|---------|--------|
+| `Personal_vault/src/js/screens/transactions.js` | v3.5.10 | Account dedup with Set |
+| `Travel_app/src/js/screens/travel-export.js` | v3.5.47 | computeStayContext; PDF/WhatsApp/Word field fixes; Word Android share intent |
+| `Travel-Vault_PWA/app-b-private-vault/js/screens/transactions.js` | v3.5.10 | Account dedup with Set |
+| `Travel-Vault_PWA/app-a-family-hub/js/screens/travel-export.js` | v4.0.4 | computeStayContext; PDF/WhatsApp field fixes; Word days fix |
+| `Travel-Vault_PWA/dist/FamilyHub_Standalone.html` | — | Rebuilt |
+| `Travel-Vault_PWA/dist/PrivateVault_Standalone.html` | — | Rebuilt |
+
+**Git Commit:** `b4441e3` (APK + PWA, all 4 fixes)
