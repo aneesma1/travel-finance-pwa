@@ -1,4 +1,4 @@
-// v4.0.3 — 2026-05-16 — Fix: people pills use name; country list dest-only; add Word export
+// v4.0.4 — 2026-05-16 — Fix PDF/WhatsApp field names & bridging days; Word days fix; accounts dedup
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -13,10 +13,34 @@ import { copyToClipboard, showToast, formatDisplayDate, daysBetween, today } fro
 function getStayDays(t) {
   let d = t.daysInQatar ? Number(t.daysInQatar) : null;
   if (d === null || isNaN(d)) {
-    if (t.dateInQatar && t.dateOutQatar) d = daysBetween(t.dateInQatar, t.dateOutQatar);
-    else if (t.dateInQatar && !t.dateOutQatar) d = daysBetween(t.dateInQatar, today());
+    const arrDate = t.dateArrivedDest || t.dateInQatar;
+    const depDate = t.dateOutQatar;
+    if (arrDate && depDate) d = daysBetween(arrDate, depDate);
+    else if (arrDate && !depDate) d = daysBetween(arrDate, today());
   }
   return d || 0;
+}
+
+// Compute per-trip stay days with bridging: end of stay = next trip's arrival date.
+// Returns { stayMap: Map<trip,days>, endDateMap: Map<trip,dateStr|null> }
+function computeStayContext(pTrips) {
+  const sorted = [...pTrips].sort((a, b) => {
+    const da = a.dateArrivedDest || a.dateInQatar || '';
+    const db = b.dateArrivedDest || b.dateInQatar || '';
+    return da.localeCompare(db);
+  });
+  const stayMap    = new Map();
+  const endDateMap = new Map(); // null = person is still at destination (ongoing)
+  sorted.forEach((trip, idx) => {
+    const arrDate     = trip.dateArrivedDest || trip.dateInQatar;
+    const nextTrip    = sorted[idx + 1];
+    const nextArrDate = nextTrip ? (nextTrip.dateArrivedDest || nextTrip.dateInQatar) : null;
+    const endDate     = nextArrDate || today();
+    const days        = arrDate ? Math.max(0, daysBetween(arrDate, endDate)) : 0;
+    stayMap.set(trip, days);
+    endDateMap.set(trip, nextArrDate || null);
+  });
+  return { stayMap, endDateMap };
 }
 
 // ── Resolve best display name from a trip (handles both field conventions) ────
@@ -347,13 +371,14 @@ async function exportWord(trips, deliver) {
 
   let sections = '';
   Object.entries(byPerson).forEach(([name, { person, trips: pTrips }]) => {
+    const { stayMap } = computeStayContext(pTrips);
     const sorted = [...pTrips].sort((a, b) =>
       new Date(a.dateLeftOrigin || a.dateOutIndia || 0) - new Date(b.dateLeftOrigin || b.dateOutIndia || 0)
     );
     const rows = sorted.map((t, i) => {
       const dep  = t.dateLeftOrigin || t.dateOutIndia || '';
       const arr  = t.dateArrivedDest || t.dateInQatar || '';
-      const days = (t.daysInQatar != null && !isNaN(Number(t.daysInQatar))) ? Number(t.daysInQatar) : (arr ? daysBetween(arr, t.dateOutQatar || today()) : '');
+      const days = stayMap.get(t) ?? 0;
       const comp = Array.isArray(t.travelWith) ? t.travelWith.join(', ') : (t.travelWith || '');
       return `<tr style="background:${i % 2 === 0 ? '#ffffff' : '#eef2ff'};">
         <td style="text-align:center;color:#6B7280;">${i + 1}</td>
@@ -438,6 +463,7 @@ async function exportPDF(trips, members, documents, deliver) {
     pageNum++;
 
     let y = margin;
+    const { stayMap, endDateMap } = computeStayContext(pTrips);
 
     // ── Header band ──────────────────────────────────────────────────────────
     const rgb = hexToRgbPdf(person?.color || '#3730A3');
@@ -456,11 +482,11 @@ async function exportPDF(trips, members, documents, deliver) {
 
     // ── Summary stats ─────────────────────────────────────────────────────────
     const totalTrips   = pTrips.length;
-    const totalDays    = pTrips.reduce((s, t) => s + getStayDays(t), 0);
+    const totalDays    = pTrips.reduce((s, t) => s + (stayMap.get(t) ?? 0), 0);
     const yearlyTotals = {};
     pTrips.forEach(t => {
-      const yr = t.dateOutIndia?.slice(0,4) || 'Unknown';
-      yearlyTotals[yr] = (yearlyTotals[yr] || 0) + getStayDays(t);
+      const yr = (t.dateLeftOrigin || t.dateOutIndia)?.slice(0,4) || 'Unknown';
+      yearlyTotals[yr] = (yearlyTotals[yr] || 0) + (stayMap.get(t) ?? 0);
     });
 
     doc.setFillColor(248, 250, 252);
@@ -510,19 +536,19 @@ async function exportPDF(trips, members, documents, deliver) {
 
     const cols = [
       { label: '#',           x: margin + 1,   w: 6  },
-      { label: 'Departed India', x: margin + 7,   w: 26 },
-      { label: 'Destination',   x: margin + 33,  w: 22 },
-      { label: 'Arrived',       x: margin + 55,  w: 22 },
-      { label: 'Left',          x: margin + 77,  w: 22 },
-      { label: 'Days',          x: margin + 99,  w: 12 },
-      { label: 'Flight In',     x: margin + 111, w: 20 },
-      { label: 'Reason',        x: margin + 131, w: 51 },
+      { label: 'Departed',    x: margin + 7,   w: 26 },
+      { label: 'Destination', x: margin + 33,  w: 22 },
+      { label: 'Arrived',     x: margin + 55,  w: 22 },
+      { label: 'Returned',    x: margin + 77,  w: 22 },
+      { label: 'Days',        x: margin + 99,  w: 12 },
+      { label: 'Flight In',   x: margin + 111, w: 20 },
+      { label: 'Reason',      x: margin + 131, w: 51 },
     ];
 
     cols.forEach(c => doc.text(c.label, c.x, y + 5));
     y += 9;
 
-    pTrips.sort((a,b) => new Date(b.dateOutIndia) - new Date(a.dateOutIndia))
+    pTrips.sort((a,b) => new Date(b.dateLeftOrigin || b.dateOutIndia || 0) - new Date(a.dateLeftOrigin || a.dateOutIndia || 0))
       .forEach((trip, idx) => {
         if (y > 270) { doc.addPage('a4','portrait'); y = margin; }
 
@@ -536,11 +562,11 @@ async function exportPDF(trips, members, documents, deliver) {
 
         const row = [
           String(idx + 1),
-          fmtDate(trip.dateOutIndia),
-          trip.destination || 'Qatar',
-          fmtDate(trip.dateInQatar),
-          trip.dateOutQatar ? fmtDate(trip.dateOutQatar) : 'Still here',
-          trip.daysInQatar != null ? String(trip.daysInQatar) : '--',
+          fmtDate(trip.dateLeftOrigin || trip.dateOutIndia),
+          (trip.destinationCountry || trip.destination || 'Qatar'),
+          fmtDate(trip.dateArrivedDest || trip.dateInQatar),
+          endDateMap.get(trip) ? fmtDate(endDateMap.get(trip)) : 'Ongoing',
+          String(stayMap.get(trip) ?? 0),
           (trip.flightInward || '--').slice(0, 10),
           (trip.reason || '--').slice(0, 38),
         ];
@@ -726,22 +752,23 @@ async function exportWhatsApp(trips, persons) {
     
     splitNames.forEach(name => {
       if (!byPersonName[name]) byPersonName[name] = { name, trips: [] };
-      // Avoid duplicate trips for the same person in the report (deduplicate by date)
-      const dKey = `${t.dateOutIndia}|${t.dateInIndia}`;
-      if (!byPersonName[name].trips.some(existing => `${existing.dateOutIndia}|${existing.dateInIndia}` === dKey)) {
+      // Avoid duplicate trips for the same person (deduplicate by departure + arrival)
+      const dKey = `${t.dateLeftOrigin || t.dateOutIndia}|${t.dateArrivedDest || t.dateInQatar}`;
+      if (!byPersonName[name].trips.some(ex => `${ex.dateLeftOrigin || ex.dateOutIndia}|${ex.dateArrivedDest || ex.dateInQatar}` === dKey)) {
         byPersonName[name].trips.push(t);
       }
     });
   });
 
   Object.values(byPersonName).sort((a,b) => a.name.localeCompare(b.name)).forEach(({ name, trips: pTrips }) => {
-    const totalDays = pTrips.reduce((s, t) => s + getStayDays(t), 0);
-    
-    // Yearly totals breakdown
+    const { stayMap, endDateMap } = computeStayContext(pTrips);
+    const totalDays = pTrips.reduce((s, t) => s + (stayMap.get(t) ?? 0), 0);
+
+    // Yearly totals breakdown (group by departure year)
     const yearly = {};
     pTrips.forEach(t => {
-      const yr = t.dateOutIndia?.match(/\b(20\d{2})\b/)?.[1] || '?';
-      yearly[yr] = (yearly[yr] || 0) + getStayDays(t);
+      const yr = (t.dateLeftOrigin || t.dateOutIndia)?.match(/\b(20\d{2})\b/)?.[1] || '?';
+      yearly[yr] = (yearly[yr] || 0) + (stayMap.get(t) ?? 0);
     });
     const yrLine = Object.keys(yearly).sort((a,b)=>b-a)
       .map(yr => yr + ': ' + yearly[yr] + 'd').join(' · ');
@@ -750,17 +777,18 @@ async function exportWhatsApp(trips, persons) {
     lines.push('─────────────────────');
 
     pTrips.sort((a,b) => {
-      const d1 = a.dateOutIndia || '';
-      const d2 = b.dateOutIndia || '';
-      return d2.localeCompare(d1); // simple string sort for descending dates
+      const d1 = a.dateLeftOrigin || a.dateOutIndia || '';
+      const d2 = b.dateLeftOrigin || b.dateOutIndia || '';
+      return d2.localeCompare(d1);
     }).forEach((t, i) => {
-      const d = t.destination || 'Qatar';
-      const stay = getStayDays(t);
-      lines.push(
-        (i+1) + '. ' + d + ': ' + fmtDate(t.dateOutIndia) +
-        ' → ' + (t.dateInIndia ? fmtDate(t.dateInIndia) : 'Present')
-      );
-      if (stay > 0) lines.push('   🕐 ' + stay + ' days in ' + d);
+      const dest    = t.destinationCountry || t.destination || 'Qatar';
+      const origin  = t.originCountry || 'India';
+      const stay    = stayMap.get(t) ?? 0;
+      const depDate = fmtDate(t.dateLeftOrigin || t.dateOutIndia);
+      const arrDate = fmtDate(t.dateArrivedDest || t.dateInQatar);
+      const retDate = endDateMap.get(t) ? fmtDate(endDateMap.get(t)) : 'Ongoing';
+      lines.push(`${i+1}. ${origin} → ${dest}: Left ${depDate}, Arrived ${arrDate}`);
+      lines.push(`   ↩️ Return: ${retDate}  🕐 ${stay} days`);
       if (t.flightInward)  lines.push('   ✈️ In: ' + t.flightInward);
       if (t.flightOutward) lines.push('   ✈️ Out: ' + t.flightOutward);
       if (t.reason)        lines.push('   📝 ' + t.reason);

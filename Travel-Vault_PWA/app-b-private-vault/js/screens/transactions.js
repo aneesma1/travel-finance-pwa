@@ -1,4 +1,4 @@
-// v3.5.9 — 2026-05-16 — Word table format; Share Image button; Travel export people/country fix
+// v3.5.10 — 2026-05-16 — Fix: account filter deduplication
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -307,7 +307,7 @@ export async function renderTransactions(container) {
 
   const { transactions = [], categories: savedCats = [], accounts: savedAccounts = [] } = data;
   const allCategories = [...new Set(transactions.map(t => t.category1).filter(Boolean))];
-  const allAccounts   = ['Cash','Card','Bank','Other', ...savedAccounts];
+  const allAccounts   = [...new Set(['Cash','Card','Bank','Other', ...savedAccounts])];
 
   // Read from URL hash or default to All
   const p = getHashParams();
