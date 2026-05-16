@@ -560,6 +560,13 @@ export async function renderTravelLog(container, params = {}) {
     return p ? (p.emoji || '👤') : '👤';
   }
 
+  // Local-time date string (avoids UTC toISOString() shifting date by timezone offset)
+  function toLocalDate(d) {
+    return d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+  }
+
   function computeSummaryData() {
     if (!summaryState.selectedPassenger) return null;
     const pNameLower = summaryState.selectedPassenger.toLowerCase();
@@ -624,8 +631,8 @@ export async function renderTravelLog(container, params = {}) {
             year: String(curYear),
             country,
             days: fragmentDays,
-            dateIn: currentStart.toISOString().split('T')[0],
-            dateOut: (fragmentEndMs === finalEndMs && !nextTrip) ? null : new Date(fragmentEndMs).toISOString().split('T')[0],
+            dateIn: toLocalDate(currentStart),
+            dateOut: (fragmentEndMs === finalEndMs && !nextTrip) ? null : toLocalDate(new Date(fragmentEndMs)),
             reason: t.reason || '',
           });
           

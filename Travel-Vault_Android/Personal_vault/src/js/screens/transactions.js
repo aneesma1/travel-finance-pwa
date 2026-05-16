@@ -1,4 +1,4 @@
-// v3.5.8 — 2026-05-15 — Fix blank export (currency 'All' bug); Word export; Capacitor Share; Share Text option
+// v3.5.9 — 2026-05-16 — Fix: Word default; Word table format; Android save via Filesystem; Share Image; Travel export people match
 
 // ─── app-b-private-vault/js/screens/transactions.js ─────────────────────────
 // Full transaction list with filter bar, running balance, swipe-to-delete
@@ -7,6 +7,7 @@
 
 import { getCachedFinanceData, setCachedFinanceData } from '../../shared/db.js';
 import { localSave } from '../../shared/sync-manager.js';
+import { saveFileToExports } from '../../shared/drive.js';
 import { navigate } from '../router.js';
 import { txnRow } from './dashboard.js';
 import {
@@ -80,6 +81,7 @@ export async function renderTransactions(container) {
         <button id="export-download" class="btn btn-primary" style="flex:1;min-width:120px;">📥 Download</button>
         <button id="export-share-file" class="btn btn-secondary" style="flex:1;min-width:120px;">📤 Share File</button>
         <button id="export-share-text" class="btn btn-secondary" style="flex:1;min-width:120px;">💬 Share Text</button>
+        <button id="export-share-img" class="btn btn-secondary" style="flex:1;min-width:120px;">📸 Share Image</button>
       </div>
     `;
 
@@ -96,7 +98,7 @@ export async function renderTransactions(container) {
     const close = () => { sheet.remove(); backdrop.remove(); };
     backdrop.addEventListener('click', close);
 
-    let selectedFmt   = 'xlsx';
+    let selectedFmt   = 'word';   // matches the first pill shown as active
     let selectedScope = 'filtered';
 
     sheet.querySelectorAll('#export-format-pills .sheet-pill').forEach(btn => {
@@ -170,29 +172,61 @@ export async function renderTransactions(container) {
       const scopeLabel = selectedScope === 'filtered' ? (filterSummary.replace(/ · /g,'_') || 'Filtered') : 'All';
       status.textContent = 'Exporting ' + scopedTxns.length + ' records…';
 
-      // ── Word (HTML-based .doc) ─────────────────────────────────────────────
+      // ── Word (HTML table .doc) ────────────────────────────────────────────
       if (selectedFmt === 'word') {
-        const cards = scopedTxns.map(t => `
-          <div style="border:1px solid #D1D5DB;border-radius:8px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid;">
-            <h3 style="margin:0 0 10px;color:#1a56db;font-size:15px;">${t.description || 'Transaction'}</h3>
-            <table style="width:100%;border-collapse:collapse;font-size:13px;">
-              <tr><td style="color:#6B7280;padding:3px 10px 3px 0;width:38%;">📅 Date</td><td style="font-weight:600;">${t.date || '--'}</td></tr>
-              ${t.amountSpend ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">💸 Spend</td><td style="font-weight:700;color:#DC2626;">${t.currency || ''} ${t.amountSpend}</td></tr>` : ''}
-              ${t.income ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">💰 Income</td><td style="font-weight:700;color:#16A34A;">${t.currency || ''} ${t.income}</td></tr>` : ''}
-              <tr><td style="color:#6B7280;padding:3px 10px 3px 0;">🏷️ Category</td><td>${t.category1 || '--'}${t.category2 ? ' › ' + t.category2 : ''}</td></tr>
-              <tr><td style="color:#6B7280;padding:3px 10px 3px 0;">🏦 Account</td><td>${t.account || '--'}</td></tr>
-              ${t.bankName ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">🏛️ Bank/Card</td><td>${t.bankName}</td></tr>` : ''}
-              ${t.notes1 ? `<tr><td style="color:#6B7280;padding:3px 10px 3px 0;">💬 Notes</td><td>${t.notes1}</td></tr>` : ''}
-            </table>
-          </div>`).join('');
+        const tableRows = scopedTxns.map((t, i) => `
+          <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+            <td style="text-align:center;color:#6B7280;">${i + 1}</td>
+            <td style="white-space:nowrap;">${t.date || ''}</td>
+            <td>${t.description || ''}</td>
+            <td style="color:#DC2626;font-weight:600;text-align:right;">${t.amountSpend ? (t.currency || '') + ' ' + t.amountSpend : ''}</td>
+            <td style="color:#16A34A;font-weight:600;text-align:right;">${t.income ? (t.currency || '') + ' ' + t.income : ''}</td>
+            <td>${t.category1 || ''}${t.category2 ? ' › ' + t.category2 : ''}</td>
+            <td>${t.account || ''}</td>
+            <td>${t.bankName || ''}</td>
+            <td>${t.notes1 || ''}</td>
+          </tr>`).join('');
 
-        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body style="font-family:Calibri,Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px;"><h1 style="color:#1e3a5f;font-size:20px;">Finance Records · ${filterSummary || 'All'}</h1><p style="color:#6B7280;">${scopedTxns.length} transactions · ${new Date().toLocaleDateString()}</p><hr style="border-color:#E5E7EB;margin:12px 0;">${cards}</body></html>`;
-        const blob = new Blob([html], { type: 'application/msword' });
+        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><style>
+  body{font-family:Calibri,Arial,sans-serif;margin:20px;font-size:11pt;}
+  h1{color:#1e3a5f;font-size:16pt;margin:0 0 4px;}
+  p{color:#6B7280;font-size:10pt;margin:0 0 14px;}
+  table{border-collapse:collapse;width:100%;font-size:10pt;}
+  th{background:#1e3a5f;color:#ffffff;padding:6px 8px;text-align:left;font-size:10pt;border:1px solid #1e3a5f;}
+  td{padding:5px 8px;border:1px solid #E5E7EB;vertical-align:top;}
+</style></head>
+<body>
+  <h1>Finance Records · ${filterSummary || 'All'}</h1>
+  <p>${scopedTxns.length} transactions &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-GB')}</p>
+  <table>
+    <thead><tr>
+      <th style="width:4%;">#</th>
+      <th style="width:9%;">Date</th>
+      <th style="width:20%;">Description</th>
+      <th style="width:11%;">Spend</th>
+      <th style="width:11%;">Income</th>
+      <th style="width:17%;">Category</th>
+      <th style="width:10%;">Account</th>
+      <th style="width:10%;">Bank/Card</th>
+      <th style="width:8%;">Notes</th>
+    </tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+</body></html>`;
+
         const fname = 'Finance_' + scopeLabel + '_' + ts + '.doc';
         if (deliver === 'download') {
-          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click(); URL.revokeObjectURL(a.href);
+          if (window.Capacitor?.Plugins?.Filesystem) {
+            const path = await saveFileToExports('finance', fname, html, 'utf8');
+            showToast('✅ Saved: ' + path, 'success', 4000);
+          } else {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([html], { type: 'application/msword' }));
+            a.download = fname; a.click();
+          }
         } else {
-          await shareFile(blob, fname, 'application/msword');
+          await shareFile(new Blob([html], { type: 'application/msword' }), fname, 'application/msword');
         }
         status.textContent = '✅ ' + fname; setTimeout(close, 1800); return;
       }
@@ -273,6 +307,50 @@ export async function renderTransactions(container) {
     document.getElementById('export-download').addEventListener('click', () => doExport('download'));
     document.getElementById('export-share-file').addEventListener('click', () => doExport('share'));
     document.getElementById('export-share-text').addEventListener('click', () => shareText());
+    document.getElementById('export-share-img').addEventListener('click', () => shareAsImage());
+
+    async function shareAsImage() {
+      close();
+      if (!window.html2canvas) {
+        showToast('Loading capture library…', 'info', 1500);
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+      const target = document.getElementById('txn-list-wrap');
+      showToast('Capturing records…', 'info', 1500);
+      try {
+        const canvas = await window.html2canvas(target, {
+          backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false
+        });
+        canvas.toBlob(async (blob) => {
+          const fname = 'Finance_Records_' + ts + '.png';
+          const SharePlugin = window.Capacitor?.Plugins?.Share;
+          const FS = window.Capacitor?.Plugins?.Filesystem;
+          if (FS && SharePlugin) {
+            const reader = new FileReader();
+            const base64 = await new Promise((res, rej) => {
+              reader.onload = e => res(e.target.result.split(',')[1]);
+              reader.onerror = rej;
+              reader.readAsDataURL(blob);
+            });
+            await FS.writeFile({ path: fname, data: base64, directory: 'CACHE' });
+            const { uri } = await FS.getUri({ path: fname, directory: 'CACHE' });
+            await SharePlugin.share({ title: 'Finance Records', url: uri, dialogTitle: 'Share image' });
+            await FS.deleteFile({ path: fname, directory: 'CACHE' }).catch(() => {});
+          } else if (navigator.canShare?.({ files: [new File([blob], fname, { type: 'image/png' })] })) {
+            await navigator.share({ files: [new File([blob], fname, { type: 'image/png' })] }).catch(() => {});
+          } else {
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click();
+          }
+        }, 'image/png');
+      } catch (err) {
+        showToast('Image capture failed: ' + err.message, 'error');
+      }
+    }
   }
 
   // Wait for data to be structurally ready (via global event)

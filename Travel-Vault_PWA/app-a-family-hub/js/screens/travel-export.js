@@ -1,4 +1,4 @@
-// v4.0.2 — 2026-05-15 — Added: Destination Country filter pills
+// v4.0.3 — 2026-05-16 — Fix: people pills use name; country list dest-only; add Word export
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -36,7 +36,7 @@ export function openTravelExportSheet(persons, trips, documents) {
   if (!years.length) years.push(String(new Date().getFullYear()));
 
   const allCountries = [...new Set(
-    trips.map(t => t.destinationCountry || t.destination).filter(Boolean)
+    trips.map(t => t.destinationCountry).filter(Boolean)
   )].sort();
 
   const sheet = document.createElement('div');
@@ -73,7 +73,7 @@ export function openTravelExportSheet(persons, trips, documents) {
           'background:var(--primary-bg);color:var(--primary);font-size:13px;',
           'font-weight:600;cursor:pointer;">👥 All</button>',
         persons.map(m =>
-          '<button class="tex-pill" data-person="' + (m.id || m.name) + '" style="' +
+          '<button class="tex-pill" data-person="' + m.name + '" style="' +
           'padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);' +
           'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">' +
           (m.emoji || '👤') + ' ' + m.name + '</button>'
@@ -118,6 +118,9 @@ export function openTravelExportSheet(persons, trips, documents) {
           'padding:9px 16px;border-radius:20px;border:1.5px solid var(--primary);',
           'background:var(--primary-bg);color:var(--primary);font-size:13px;',
           'font-weight:600;cursor:pointer;">📄 PDF Report</button>',
+        '<button class="tex-fmt" data-fmt="word" style="',
+          'padding:9px 16px;border-radius:20px;border:1.5px solid var(--border);',
+          'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">📝 Word</button>',
         '<button class="tex-fmt" data-fmt="xlsx" style="',
           'padding:9px 16px;border-radius:20px;border:1.5px solid var(--border);',
           'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">📊 Excel</button>',
@@ -274,10 +277,13 @@ export function openTravelExportSheet(persons, trips, documents) {
       .filter(t => {
         // People filter — match by personId, personName, or passengerName
         if (!selPeople.has('all')) {
-          const matchById        = t.personId     && selPeople.has(t.personId);
-          const matchByName      = t.personName   && selPeople.has(t.personName.trim());
           const matchByPassenger = t.passengerName && selPeople.has(t.passengerName.trim());
-          if (!matchById && !matchByName && !matchByPassenger) return false;
+          const matchByName      = t.personName   && selPeople.has(t.personName.trim());
+          const companions = Array.isArray(t.travelWith)
+            ? t.travelWith
+            : String(t.travelWith || '').split(/[,;]+/).map(n => n.trim()).filter(Boolean);
+          const matchByCompanion = companions.some(c => selPeople.has(c));
+          if (!matchByPassenger && !matchByName && !matchByCompanion) return false;
         }
         // Country filter
         if (selCountry !== 'all') {
@@ -313,9 +319,10 @@ export function openTravelExportSheet(persons, trips, documents) {
     status.textContent = 'Preparing ' + filtered.length + ' trips…';
 
     try {
-      if (selFmt === 'pdf')      await exportPDF(filtered, persons, documents, deliver);
-      else if (selFmt === 'xlsx') await exportExcel(filtered, deliver);
-      else if (selFmt === 'csv')  await exportCSV(filtered, deliver);
+      if (selFmt === 'pdf')           await exportPDF(filtered, persons, documents, deliver);
+      else if (selFmt === 'word')     await exportWord(filtered, deliver);
+      else if (selFmt === 'xlsx')     await exportExcel(filtered, deliver);
+      else if (selFmt === 'csv')      await exportCSV(filtered, deliver);
       else if (selFmt === 'whatsapp') await exportWhatsApp(filtered, persons);
       status.textContent = '✅ Done!';
       setTimeout(() => { if (selFmt !== 'whatsapp') close(); }, 1200);
@@ -327,6 +334,78 @@ export function openTravelExportSheet(persons, trips, documents) {
 
   document.getElementById('tex-export').addEventListener('click', () => doExport('download'));
   document.getElementById('tex-share').addEventListener('click',  () => doExport('share'));
+}
+
+// ── Word Export (HTML table .doc, grouped by person) ─────────────────────────
+async function exportWord(trips, deliver) {
+  const byPerson = {};
+  trips.forEach(t => {
+    const name = t.personName || t.passengerName || 'Unknown';
+    if (!byPerson[name]) byPerson[name] = { person: t._person, trips: [] };
+    byPerson[name].trips.push(t);
+  });
+
+  let sections = '';
+  Object.entries(byPerson).forEach(([name, { person, trips: pTrips }]) => {
+    const sorted = [...pTrips].sort((a, b) =>
+      new Date(a.dateLeftOrigin || a.dateOutIndia || 0) - new Date(b.dateLeftOrigin || b.dateOutIndia || 0)
+    );
+    const rows = sorted.map((t, i) => {
+      const dep  = t.dateLeftOrigin || t.dateOutIndia || '';
+      const arr  = t.dateArrivedDest || t.dateInQatar || '';
+      const days = (t.daysInQatar != null && !isNaN(Number(t.daysInQatar))) ? Number(t.daysInQatar) : (arr ? daysBetween(arr, t.dateOutQatar || today()) : '');
+      const comp = Array.isArray(t.travelWith) ? t.travelWith.join(', ') : (t.travelWith || '');
+      return `<tr style="background:${i % 2 === 0 ? '#ffffff' : '#eef2ff'};">
+        <td style="text-align:center;color:#6B7280;">${i + 1}</td>
+        <td style="white-space:nowrap;">${dep}</td>
+        <td>${t.originCountry || 'India'}</td>
+        <td style="color:#1a56db;font-weight:600;">${t.destinationCountry || 'Qatar'}</td>
+        <td style="white-space:nowrap;">${arr}</td>
+        <td style="text-align:center;font-weight:700;color:#1a56db;">${days}</td>
+        <td>${t.flightNumber || t.flightInward || '--'}</td>
+        <td>${t.reason || ''}</td>
+        <td>${comp}</td>
+      </tr>`;
+    }).join('');
+    sections += `
+      <h2 style="color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:4px;margin-top:24px;">
+        ${person?.emoji || '👤'} ${name}
+      </h2>
+      <p style="color:#6B7280;font-size:10pt;margin:2px 0 10px;">${sorted.length} trips</p>
+      <table>
+        <thead><tr>
+          <th style="width:4%;">#</th><th style="width:10%;">Departed</th>
+          <th style="width:8%;">From</th><th style="width:8%;">To</th>
+          <th style="width:10%;">Arrived</th><th style="width:6%;">Days</th>
+          <th style="width:12%;">Flight</th><th style="width:26%;">Reason</th>
+          <th style="width:16%;">Companions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  });
+
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><style>
+  body{font-family:Calibri,Arial,sans-serif;margin:20px;font-size:11pt;}
+  h1{color:#1e3a5f;font-size:18pt;margin:0 0 4px;}
+  h2{font-size:14pt;margin:0;}
+  p{color:#6B7280;font-size:10pt;}
+  table{border-collapse:collapse;width:100%;font-size:9pt;margin-bottom:20px;}
+  th{background:#1e3a5f;color:#ffffff;padding:5px 7px;text-align:left;border:1px solid #1e3a5f;}
+  td{padding:4px 7px;border:1px solid #D1D5DB;vertical-align:top;}
+</style></head>
+<body>
+  <h1>✈️ Travel History Report</h1>
+  <p>${trips.length} trips · Generated ${new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}</p>
+  ${sections}
+</body></html>`;
+
+  const blob = new Blob([html], { type: 'application/msword' });
+  const fname = 'TravelHistory_' + new Date().toISOString().slice(0,10) + '.doc';
+  if (navigator.share && navigator.canShare?.({ files: [new File([blob], fname, { type: 'application/msword' })] })) {
+    try { await navigator.share({ files: [new File([blob], fname, { type: 'application/msword' })] }); return; } catch {}
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click(); URL.revokeObjectURL(a.href);
 }
 
 // ── PDF Export ────────────────────────────────────────────────────────────────

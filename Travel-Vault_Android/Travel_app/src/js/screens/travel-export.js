@@ -1,4 +1,4 @@
-// v3.5.45 — 2026-05-15 — Add destination country filter; multi-year select; days-stayed summary export
+// v3.5.46 — 2026-05-16 — Fix people filter (name not ID); country list dest-only; add Word export
 
 // ─── app-a-family-hub/js/screens/travel-export.js ───────────────────────────
 // Travel history export: per-person or multi-person, date range
@@ -43,8 +43,9 @@ export function openTravelExportSheet(persons, trips, documents) {
   )].sort((a, b) => b - a);
   if (!years.length) years.push(String(new Date().getFullYear()));
 
+  // Only destination countries (origin countries are not useful as a destination filter)
   const allCountries = [...new Set(
-    trips.flatMap(t => [t.destinationCountry, t.originCountry].filter(Boolean))
+    trips.map(t => t.destinationCountry).filter(Boolean)
   )].sort();
 
   const sheet = document.createElement('div');
@@ -81,7 +82,7 @@ export function openTravelExportSheet(persons, trips, documents) {
           'background:var(--primary-bg);color:var(--primary);font-size:13px;',
           'font-weight:600;cursor:pointer;">👥 All</button>',
         persons.map(m =>
-          '<button class="tex-pill" data-person="' + (m.id || m.name) + '" style="' +
+          '<button class="tex-pill" data-person="' + m.name + '" style="' +
           'padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);' +
           'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">' +
           (m.emoji || '👤') + ' ' + m.name + '</button>'
@@ -146,6 +147,9 @@ export function openTravelExportSheet(persons, trips, documents) {
           'padding:9px 16px;border-radius:20px;border:1.5px solid var(--primary);',
           'background:var(--primary-bg);color:var(--primary);font-size:13px;',
           'font-weight:600;cursor:pointer;">📄 PDF Report</button>',
+        '<button class="tex-fmt" data-fmt="word" style="',
+          'padding:9px 16px;border-radius:20px;border:1.5px solid var(--border);',
+          'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">📝 Word</button>',
         '<button class="tex-fmt" data-fmt="xlsx" style="',
           'padding:9px 16px;border-radius:20px;border:1.5px solid var(--border);',
           'background:transparent;color:var(--text);font-size:13px;cursor:pointer;">📊 Excel</button>',
@@ -289,12 +293,15 @@ export function openTravelExportSheet(persons, trips, documents) {
 
     return trips
       .filter(t => {
-        // People filter — match by personId or personName or passengerName
+        // People filter — pills now store name; match passengerName, companions, or legacy fields
         if (!selPeople.has('all')) {
-          const matchById      = t.personId     && selPeople.has(t.personId);
-          const matchByName    = t.personName   && selPeople.has(t.personName.trim());
           const matchByPassenger = t.passengerName && selPeople.has(t.passengerName.trim());
-          if (!matchById && !matchByName && !matchByPassenger) return false;
+          const matchByName      = t.personName   && selPeople.has(t.personName.trim());
+          const companions = Array.isArray(t.travelWith)
+            ? t.travelWith
+            : String(t.travelWith || '').split(/[,;]+/).map(n => n.trim()).filter(Boolean);
+          const matchByCompanion = companions.some(c => selPeople.has(c));
+          if (!matchByPassenger && !matchByName && !matchByCompanion) return false;
         }
         // Date range filter (check multiple date fields)
         const tripDate = t.dateLeftOrigin || t.dateOutIndia || t.dateArrivedDest || '';
@@ -324,9 +331,10 @@ export function openTravelExportSheet(persons, trips, documents) {
     status.textContent = 'Preparing ' + filtered.length + ' trips…';
 
     try {
-      if (selFmt === 'pdf')      await exportPDF(filtered, persons, documents, deliver);
-      else if (selFmt === 'xlsx') await exportExcel(filtered, deliver);
-      else if (selFmt === 'csv')  await exportCSV(filtered, deliver);
+      if (selFmt === 'pdf')           await exportPDF(filtered, persons, documents, deliver);
+      else if (selFmt === 'word')     await exportWord(filtered, deliver);
+      else if (selFmt === 'xlsx')     await exportExcel(filtered, deliver);
+      else if (selFmt === 'csv')      await exportCSV(filtered, deliver);
       else if (selFmt === 'whatsapp') await exportWhatsApp(filtered, persons);
       status.textContent = '✅ Done!';
       setTimeout(() => { if (selFmt !== 'whatsapp') close(); }, 1200);
@@ -338,6 +346,104 @@ export function openTravelExportSheet(persons, trips, documents) {
 
   document.getElementById('tex-export').addEventListener('click', () => doExport('download'));
   document.getElementById('tex-share').addEventListener('click',  () => doExport('share'));
+}
+
+// ── Word Export (two-column table, one row per trip, grouped by person) ──────
+async function exportWord(trips, deliver) {
+  // Group by passenger name
+  const byPerson = {};
+  trips.forEach(t => {
+    const name = getTripPersonName(t) || 'Unknown';
+    if (!byPerson[name]) byPerson[name] = { person: t._person, trips: [] };
+    byPerson[name].trips.push(t);
+  });
+
+  let sections = '';
+  Object.entries(byPerson).forEach(([name, { person, trips: pTrips }]) => {
+    const sorted = [...pTrips].sort((a, b) =>
+      new Date(a.dateLeftOrigin || a.dateOutIndia || 0) - new Date(b.dateLeftOrigin || b.dateOutIndia || 0)
+    );
+    const rows = sorted.map((t, i) => {
+      const dep = t.dateLeftOrigin || t.dateOutIndia || '';
+      const arr = t.dateArrivedDest || t.dateInQatar || '';
+      const days = getStayDays(t) || daysBetween(arr, t.dateOutQatar || today()) || '';
+      const companions = Array.isArray(t.travelWith)
+        ? t.travelWith.join(', ')
+        : (t.travelWith || '');
+      return `<tr style="background:${i % 2 === 0 ? '#ffffff' : '#eef2ff'};">
+        <td style="text-align:center;color:#6B7280;">${i + 1}</td>
+        <td style="white-space:nowrap;">${dep}</td>
+        <td>${t.originCountry || 'India'}</td>
+        <td style="color:#1a56db;font-weight:600;">${t.destinationCountry || 'Qatar'}</td>
+        <td style="white-space:nowrap;">${arr}</td>
+        <td style="text-align:center;font-weight:700;color:#1a56db;">${days}</td>
+        <td>${t.flightNumber || t.flightInward || '--'}</td>
+        <td>${t.reason || ''}</td>
+        <td>${companions}</td>
+      </tr>`;
+    }).join('');
+
+    sections += `
+      <h2 style="color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:4px;margin-top:24px;">
+        ${person?.emoji || '👤'} ${name}
+      </h2>
+      <p style="color:#6B7280;font-size:10pt;margin:2px 0 10px;">${sorted.length} trips</p>
+      <table>
+        <thead><tr>
+          <th style="width:4%;">#</th>
+          <th style="width:10%;">Departed</th>
+          <th style="width:8%;">From</th>
+          <th style="width:8%;">To</th>
+          <th style="width:10%;">Arrived</th>
+          <th style="width:6%;">Days</th>
+          <th style="width:12%;">Flight</th>
+          <th style="width:26%;">Reason</th>
+          <th style="width:16%;">Companions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  });
+
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><style>
+  body{font-family:Calibri,Arial,sans-serif;margin:20px;font-size:11pt;}
+  h1{color:#1e3a5f;font-size:18pt;margin:0 0 4px;}
+  h2{font-size:14pt;margin:0;}
+  p{color:#6B7280;font-size:10pt;}
+  table{border-collapse:collapse;width:100%;font-size:9pt;margin-bottom:20px;}
+  th{background:#1e3a5f;color:#ffffff;padding:5px 7px;text-align:left;border:1px solid #1e3a5f;}
+  td{padding:4px 7px;border:1px solid #D1D5DB;vertical-align:top;}
+</style></head>
+<body>
+  <h1>✈️ Travel History Report</h1>
+  <p>${trips.length} trips &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}</p>
+  ${sections}
+</body></html>`;
+
+  const fname = 'TravelHistory_' + timestampSuffix() + '.doc';
+  if (deliver === 'download') {
+    await saveFileToExports('travel', fname, html, 'utf8');
+    showToast('✅ Saved to exports folder', 'success', 3000);
+  } else {
+    // Share via Capacitor
+    const blob = new Blob([html], { type: 'application/msword' });
+    if (window.Capacitor?.Plugins?.Filesystem && window.Capacitor?.Plugins?.Share) {
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+      const reader = new FileReader();
+      const base64 = await new Promise((res, rej) => {
+        reader.onload = e => res(e.target.result.split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(blob);
+      });
+      await Filesystem.writeFile({ path: fname, data: base64, directory: 'CACHE' });
+      const { uri } = await Filesystem.getUri({ path: fname, directory: 'CACHE' });
+      await Share.share({ title: 'Travel History', files: [uri], dialogTitle: 'Share Travel Report' });
+      await Filesystem.deleteFile({ path: fname, directory: 'CACHE' }).catch(() => {});
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = fname; a.click();
+    }
+  }
 }
 
 // ── PDF Export ────────────────────────────────────────────────────────────────
